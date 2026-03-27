@@ -10766,7 +10766,10 @@ var QS_MOTIVATION = [
 var _qsInterval = null;
 
 function _getQsData() { try { return JSON.parse(localStorage.getItem('dagnara_quit_smoking') || '{}'); } catch(e) { return {}; } }
-function _saveQsData(d) { try { localStorage.setItem('dagnara_quit_smoking', JSON.stringify(d)); } catch(e) {} }
+function _saveQsData(d) {
+  try { localStorage.setItem('dagnara_quit_smoking', JSON.stringify(d)); } catch(e) {}
+  if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_quit_smoking');
+}
 function _qsElapsedHours(qd) { return Math.max(0, (Date.now() - new Date(qd).getTime()) / 3600000); }
 
 window.openQuitSmoking = function() {
