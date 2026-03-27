@@ -20036,7 +20036,15 @@ var _origShowPanel = window.showPanel;;
     btn.style.color=show?'#a78bfa':'rgba(196,181,255,0.5)';
   };
   window.toggleAuthPwd=window.obTogglePwd;
-  window.forgotPassword=function(){if(typeof showToast!=='undefined')toastInfo('📧 Password reset coming soon!');};
+  window.forgotPassword = function(){
+    var overlay = document.getElementById('pwResetOverlay');
+    if(!overlay) return;
+    var loginEmail = document.getElementById('loginEmail');
+    if(loginEmail && loginEmail.value) document.getElementById('pwrEmail').value = loginEmail.value;
+    pwrShowStep(1);
+    document.getElementById('pwrErr1').textContent = '';
+    overlay.style.display = 'flex';
+  };
 
   // ── Check on load ─────────────────────────────────
   var _cu = getCurrentUser();
