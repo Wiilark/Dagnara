@@ -17638,7 +17638,7 @@ function updateDiaryGoalBanner() {
     { id:'mood_logged', emoji:'😊', title:'Mindful', desc:'Log your mood', check:function(){ return ProfileStore.get('mood_last') !== null; } },
   ];
 
-  var _earned = (function(){ try{ var s=localStorage.getItem('dagnara_achievements'); return s?JSON.parse(s):[]; }catch(e){return[];} })();
+  var _earned = (function(){ try{ var s=localStorage.getItem(_userKey('dagnara_achievements')); return s?JSON.parse(s):[]; }catch(e){return[];} })();
 
   function checkAchievements(){
     ACHIEVEMENTS.forEach(function(a){
