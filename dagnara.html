@@ -21115,9 +21115,9 @@ var CloudSync = (function(){
     if(!_client){ _dot('offline'); return; }
     _dot('syncing');
     try{
-      // 1. Merge cloud profile into local users DB
+      // 1. Merge cloud profile into local — cloud wins only if it has real data
       var cloudProfile = await _pullProfile();
-      if(cloudProfile){
+      if(cloudProfile && cloudProfile.name && cloudProfile.name !== 'Kakha'){
         var users = JSON.parse(localStorage.getItem('dagnara_users')||'[]');
         var idx   = users.findIndex(function(u){ return u.email===email; });
         if(idx >= 0){
