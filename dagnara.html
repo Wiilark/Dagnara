@@ -9826,6 +9826,7 @@ function _getProgramsData() {
 }
 function _saveProgramsData(d) {
   try { localStorage.setItem('dagnara_programs', JSON.stringify(d)); } catch(e) {}
+  if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_programs');
 }
 
 function _programDaysSince(since) {
