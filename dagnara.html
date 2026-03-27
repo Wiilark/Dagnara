@@ -12803,7 +12803,7 @@ function saveMeasureInput(key){
       var entry = {date:dateKey, label:dateLabel, weight:valKg};
       if(idx>=0) history[idx]=entry; else history.push(entry);
       history.sort(function(a,b){ return a.date.localeCompare(b.date); });
-      if(history.length>60) history=history.slice(-60);
+      if(history.length>500) history=history.slice(-500);
       ProfileStore.set('weight_history', JSON.stringify(history));
     } catch(e){}
   }
@@ -14299,7 +14299,7 @@ function renderDpWeekChart() {
         var entry = { date:todayKey, label:dateLabel, weight:valKg };
         if(idx>=0) history[idx]=entry; else history.push(entry);
         history.sort(function(a,b){ return a.date.localeCompare(b.date); });
-        if(history.length>60) history=history.slice(-60);
+        if(history.length>500) history=history.slice(-500);
         ProfileStore.set('weight_history', JSON.stringify(history));
       } catch(e) {}
 
