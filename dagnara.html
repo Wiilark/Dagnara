@@ -8571,7 +8571,7 @@ function saveWeight() {
   var entry = { date: todayKey, label: dateLabel, weight: _wVal };
   if (idx >= 0) history[idx] = entry; else history.push(entry);
   history.sort(function(a,b){ return a.date.localeCompare(b.date); });
-  if (history.length > 60) history = history.slice(-60);
+  if (history.length > 500) history = history.slice(-500);
   saveWeightHistory(history);
   // Update ALL displays including profile
   updateAllWeightDisplays();
