@@ -19669,14 +19669,28 @@ var _origShowPanel = window.showPanel;;
     // Save into users DB — each user carries their full profile
     var users = getUsers();
     var existing = users.findIndex(function(u){ return u.email===_ob.email; });
+    if(existing>=0){ // Email taken locally — block
+      var errEl2=document.getElementById('ob1Err');
+      if(errEl2) errEl2.textContent='Email already registered. Log in instead.';
+      obGo(1); return;
+    }
     var hashedPwd = await hashPassword(_ob.pwd);
     var userRecord = { email:_ob.email, password:hashedPwd, profile:profile,
       device: navigator.userAgent.indexOf('iPhone')>-1?'iPhone':navigator.userAgent.indexOf('Android')>-1?'Android':'Browser',
       addedAt: new Date().toISOString()
     };
-    if(existing>=0) users[existing] = userRecord;
-    else users.push(userRecord);
+    users.push(userRecord);
     saveUsers(users);
+    // Push account to Supabase so any device can log in
+    if(SUPABASE_URL && SUPABASE_KEY){
+      try{
+        var sb2=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+        await sb2.from('dagnara_profiles').upsert({
+          email:_ob.email, password_hash:hashedPwd,
+          profile_data:profile, updated_at:new Date().toISOString()
+        },{onConflict:'email'});
+      }catch(e){ console.warn('[Auth] register push:', e); }
+    }
 
     // Set current session
     setCurrentUser(_ob.email);
