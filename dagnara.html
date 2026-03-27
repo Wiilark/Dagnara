@@ -3097,6 +3097,32 @@ textarea:focus-visible,
     
 
 
+    <!-- DAILY MISSION CARD -->
+    <div id="dailyMissionCard">
+      <div class="dm-header">Today's Goal</div>
+      <!-- Mission 1: Log meals -->
+      <div class="dm-row">
+        <div class="dm-check" id="dmMealsCheck"></div>
+        <span class="dm-emoji">🍽️</span>
+        <span class="dm-label">Log all meals</span>
+        <span class="dm-progress" id="dmMealsProgress">0 / 3</span>
+      </div>
+      <!-- Mission 2: Drink water -->
+      <div class="dm-row">
+        <div class="dm-check" id="dmWaterCheck"></div>
+        <span class="dm-emoji">💧</span>
+        <span class="dm-label" id="dmWaterLabel">Drink 8 glasses</span>
+        <span class="dm-progress" id="dmWaterProgress">0 / 8</span>
+      </div>
+      <!-- Mission 3: Walk steps -->
+      <div class="dm-row">
+        <div class="dm-check" id="dmStepsCheck"></div>
+        <span class="dm-emoji">🚶</span>
+        <span class="dm-label">Walk 7,000 steps</span>
+        <span class="dm-progress" id="dmStepsProgress">0 / 7k</span>
+      </div>
+    </div>
+
     <!-- TODAY'S GOAL CARD -->
     <div id="todayGoalCard" onclick="navigateTo('diary')" style="margin:14px 14px 0;background:var(--layer1);border:1px solid var(--line2);border-radius:20px;padding:18px 18px 16px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent;">
       <div id="tgcGlow" style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;opacity:0.10;pointer-events:none;background:#7c4dff;transition:background 0.6s;"></div>
