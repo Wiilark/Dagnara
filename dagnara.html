@@ -25941,7 +25941,7 @@ window.shareWeeklyCard = function() {
 
   // Stats
   var streak = 0;
-  try { streak = JSON.parse(localStorage.getItem('dagnara_streaks') || '{}').current || 0; } catch(e) {}
+  try { streak = JSON.parse(localStorage.getItem(_userKey('dagnara_streaks')) || '{}').current || 0; } catch(e) {}
   var weekKcal = 0, weekDays = 0;
   try {
     for (var di = 0; di < 7; di++) {
