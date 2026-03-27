@@ -17511,45 +17511,266 @@ function updateDiaryGoalBanner() {
 
 <script>
 // ═══════════════════════════════════════════════════════
-// IMPROVEMENT #4 — PUSH NOTIFICATION SCHEDULING
+// PUSH NOTIFICATION SCHEDULING
 // ═══════════════════════════════════════════════════════
 (function(){
-  function scheduleNotifications(){
-    if(!('Notification' in window)) return;
-    Notification.requestPermission().then(function(perm){
-      if(perm !== 'granted') return;
-      // Schedule daily diary reminder using ServiceWorker-free approach
-      // Store check-in time preference
-      var checkInTime = ProfileStore.get('checkin_time') || '20:00';
-      ProfileStore.set('notif_enabled','1');
-      if(typeof showToast==='function') showToast('🔔 Daily reminders enabled for ' + checkInTime);
-    });
+
+  var _dagSwReg = null;
+
+  // ── Service Worker ─────────────────────────────────
+  var _swCode = [
+    "var _dagJobs = [];",
+    "self.addEventListener('notificationclick', function(e){",
+    "  e.notification.close();",
+    "  e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(cs){",
+    "    if(cs.length) return cs[0].focus();",
+    "    return clients.openWindow(self.location.origin);",
+    "  }));",
+    "});",
+    "self.addEventListener('message', function(e){",
+    "  if(!e.data) return;",
+    "  if(e.data.type==='DAG_SCHEDULE'){",
+    "    _dagJobs = e.data.jobs || [];",
+    "    _dagJobs.forEach(function(job){",
+    "      var delay = job.at - Date.now();",
+    "      if(delay>0 && delay<86400000){",
+    "        setTimeout(function(){",
+    "          self.registration.showNotification(job.title,{",
+    "            body:job.body, icon:job.icon||'', tag:job.tag,",
+    "            renotify:true, vibrate:[200,100,200]",
+    "          });",
+    "        }, delay);",
+    "      }",
+    "    });",
+    "  }",
+    "  if(e.data.type==='PILL_SCHEDULE'){",
+    "    var meds=e.data.meds||[];",
+    "    meds.forEach(function(job){",
+    "      var delay=job.at-Date.now();",
+    "      if(delay>0&&delay<86400000){",
+    "        setTimeout(function(){",
+    "          self.registration.showNotification('💊 '+job.name,{",
+    "            body:job.body, icon:job.icon||'', tag:job.tag,",
+    "            renotify:true, vibrate:[200,100,200]",
+    "          });",
+    "        },delay);",
+    "      }",
+    "    });",
+    "  }",
+    "});"
+  ].join('\n');
+
+  function _registerSW(cb){
+    if(!('serviceWorker' in navigator)) return;
+    var blob = new Blob([_swCode], {type:'application/javascript'});
+    var url  = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url).then(function(reg){
+      _dagSwReg = reg;
+      // Also update pill SW reference so pill reminders use this unified SW
+      window._pillSwRegistration = reg;
+      if(cb) cb(reg);
+    }).catch(function(){});
   }
 
-  // Check if we should show a reminder (called on load)
+  function _sendJobsToSW(jobs){
+    if(!_dagSwReg) { _registerSW(function(reg){ _sendJobsToSW(jobs); }); return; }
+    var target = _dagSwReg.active || _dagSwReg.installing || _dagSwReg.waiting;
+    if(target) target.postMessage({type:'DAG_SCHEDULE', jobs:jobs});
+  }
+
+  // ── Build today's notification schedule ───────────
+  function _buildJobs(){
+    var jobs = [];
+    var now = new Date();
+    var todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+
+    // Daily check-in
+    if(localStorage.getItem('dagnara_notif_daily') === '1'){
+      var timeStr = localStorage.getItem('dagnara_notif_time') || '20:00';
+      var parts = timeStr.split(':');
+      var fireAt = new Date();
+      fireAt.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
+      var lastNotif = localStorage.getItem('dagnara_last_daily_notif');
+      if(fireAt.getTime() > Date.now() && lastNotif !== todayKey){
+        var diaryStored = null;
+        try { diaryStored = localStorage.getItem('dagnara_diary_'+todayKey); } catch(e){}
+        var hasLogged = diaryStored && JSON.parse(diaryStored).eaten > 0;
+        if(!hasLogged){
+          jobs.push({
+            title: 'Dagnara — Log your day 🌙',
+            body:  "You haven't tracked yet today. 60 seconds keeps your streak alive!",
+            tag:   'dag-daily',
+            at:    fireAt.getTime()
+          });
+        }
+      }
+    }
+
+    // Streak protection — 1h before midnight if not yet logged
+    if(localStorage.getItem('dagnara_notif_streak') === '1'){
+      var streakAt = new Date();
+      streakAt.setHours(23, 0, 0, 0);
+      var lastStreak = localStorage.getItem('dagnara_last_streak_notif');
+      if(streakAt.getTime() > Date.now() && lastStreak !== todayKey){
+        var ds2 = null;
+        try { ds2 = localStorage.getItem('dagnara_diary_'+todayKey); } catch(e){}
+        var logged2 = ds2 && JSON.parse(ds2).eaten > 0;
+        if(!logged2){
+          jobs.push({
+            title: 'Dagnara — Streak at risk 🔥',
+            body:  "1 hour left to log today and keep your streak going!",
+            tag:   'dag-streak',
+            at:    streakAt.getTime()
+          });
+        }
+      }
+    }
+
+    // Meal reminders — breakfast 8am, lunch 12:30pm, dinner 7pm
+    if(localStorage.getItem('dagnara_notif_meals') === '1'){
+      [[8,0,'🍳 Time for breakfast!','Start your day right — log your morning meal.'],[12,30,'🥗 Lunchtime!','Don\'t forget to log your lunch.'],[19,0,'🍽️ Dinner time!','Log your evening meal to stay on track.']].forEach(function(m){
+        var mAt = new Date(); mAt.setHours(m[0],m[1],0,0);
+        if(mAt.getTime() > Date.now()) jobs.push({title:m[2],body:m[3],tag:'dag-meal-'+m[0],at:mAt.getTime()});
+      });
+    }
+
+    return jobs;
+  }
+
+  // ── Schedule all today's notifications ────────────
+  function scheduleDailyNotif(){
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    var jobs = _buildJobs();
+    if(jobs.length) _sendJobsToSW(jobs);
+  }
+
+  // ── Called on app open (after 3s) ─────────────────
   function checkDailyReminder(){
     if(!('Notification' in window) || Notification.permission !== 'granted') return;
-    var today = new Date();
-    var key = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-    var stored = localStorage.getItem(diaryKey(key));
-    var hasLogged = stored && JSON.parse(stored).eaten > 0;
-    var hour = today.getHours();
-    // If it's after 7pm and nothing logged, show notification
-    if(hour >= 19 && !hasLogged){
-      var lastNotif = localStorage.getItem('dagnara_last_notif');
-      if(lastNotif !== key){
-        try {
-          new Notification('Dagnara 🌙', {
-            body: "You haven't logged today yet. Take 60 seconds to track your meals!",
-            icon: '/favicon.ico'
-          });
-          localStorage.setItem('dagnara_last_notif', key);
-        } catch(e){}
+    scheduleDailyNotif();
+    // Also fire immediate notification if past reminder time and not logged
+    if(localStorage.getItem('dagnara_notif_daily') !== '1') return;
+    var now = new Date();
+    var todayKey = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    var timeStr = localStorage.getItem('dagnara_notif_time') || '20:00';
+    var parts = timeStr.split(':');
+    var hour = parseInt(parts[0]);
+    if(now.getHours() >= hour){
+      var lastNotif = localStorage.getItem('dagnara_last_daily_notif');
+      if(lastNotif === todayKey) return;
+      var diaryStored = null;
+      try { diaryStored = localStorage.getItem('dagnara_diary_'+todayKey); } catch(e){}
+      var hasLogged = diaryStored && JSON.parse(diaryStored).eaten > 0;
+      if(!hasLogged){
+        localStorage.setItem('dagnara_last_daily_notif', todayKey);
+        try { new Notification('Dagnara — Log your day 🌙',{body:"You haven't tracked today yet. Keep your streak alive!",tag:'dag-daily-now'}); } catch(e){}
       }
     }
   }
 
-  window.enableNotifications = scheduleNotifications;
+  // ── Settings toggles ──────────────────────────────
+  function _requestAndEnable(key, toggleEl, label, onGranted){
+    if(!('Notification' in window)){
+      if(typeof showToast==='function') showToast('Your browser does not support notifications.');
+      toggleEl.classList.add('off'); toggleEl.classList.remove('on'); return;
+    }
+    if(Notification.permission === 'granted'){
+      onGranted();
+    } else if(Notification.permission === 'denied'){
+      if(typeof showToast==='function') showToast('Notifications blocked — enable in browser settings.');
+      toggleEl.classList.add('off'); toggleEl.classList.remove('on');
+    } else {
+      Notification.requestPermission().then(function(perm){
+        if(perm === 'granted'){ onGranted(); }
+        else {
+          if(typeof showToast==='function') showToast('Permission denied — notifications won\'t fire.');
+          toggleEl.classList.add('off'); toggleEl.classList.remove('on');
+          localStorage.setItem(key,'0');
+        }
+      });
+    }
+  }
+
+  window.toggleDailyNotif = function(el){
+    var isOn = el.classList.contains('on');
+    if(!isOn){
+      _requestAndEnable('dagnara_notif_daily', el, 'Daily check-in', function(){
+        el.classList.remove('off'); el.classList.add('on');
+        localStorage.setItem('dagnara_notif_daily','1');
+        var timeRow = document.getElementById('notifTimeRow');
+        if(timeRow) timeRow.style.display = 'flex';
+        scheduleDailyNotif();
+        if(typeof showToast==='function'){
+          var t = localStorage.getItem('dagnara_notif_time')||'20:00';
+          showToast('🔔 Daily reminder set for '+t);
+        }
+      });
+    } else {
+      el.classList.remove('on'); el.classList.add('off');
+      localStorage.setItem('dagnara_notif_daily','0');
+      var timeRow = document.getElementById('notifTimeRow');
+      if(timeRow) timeRow.style.display = 'none';
+    }
+  };
+
+  window.toggleMealNotif = function(el){
+    var isOn = el.classList.contains('on');
+    if(!isOn){
+      _requestAndEnable('dagnara_notif_meals', el, 'Meal reminders', function(){
+        el.classList.remove('off'); el.classList.add('on');
+        localStorage.setItem('dagnara_notif_meals','1');
+        scheduleDailyNotif();
+        if(typeof showToast==='function') showToast('🍽️ Meal reminders enabled');
+      });
+    } else {
+      el.classList.remove('on'); el.classList.add('off');
+      localStorage.setItem('dagnara_notif_meals','0');
+    }
+  };
+
+  window.toggleStreakNotif = function(el){
+    var isOn = el.classList.contains('on');
+    if(!isOn){
+      _requestAndEnable('dagnara_notif_streak', el, 'Streak protection', function(){
+        el.classList.remove('off'); el.classList.add('on');
+        localStorage.setItem('dagnara_notif_streak','1');
+        scheduleDailyNotif();
+        if(typeof showToast==='function') showToast('🔥 Streak protection enabled');
+      });
+    } else {
+      el.classList.remove('on'); el.classList.add('off');
+      localStorage.setItem('dagnara_notif_streak','0');
+    }
+  };
+
+  window.saveNotifTime = function(val){
+    localStorage.setItem('dagnara_notif_time', val);
+    scheduleDailyNotif();
+    if(typeof showToast==='function') showToast('🔔 Reminder time set to '+val);
+  };
+
+  // ── Restore toggle state on settings open ─────────
+  window._restoreNotifSettings = function(){
+    var daily  = localStorage.getItem('dagnara_notif_daily')  === '1';
+    var meals  = localStorage.getItem('dagnara_notif_meals')  === '1';
+    var streak = localStorage.getItem('dagnara_notif_streak') === '1';
+    var t      = localStorage.getItem('dagnara_notif_time')   || '20:00';
+    function setT(id, on){ var el=document.getElementById(id); if(!el)return; el.classList.toggle('on',on); el.classList.toggle('off',!on); }
+    setT('notifDailyToggle',  daily);
+    setT('notifMealToggle',   meals);
+    setT('notifStreakToggle', streak);
+    var ti = document.getElementById('notifTimeInput'); if(ti) ti.value = t;
+    var tr = document.getElementById('notifTimeRow'); if(tr) tr.style.display = daily ? 'flex' : 'none';
+    // If already granted, re-schedule
+    if(daily || meals || streak) scheduleDailyNotif();
+  };
+
+  window.scheduleDailyNotif  = scheduleDailyNotif;
+  window.checkDailyReminder  = checkDailyReminder;
+  window.enableNotifications = scheduleDailyNotif;
+
+  // Restore state on load
+  setTimeout(window._restoreNotifSettings, 1000);
 })();
 
 
