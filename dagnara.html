@@ -20672,6 +20672,9 @@ var CloudSync = (function(){
         }
       });
 
+      // 3. Pull pills, programs, quit trackers, achievements
+      await _pullAllSync();
+
       _dot('synced');
     }catch(e){ _dot('error'); console.warn('[CloudSync] syncOnLogin:', e); }
   }
