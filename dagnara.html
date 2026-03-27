@@ -20863,9 +20863,17 @@ var CloudSync = (function(){
         }
       }
 
-      // Push all sync keys
-      for(var si=0; si<SYNC_KEYS.length; si++){
-        await _pushSync(SYNC_KEYS[si]);
+      // Push all sync keys (profile-agnostic + user-scoped)
+      var allKeys = _getSyncKeys();
+      for(var si=0; si<allKeys.length; si++){
+        await _pushSync(allKeys[si]);
+      }
+      // Push all pill log entries
+      for(var pi=0; pi<localStorage.length; pi++){
+        var pk = localStorage.key(pi);
+        if(pk && pk.indexOf('dagnara_pill_log_')===0){
+          await _pushSync(pk);
+        }
       }
 
       _dot('synced');
