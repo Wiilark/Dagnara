@@ -9084,8 +9084,9 @@ window.addEventListener('load', function() {
   setTimeout(function() { updateAllTabBars('diary'); }, 50);
   if(typeof initWaterRow==='function') setTimeout(initWaterRow, 200);
   if(typeof restoreUserProfile==='function') restoreUserProfile();
-  // Populate home insight card on load
+  // Populate home insight card and home cards on load
   if(typeof window.runInsightEngine==='function') setTimeout(window.runInsightEngine, 600);
+  if(typeof window.updateHomeCards==='function') setTimeout(window.updateHomeCards, 800);
 
 
   // --- Merged from secondary load listeners ---
