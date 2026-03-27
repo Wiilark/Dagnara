@@ -3184,6 +3184,23 @@ textarea:focus-visible,
       </div>
     </div>
 
+    <!-- QUICK LOG STRIP -->
+    <div id="quickLogStrip">
+      <div class="ql-label">Quick Log</div>
+      <div class="ql-scroll">
+        <div class="ql-chip ql-chip-action" onclick="homeQuickAdd()">
+          <span style="font-size:15px;">⚡</span>
+          <span class="ql-chip-name">Quick kcal</span>
+        </div>
+        <div class="ql-chip ql-chip-repeat" id="qlYesterdayChip" style="display:none;" onclick="quickRepeatYesterday()">
+          <span style="font-size:15px;">🔁</span>
+          <span class="ql-chip-name">Yesterday</span>
+          <span class="ql-chip-kcal" id="qlYesterdayKcal"></span>
+        </div>
+        <div id="qlRecentItems" style="display:contents;"></div>
+      </div>
+    </div>
+
     <!-- TODAY'S GOAL CARD -->
     <div id="todayGoalCard" onclick="navigateTo('diary')" style="margin:14px 14px 0;background:var(--layer1);border:1px solid var(--line2);border-radius:20px;padding:18px 18px 16px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent;">
       <div id="tgcGlow" style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;opacity:0.10;pointer-events:none;background:#7c4dff;transition:background 0.6s;"></div>
