@@ -4603,6 +4603,20 @@ textarea:focus-visible,
 
       </div>
 
+      <div class="profile-section-label">Cloud Sync</div>
+      <div class="profile-menu-card">
+        <div class="profile-menu-row" onclick="profileForcePushAll()" style="cursor:pointer;">
+          <div class="profile-menu-icon" style="background:rgba(99,102,241,0.12);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          </div>
+          <div class="profile-menu-text">
+            <div class="profile-menu-title">Upload all data to cloud</div>
+            <div class="profile-menu-sub" id="forceSyncSub">Sync this device's data to all your devices</div>
+          </div>
+          <div id="cloudSyncDot" title="Offline" style="width:9px;height:9px;border-radius:50%;background:rgba(196,181,255,0.2);transition:background 0.4s,box-shadow 0.4s;flex-shrink:0;"></div>
+        </div>
+      </div>
+
       <div class="profile-section-label">Health Sync</div>
       <div class="profile-menu-card">
 
