@@ -6086,6 +6086,14 @@ const VEG_EMOJI   = ['🥦','🥕','🥒','🌽','🥬','🥑','🍅'];
 const FRUIT_EMOJI = ['🍎','🍊','🍇','🍓','🍌','🍑','🫐'];
 
 // ── Per-user diary key helpers ──────────────────────────────
+// Returns a user-scoped localStorage key — safe to call at any time.
+function _userKey(base) {
+  try {
+    var uid = (typeof ProfileStore !== 'undefined') ? ProfileStore.getUID() : '';
+    return uid ? base + '_' + uid : base;
+  } catch(e) { return base; }
+}
+
 // Uses the same UID as ProfileStore so each user's diary is isolated.
 // Lazy: ProfileStore may not yet be defined at script parse time,
 // but by the time any diary entry is read/written the user is logged in.
