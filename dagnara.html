@@ -5923,6 +5923,8 @@ function navigateTo(id) {
       if (id === 'recipes')  initRecipes();
       if (id === 'programs') initPrograms();
       if (id === 'profile')  { if(typeof _restoreNotifSettings==='function') _restoreNotifSettings(); }
+      if (id === 'diary')    { if(typeof window.updateHomeCards==='function') setTimeout(window.updateHomeCards, 100); }
+      if (id === 'progress') { if(typeof window.updateHomeCards==='function') setTimeout(window.updateHomeCards, 100); }
     }, 320);
 
   } else if (isMain) {
