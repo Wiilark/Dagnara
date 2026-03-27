@@ -11020,6 +11020,7 @@ function _getQdData() {
 }
 function _saveQdData(d) {
   try { localStorage.setItem('dagnara_quit_drinking', JSON.stringify(d)); } catch(e) {}
+  if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_quit_drinking');
 }
 function _qdElapsedHours(quitDateStr) {
   var ms = Date.now() - new Date(quitDateStr).getTime();
