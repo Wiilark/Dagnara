@@ -1029,6 +1029,26 @@ input, textarea { user-select:text; }
 .hsb-dot.today-empty { background:rgba(245,158,11,0.18); border:1px dashed rgba(245,158,11,0.4); height:3px; margin:1px 0; }
 .hsb-dot.today-done { background:linear-gradient(90deg,#22c55e,#4ade80); }
 
+/* ── Quick Log Strip ── */
+#quickLogStrip { margin:10px 14px 0; }
+.ql-label { font-family:'DM Sans',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(196,181,255,0.45); margin-bottom:8px; }
+.ql-scroll { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; -webkit-overflow-scrolling:touch; }
+.ql-scroll::-webkit-scrollbar { display:none; }
+.ql-chip {
+  display:flex; align-items:center; gap:6px; flex-shrink:0;
+  padding:8px 13px; background:var(--layer1); border:1px solid var(--line2);
+  border-radius:40px; cursor:pointer;
+  transition:background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.ql-chip:active { background:var(--layer2); border-color:rgba(124,77,255,0.35); transform:scale(0.96); }
+.ql-chip-name { font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; color:var(--ink); white-space:nowrap; max-width:100px; overflow:hidden; text-overflow:ellipsis; }
+.ql-chip-kcal { font-family:'Geist Mono',monospace; font-size:10px; color:var(--ink3); white-space:nowrap; }
+.ql-chip-action { background:rgba(124,77,255,0.07); border-color:rgba(124,77,255,0.2); }
+.ql-chip-action .ql-chip-name { color:var(--lavender); }
+.ql-chip-repeat { background:rgba(34,197,94,0.06); border-color:rgba(34,197,94,0.2); }
+.ql-chip-repeat .ql-chip-name { color:#4ade80; }
+
 /* ── Daily Mission Card ── */
 #dailyMissionCard {
   margin:14px 14px 0;
