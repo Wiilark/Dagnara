@@ -20607,6 +20607,200 @@ function updateLiveWidgets() {
   } catch(e){}
 }
 
+// ═══════════════════════════════════════════════════════
+// HOME SCREEN CARDS — Today's Goal · Weight Journey · Reward
+// ═══════════════════════════════════════════════════════
+(function(){
+
+  // ── Today's Goal Card ──────────────────────────────
+  function updateTodayGoalCard(){
+    var today = new Date();
+    var key = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    var entry = {};
+    try { var raw = localStorage.getItem('dagnara_diary_'+key) || localStorage.getItem('diaryStore_'+key); if(raw) entry = JSON.parse(raw); } catch(e){}
+
+    var eaten  = entry.eaten  || 0;
+    var goal   = 0;
+    try { goal = parseInt(ProfileStore.get('kcal_goal')) || 0; } catch(e){}
+    if(!goal){ try{ goal = parseInt(localStorage.getItem('kcal_goal')) || 1800; }catch(e){ goal=1800; } }
+
+    var water  = entry.water  || 0;
+    var pct    = goal > 0 ? Math.min(100, Math.round(eaten / goal * 100)) : 0;
+    var left   = Math.max(0, goal - eaten);
+    var over   = eaten > goal;
+    var done   = pct >= 90 && pct <= 120;
+
+    // Update elements
+    var status = document.getElementById('tgcStatus');
+    var icon   = document.getElementById('tgcIcon');
+    var bar    = document.getElementById('tgcCalBar');
+    var num    = document.getElementById('tgcKcalNum');
+    var lbl    = document.getElementById('tgcKcalLabel');
+    var wtr    = document.getElementById('tgcWater');
+    var kleft  = document.getElementById('tgcKcalLeft');
+    var glow   = document.getElementById('tgcGlow');
+
+    if(num)  num.textContent  = eaten ? eaten.toLocaleString() : '--';
+    if(wtr)  wtr.textContent  = water + ' / 8 glasses';
+    if(bar){
+      bar.style.width = pct + '%';
+      bar.style.background = done ? 'linear-gradient(90deg,#22c55e,#4ade80)' :
+                             over ? 'linear-gradient(90deg,#f59e0b,#ef4444)' :
+                                    'linear-gradient(90deg,#7c4dff,#a855f7)';
+    }
+    if(glow) glow.style.background = done ? '#22c55e' : over ? '#f59e0b' : '#7c4dff';
+
+    if(done){
+      if(icon)   icon.textContent   = '✅';
+      if(status) status.textContent = 'Goal hit! Great work.';
+      if(lbl)    lbl.textContent    = 'kcal today';
+      if(kleft)  kleft.textContent  = 'On target 🎯';
+    } else if(over){
+      if(icon)   icon.textContent   = '⚠️';
+      if(status) status.textContent = (eaten - goal) + ' kcal over goal';
+      if(lbl)    lbl.textContent    = 'kcal eaten';
+      if(kleft)  kleft.textContent  = 'Over by ' + (eaten - goal);
+    } else if(eaten === 0){
+      if(icon)   icon.textContent   = '🎯';
+      if(status) status.textContent = goal ? 'Target: ' + goal.toLocaleString() + ' kcal' : 'Log your meals';
+      if(lbl)    lbl.textContent    = 'kcal eaten';
+      if(kleft)  kleft.textContent  = goal ? goal.toLocaleString() + ' kcal goal' : 'Set goal in Profile';
+    } else {
+      if(icon)   icon.textContent   = '🎯';
+      if(status) status.textContent = left + ' kcal remaining';
+      if(lbl)    lbl.textContent    = 'kcal eaten';
+      if(kleft)  kleft.textContent  = left + ' kcal left';
+    }
+
+    // Fire reward if goal newly hit today
+    var rewardKey = 'dagnara_goal_reward_'+key;
+    if(done && !localStorage.getItem(rewardKey) && eaten > 0){
+      localStorage.setItem(rewardKey, '1');
+      setTimeout(fireConfetti, 400);
+      if(typeof showToast==='function') setTimeout(function(){ showToast('🎉 Daily goal hit! You\'re on track.'); }, 600);
+    }
+  }
+
+  // ── Weight Journey Card ────────────────────────────
+  function updateWeightJourneyCard(){
+    var card = document.getElementById('weightJourneyCard');
+    if(!card) return;
+
+    var startW = 0, goalW = 0, curW = 0, goalType = '';
+    try {
+      startW   = parseFloat(ProfileStore.get('cur_weight')  || '0');
+      goalW    = parseFloat(ProfileStore.get('goal_weight') || '0');
+      curW     = parseFloat(ProfileStore.get('weight')      || ProfileStore.get('cur_weight') || '0');
+      goalType = ProfileStore.get('goal_type') || '';
+    } catch(e){}
+
+    if(!goalW || !startW || !goalType || goalType === 'maintain'){ card.style.display='none'; return; }
+    card.style.display = 'block';
+
+    var totalDelta = Math.abs(startW - goalW);
+    var doneDelta  = goalType === 'lose' ? Math.max(0, startW - curW) : Math.max(0, curW - startW);
+    var pct = totalDelta > 0 ? Math.min(100, Math.round(doneDelta / totalDelta * 100)) : 0;
+    var toGo = Math.max(0, Math.abs(curW - goalW));
+    var reached = pct >= 100;
+
+    // Weekly trend from weight history
+    var trend = '';
+    try {
+      var hist = JSON.parse(ProfileStore.get('weight_history') || '[]');
+      if(hist.length >= 2){
+        var latest = hist[hist.length-1].weight;
+        var weekAgo = hist[Math.max(0, hist.length-8)].weight;
+        var diff = +(latest - weekAgo).toFixed(1);
+        if(Math.abs(diff) >= 0.1){
+          var positive = (goalType==='lose' && diff<0) || (goalType==='gain' && diff>0);
+          trend = (diff > 0 ? '↑ +' : '↓ ') + Math.abs(diff) + ' kg / wk';
+          var trendEl = document.getElementById('wjcTrend');
+          if(trendEl){
+            trendEl.textContent = trend;
+            trendEl.style.display = 'flex';
+            trendEl.style.background = positive ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)';
+            trendEl.style.color = positive ? '#22c55e' : '#ef4444';
+          }
+        }
+      }
+    } catch(e){}
+
+    var headline = document.getElementById('wjcHeadline');
+    var sub      = document.getElementById('wjcSub');
+    var bar      = document.getElementById('wjcBar');
+    var startLbl = document.getElementById('wjcStart');
+    var goalLbl  = document.getElementById('wjcGoal');
+    var pctLbl   = document.getElementById('wjcPct');
+
+    if(reached){
+      if(headline) headline.textContent = '🏆 Goal reached!';
+      if(sub)      sub.textContent = 'You hit ' + goalW + ' kg — incredible.';
+    } else {
+      var lostStr = doneDelta.toFixed(1);
+      var toGoStr = toGo.toFixed(1);
+      if(headline) headline.textContent = goalType==='lose'
+        ? (doneDelta > 0 ? lostStr + ' kg lost so far' : 'Starting weight: ' + startW + ' kg')
+        : (doneDelta > 0 ? lostStr + ' kg gained so far' : 'Starting weight: ' + startW + ' kg');
+      if(sub) sub.textContent = toGoStr + ' kg to go · ' + pct + '% complete';
+    }
+    if(bar)      bar.style.width = pct + '%';
+    if(startLbl) startLbl.textContent = startW + ' kg';
+    if(goalLbl)  goalLbl.textContent  = goalW  + ' kg';
+    if(pctLbl)   pctLbl.textContent   = pct + '%';
+  }
+
+  // ── Confetti ───────────────────────────────────────
+  function fireConfetti(){
+    var canvas = document.getElementById('homeConfetti');
+    if(!canvas) return;
+    var W = window.innerWidth, H = window.innerHeight;
+    canvas.width = W; canvas.height = H;
+    canvas.style.display = 'block';
+    var ctx = canvas.getContext('2d');
+    var pieces = [];
+    var colors = ['#7c4dff','#a855f7','#22c55e','#f59e0b','#38bdf8','#f0ecff','#fbbf24'];
+    for(var i=0; i<120; i++){
+      pieces.push({
+        x: Math.random()*W, y: Math.random()*-H*0.5,
+        w: 6+Math.random()*7, h: 3+Math.random()*4,
+        r: Math.random()*Math.PI*2,
+        vx: (Math.random()-0.5)*4, vy: 2+Math.random()*5,
+        vr: (Math.random()-0.5)*0.2,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        alpha: 1
+      });
+    }
+    var start = Date.now();
+    function frame(){
+      ctx.clearRect(0,0,W,H);
+      var t = (Date.now()-start)/1000;
+      pieces.forEach(function(p){
+        p.x += p.vx; p.y += p.vy; p.r += p.vr; p.alpha = Math.max(0, 1 - t/3);
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      });
+      if(t < 3) requestAnimationFrame(frame);
+      else { canvas.style.display='none'; ctx.clearRect(0,0,W,H); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── Public API ─────────────────────────────────────
+  window.updateHomeCards = function(){
+    updateTodayGoalCard();
+    updateWeightJourneyCard();
+  };
+  window.fireConfetti = fireConfetti;
+
+  // Init after profile loads
+  setTimeout(window.updateHomeCards, 1200);
+})();
+
 // Run on every saveCurrentDay so widgets stay live
 var _origSaveCurrentDay = window.saveCurrentDay || function(){};
 // Hook: also update widgets after any diary save
