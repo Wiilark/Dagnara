@@ -5863,6 +5863,7 @@ function navigateTo(id) {
       if (id === 'progress') { drawWeightChart(); drawNSChart(); updateNSStats(); drawSleepHistoryChart(); drawMacroHistoryCharts(); }
       if (id === 'recipes')  initRecipes();
       if (id === 'programs') initPrograms();
+      if (id === 'profile')  { if(typeof _restoreNotifSettings==='function') _restoreNotifSettings(); }
     }, 320);
 
   } else if (isMain) {
