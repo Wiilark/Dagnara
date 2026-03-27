@@ -21115,21 +21115,30 @@ var CloudSync = (function(){
     if(!_client){ _dot('offline'); return; }
     _dot('syncing');
     try{
-      // 1. Merge cloud profile into local — cloud wins only if it has real data
+      // 1. Merge cloud profile into local
+      // Strategy: cloud wins if it has a newer _pushed_at timestamp than local.
+      // On a fresh device (no local profile), always accept cloud data.
       var cloudProfile = await _pullProfile();
-      if(cloudProfile && cloudProfile.name && cloudProfile.name !== 'Kakha'){
+      if(cloudProfile){
         var users = JSON.parse(localStorage.getItem('dagnara_users')||'[]');
         var idx   = users.findIndex(function(u){ return u.email===email; });
         if(idx >= 0){
-          users[idx].profile = Object.assign({}, users[idx].profile||{}, cloudProfile);
-          localStorage.setItem('dagnara_users', JSON.stringify(users));
-          if(typeof ProfileStore !== 'undefined'){
-            ProfileStore.startBulkRestore();
-            Object.keys(users[idx].profile).forEach(function(k){
-              try{ ProfileStore.set(k, String(users[idx].profile[k])); }catch(e){}
-            });
-            ProfileStore.endBulkRestore();
-            if(typeof restoreUserProfile === 'function') restoreUserProfile();
+          var localProfile = users[idx].profile || {};
+          var cloudTs = parseFloat(cloudProfile._pushed_at || 0);
+          var localTs = parseFloat(localProfile._pushed_at || 0);
+          var localEmpty = !localProfile.name;
+          // Accept cloud data if: local is empty, OR cloud is strictly newer
+          if(localEmpty || cloudTs > localTs){
+            users[idx].profile = Object.assign({}, localProfile, cloudProfile);
+            localStorage.setItem('dagnara_users', JSON.stringify(users));
+            if(typeof ProfileStore !== 'undefined'){
+              ProfileStore.startBulkRestore();
+              Object.keys(users[idx].profile).forEach(function(k){
+                try{ ProfileStore.set(k, String(users[idx].profile[k])); }catch(e){}
+              });
+              ProfileStore.endBulkRestore();
+              if(typeof restoreUserProfile === 'function') restoreUserProfile();
+            }
           }
         }
       }
