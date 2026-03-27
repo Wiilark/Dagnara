@@ -20898,7 +20898,7 @@ var CloudSync = (function(){
     scheduleProfilePush: scheduleProfilePush,
     scheduleDiaryPush: scheduleDiaryPush,
     scheduleSync: scheduleSync,
-    pushAllSync: function(){ SYNC_KEYS.forEach(function(k){ _pushSync(k); }); },
+    pushAllSync: function(){ _getSyncKeys().forEach(function(k){ _pushSync(k); }); },
     forcePushAll: forcePushAll
   };
 })();
