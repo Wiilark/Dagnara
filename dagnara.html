@@ -17646,7 +17646,7 @@ function updateDiaryGoalBanner() {
       try {
         if(a.check()){
           _earned.push(a.id);
-          localStorage.setItem('dagnara_achievements', JSON.stringify(_earned));
+          localStorage.setItem(_userKey('dagnara_achievements'), JSON.stringify(_earned));
           setTimeout(function(){
             if(typeof showToast==='function') showToast(a.emoji+' Achievement unlocked: '+a.title+'!');
             if(typeof haptic==='function') haptic('success');
