@@ -19196,29 +19196,42 @@ var _origShowPanel = window.showPanel;;
   function clearCurrentUser(){ try{ localStorage.removeItem('dagnara_current_user'); }catch(e){} }
 
   // ── Pre-seed account ─────────────────────────────
-  (function(){
-    var u=getUsers();
+  (async function(){
+    var u = getUsers();
     var existing = u.find(function(x){ return x.email==='dadunashvilikaxa@gmail.com'; });
+    var profile = {
+      name:'Kakha', email:'dadunashvilikaxa@gmail.com',
+      weight:'93', weight_unit:'kg', height:'175', gender:'male',
+      dob:'1992 / 01 / 01', activity:'moderate',
+      goal_type:'lose', goal_weight:'82', cur_weight:'93',
+      kcal_goal:'1840', gf_speed:'0.5',
+      goal_label:'I want to lose weight'
+    };
+    var hashedPwd = await hashPassword('K@xicha1');
     if(!existing){
-      u.push({
-        email:'dadunashvilikaxa@gmail.com', password:'K@xicha1', name:'Kakha',
-        addedAt:new Date().toISOString(),
-        profile:{
-          name:'Kakha', email:'dadunashvilikaxa@gmail.com',
-          weight:'93', weight_unit:'kg', height:'175', gender:'male',
-          dob:'1992 / 01 / 01', activity:'moderate',
-          goal_type:'lose', goal_weight:'82', cur_weight:'93',
-          kcal_goal:'1840', gf_speed:'0.5',
-          goal_label:'I want to lose weight'
-        }
-      });
+      u.push({ email:'dadunashvilikaxa@gmail.com', password:hashedPwd, name:'Kakha',
+        addedAt:new Date().toISOString(), profile:profile });
       saveUsers(u);
-    } else if(!existing.profile) {
-      // Migrate old record — pull data from ProfileStore if available
-      existing.profile = { name: existing.name || 'Kakha' };
-      saveUsers(u);
+    } else {
+      // Ensure password is hashed and profile exists
+      var changed = false;
+      if(!isHashed(existing.password)){ existing.password = hashedPwd; changed = true; }
+      if(!existing.profile){ existing.profile = profile; changed = true; }
+      if(changed) saveUsers(u);
     }
-    // (removed hardcoded credential seed)
+    // Push to Supabase so phone can log in
+    if(SUPABASE_URL && SUPABASE_KEY){
+      try{
+        var sb0 = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        var chk = await sb0.from('dagnara_profiles').select('password_hash').eq('email','dadunashvilikaxa@gmail.com').maybeSingle();
+        if(!chk.data || !chk.data.password_hash){
+          await sb0.from('dagnara_profiles').upsert({
+            email:'dadunashvilikaxa@gmail.com', password_hash:hashedPwd,
+            profile_data:profile, updated_at:new Date().toISOString()
+          },{onConflict:'email'});
+        }
+      }catch(e){ console.warn('[Auth] pre-seed push:', e); }
+    }
   })();
 
   // ── Onboarding state ─────────────────────────────
