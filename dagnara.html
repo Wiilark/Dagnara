@@ -9052,7 +9052,7 @@ window.addEventListener('load', function() {
 
 
   // --- Merged from secondary load listeners ---
-  setTimeout(checkDailyReminder, 3000);
+  setTimeout(function(){ if(typeof checkDailyReminder==='function') checkDailyReminder(); }, 3000);
   setTimeout(function(){
         var streaksCard = document.querySelector('.streaks-card');
         if(!streaksCard || document.getElementById('waterTrendCard')) return;
