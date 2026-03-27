@@ -19800,9 +19800,18 @@ var _origShowPanel = window.showPanel;;
       screen.style.opacity='';
       screen.style.transform='';
       if(typeof restoreUserProfile==='function') restoreUserProfile();
-      // Pull user data from cloud and merge with local
+      // Pull user data from cloud and merge with local, then push any new local data
       var _csEmail = localStorage.getItem('dagnara_current_user');
-      if(_csEmail && typeof CloudSync!=='undefined') CloudSync.syncOnLogin(_csEmail);
+      if(_csEmail && typeof CloudSync!=='undefined'){
+        CloudSync.syncOnLogin(_csEmail);
+        setTimeout(function(){ CloudSync.forcePushAll(_csEmail); }, 3000);
+        // Auto-push every 5 minutes while logged in
+        if(window._autoSyncInterval) clearInterval(window._autoSyncInterval);
+        window._autoSyncInterval = setInterval(function(){
+          var _e = localStorage.getItem('dagnara_current_user');
+          if(_e && typeof CloudSync!=='undefined') CloudSync.forcePushAll(_e);
+        }, 5 * 60 * 1000);
+      }
       if(typeof showDagHome==='function') setTimeout(showDagHome, 350);
       if(typeof showToast==='function') showToast('👋 Welcome'+(name?', '+name:'')+'!');
       if(isNew&&typeof openGoalFlow==='function') setTimeout(function(){ openGoalFlow(); },800);
