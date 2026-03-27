@@ -20812,6 +20812,25 @@ var _origSaveCurrentDay = window.saveCurrentDay || function(){};
 })();
 // Expose globally
 window.updateLiveWidgets = updateLiveWidgets;
+
+// Hook saveCurrentDay to also refresh home cards
+(function(){
+  var _patch = function(){
+    var orig = window.saveCurrentDay;
+    if(typeof orig === 'function' && !orig._homePatch){
+      window.saveCurrentDay = function(){
+        orig.apply(this, arguments);
+        if(typeof window.updateHomeCards === 'function') window.updateHomeCards();
+        if(typeof updateLiveWidgets === 'function') updateLiveWidgets();
+      };
+      window.saveCurrentDay._homePatch = true;
+    }
+  };
+  // Try immediately, then retry after a tick in case saveCurrentDay isn't defined yet
+  _patch();
+  setTimeout(_patch, 500);
+  setTimeout(_patch, 2000);
+})();
 </script>
 
 <script>
