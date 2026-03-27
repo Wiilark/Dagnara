@@ -20420,6 +20420,18 @@ var _origShowPanel = window.showPanel;;
       });
       ProfileStore.endBulkRestore();
     }
+    // Sync with Supabase — pull cloud data then push local data
+    setTimeout(function(){
+      if(typeof CloudSync !== 'undefined'){
+        CloudSync.syncOnLogin(_cu);
+        setTimeout(function(){ CloudSync.forcePushAll(_cu); }, 4000);
+        if(window._autoSyncInterval) clearInterval(window._autoSyncInterval);
+        window._autoSyncInterval = setInterval(function(){
+          var _e = localStorage.getItem('dagnara_current_user');
+          if(_e && typeof CloudSync!=='undefined') CloudSync.forcePushAll(_e);
+        }, 5 * 60 * 1000);
+      }
+    }, 1500);
   } else {
     var _rem = getRemembered();
     if(_rem) obShowLogin(); else obGo(0);
