@@ -19295,7 +19295,7 @@ var _origShowPanel = window.showPanel;;
   };
 
   // ── Step 1: Account ──────────────────────────────
-  window.obStep1Next = function(){
+  window.obStep1Next = async function(){
     var name =(document.getElementById('ob1Name').value||'').trim();
     var email=(document.getElementById('ob1Email').value||'').trim().toLowerCase();
     var pwd  =(document.getElementById('ob1Pwd').value||'');
@@ -19305,8 +19305,18 @@ var _origShowPanel = window.showPanel;;
     if(!email||!/.+@.+\..+/.test(email)){err.textContent='Enter a valid email.';return;}
     if(pwd.length<6){err.textContent='Password needs 6+ characters.';return;}
     if(pwd!==conf){err.textContent='Passwords do not match.';return;}
+    // Check local
     var users=getUsers();
     if(users.find(function(u){return u.email===email;})){err.textContent='Email already registered. Log in instead.';return;}
+    // Check Supabase for duplicate
+    if(SUPABASE_URL && SUPABASE_KEY){
+      try{
+        err.textContent='Checking…';
+        var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+        var r=await sb.from('dagnara_profiles').select('email').eq('email',email).maybeSingle();
+        if(r.data){err.textContent='Email already registered. Log in instead.';return;}
+      }catch(e){}
+    }
     err.textContent='';
     _ob.name=name; _ob.email=email; _ob.pwd=pwd;
     obGo(10); // → ob6 (plan reveal)
