@@ -20740,12 +20740,45 @@ var CloudSync = (function(){
 
   _init();
 
+  // ── Full upload of all existing local data ──────────
+  async function forcePushAll(email){
+    _email = email;
+    if(!_client){ return; }
+    _dot('syncing');
+    try{
+      // Push profile
+      await _pushProfile();
+
+      // Push all diary entries
+      var prefix = (typeof diaryKeyPrefix==='function') ? diaryKeyPrefix() : ('diaryStore_' + email + '_');
+      for(var i=0; i<localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf(prefix)===0){
+          var dateStr = k.replace(prefix,'');
+          try{
+            var raw = localStorage.getItem(k);
+            if(raw) await _pushDiary(dateStr, JSON.parse(raw));
+          }catch(e){}
+        }
+      }
+
+      // Push all sync keys
+      for(var si=0; si<SYNC_KEYS.length; si++){
+        await _pushSync(SYNC_KEYS[si]);
+      }
+
+      _dot('synced');
+      if(typeof showToast==='function') showToast('✅ All data synced to cloud!');
+    }catch(e){ _dot('error'); console.warn('[CloudSync] forcePushAll:', e); }
+  }
+
   return {
     syncOnLogin: syncOnLogin,
     scheduleProfilePush: scheduleProfilePush,
     scheduleDiaryPush: scheduleDiaryPush,
     scheduleSync: scheduleSync,
-    pushAllSync: function(){ SYNC_KEYS.forEach(function(k){ _pushSync(k); }); }
+    pushAllSync: function(){ SYNC_KEYS.forEach(function(k){ _pushSync(k); }); },
+    forcePushAll: forcePushAll
   };
 })();
 </script>
