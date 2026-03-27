@@ -16766,7 +16766,7 @@ function renderDpWeekChart() {
     // ── User ──
     try{
       var email = localStorage.getItem('dagnara_current_user')||'';
-      var name = ProfileStore.get('name')||'Kakha';
+      var name = ProfileStore.get('name')||'';
       var av = document.getElementById('ccAvatar'); if(av) av.textContent = name.slice(0,1).toUpperCase();
       var un = document.getElementById('ccUserName'); if(un) un.textContent = name;
       var ue = document.getElementById('ccUserEmail'); if(ue) ue.textContent = email;
