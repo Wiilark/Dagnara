@@ -19459,7 +19459,9 @@ var _origShowPanel = window.showPanel;;
     }
     // Ensure password_hash exists in Supabase — never overwrite profile_data
     var seedFlag = 'dagnara_seed_pushed_v1';
-    if(SUPABASE_URL && SUPABASE_KEY && !localStorage.getItem(seedFlag)){
+    var _sUrl = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : null;
+    var _sKey = (typeof SUPABASE_KEY !== 'undefined') ? SUPABASE_KEY : null;
+    if(_sUrl && _sKey && !localStorage.getItem(seedFlag)){
       try{
         var sb0 = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         // Only set password_hash if no record exists yet; never touch profile_data
