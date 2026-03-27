@@ -20772,16 +20772,25 @@ var CloudSync = (function(){
   }
 
   // ── Sync key/value store (pills, programs, quit, achievements) ──
-  var SYNC_KEYS = [
+  // Base keys — user-scoped keys are resolved at runtime via _userKey()
+  var SYNC_KEYS_BASE = [
     'dagnara_pill_meds',
     'dagnara_programs',
     'dagnara_quit_smoking',
     'dagnara_quit_drinking',
     'dagnara_qs_unlocked',
-    'dagnara_qd_unlocked',
+    'dagnara_qd_unlocked'
+  ];
+  var SYNC_KEYS_USER = [
     'dagnara_streaks',
     'dagnara_achievements'
   ];
+  function _getSyncKeys(){
+    var base = SYNC_KEYS_BASE.slice();
+    SYNC_KEYS_USER.forEach(function(k){ base.push(_userKey(k)); });
+    return base;
+  }
+  var SYNC_KEYS = SYNC_KEYS_BASE; // legacy ref — use _getSyncKeys() for full list
 
   async function _pushSync(key){
     if(!_ready()) return;
