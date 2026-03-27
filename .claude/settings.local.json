@@ -4,7 +4,12 @@
       "Bash(start:*)",
       "Bash(node:*)",
       "Bash(python3:*)",
-      "Bash(claude update:*)"
+      "Bash(claude update:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(ls:*)"
     ]
   }
 }
