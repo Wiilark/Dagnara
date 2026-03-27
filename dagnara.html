@@ -3122,6 +3122,22 @@ textarea:focus-visible,
     
 
 
+    <!-- HOME STREAK BANNER -->
+    <div id="homeStreakBanner" onclick="navigateTo('progress')">
+      <div style="position:absolute;top:-40px;right:-30px;width:140px;height:140px;border-radius:50%;opacity:0.12;pointer-events:none;background:#f59e0b;" id="hsbGlow"></div>
+      <div class="hsb-top">
+        <div class="hsb-left">
+          <div class="hsb-flame" id="hsbFlame">🔥</div>
+          <div>
+            <div class="hsb-count" id="hsbCount">No streak yet</div>
+            <div class="hsb-msg" id="hsbMsg">Log today to start one 👉</div>
+          </div>
+        </div>
+        <div class="hsb-badge" id="hsbBadge"></div>
+      </div>
+      <div class="hsb-dots" id="hsbDots"></div>
+    </div>
+
     <!-- DAILY MISSION CARD -->
     <div id="dailyMissionCard">
       <div class="dm-header">Today's Goal</div>
