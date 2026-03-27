@@ -20785,6 +20785,18 @@ var CloudSync = (function(){
     }catch(e){ _dot('error'); console.warn('[CloudSync] forcePushAll:', e); }
   }
 
+  window.profileForcePushAll = function(){
+    var email = localStorage.getItem('dagnara_current_user');
+    if(!email){ if(typeof showToast==='function') showToast('Log in first.'); return; }
+    var sub = document.getElementById('forceSyncSub');
+    if(sub) sub.textContent = 'Uploading…';
+    forcePushAll(email).then(function(){
+      if(sub) sub.textContent = 'Done! Open on your phone and log in.';
+    }).catch(function(){
+      if(sub) sub.textContent = 'Error — check internet connection.';
+    });
+  };
+
   return {
     syncOnLogin: syncOnLogin,
     scheduleProfilePush: scheduleProfilePush,
