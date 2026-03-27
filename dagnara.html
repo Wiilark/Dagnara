@@ -23438,7 +23438,7 @@ window.dagSearch = function(q){
       try{
         if(a.check()){
           earned.push(a.id);
-          localStorage.setItem('dagnara_achievements', JSON.stringify(earned));
+          localStorage.setItem(_userKey('dagnara_achievements'), JSON.stringify(earned));
           addXPSilent(a.xp);
           setTimeout(function(){
             showAchievementModal({ eyebrow:'ACHIEVEMENT UNLOCKED', emoji:a.emoji, title:a.title, desc:a.desc, xp:'+' + a.xp + ' XP' });
