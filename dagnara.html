@@ -23432,7 +23432,7 @@ window.dagSearch = function(q){
   ];
 
   function runAchievementCheck(){
-    var earned; try{ earned = JSON.parse(localStorage.getItem('dagnara_achievements') || '[]'); }catch(e){ earned = []; }
+    var earned; try{ earned = JSON.parse(localStorage.getItem(_userKey('dagnara_achievements')) || '[]'); }catch(e){ earned = []; }
     ACHIEVEMENTS.forEach(function(a){
       if(earned.indexOf(a.id) !== -1) return;
       try{
