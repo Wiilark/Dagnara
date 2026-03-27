@@ -8505,7 +8505,7 @@ function updateAllHeightDisplays() {
       var ftin = cmToFtIn((typeof _ob!=='undefined' && _ob && _ob.height) ? _ob.height : h);
       ob5H.textContent = ftin.ft + '\'' + ftin.inches + '"';
     } else {
-      ob5H.textContent = _ob && _ob.height ? Math.round(_ob.height) : Math.round(h);
+      ob5H.textContent = (typeof _ob!=='undefined' && _ob && _ob.height) ? Math.round(_ob.height) : Math.round(h);
     }
   }
   if (ob5U) ob5U.textContent = _heightUnit === 'ft' ? '' : 'cm';
