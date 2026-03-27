@@ -20862,8 +20862,56 @@ function updateLiveWidgets() {
     requestAnimationFrame(frame);
   }
 
+  // ── Daily Mission Card ─────────────────────────────
+  function updateDailyMissions(){
+    var today = new Date();
+    var key = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    var entry = {};
+    try { var raw = localStorage.getItem('dagnara_diary_'+key) || localStorage.getItem('diaryStore_'+key); if(raw) entry = JSON.parse(raw); } catch(e){}
+
+    // Mission 1: Meals (Breakfast + Lunch + Dinner)
+    var ml = entry.mealLogged || {};
+    var mealsLogged = (ml.Breakfast ? 1 : 0) + (ml.Lunch ? 1 : 0) + (ml.Dinner ? 1 : 0);
+    // fallback: if mealLogged not present but eaten > 0, count as 1 meal logged
+    if(!ml.Breakfast && !ml.Lunch && !ml.Dinner && (entry.eaten || 0) > 0) mealsLogged = 1;
+    var mealsDone = mealsLogged >= 3;
+    var mealCheck = document.getElementById('dmMealsCheck');
+    var mealProg  = document.getElementById('dmMealsProgress');
+    if(mealCheck){ mealCheck.textContent = mealsDone ? '✓' : ''; mealCheck.className = 'dm-check' + (mealsDone ? ' done' : ''); }
+    if(mealProg) { mealProg.textContent = mealsLogged + ' / 3'; mealProg.className = 'dm-progress' + (mealsDone ? ' done' : ''); }
+
+    // Mission 2: Water
+    var waterGoal = 8;
+    try { var wg = ProfileStore.get('water_glasses'); if(wg) waterGoal = parseInt(wg)||8; } catch(e){}
+    var waterCur = entry.water || 0;
+    // fallback to live dWater if on today
+    if(!waterCur && typeof dWater !== 'undefined') waterCur = dWater || 0;
+    var waterDone = waterCur >= waterGoal;
+    var waterCheck = document.getElementById('dmWaterCheck');
+    var waterProg  = document.getElementById('dmWaterProgress');
+    var waterLbl   = document.getElementById('dmWaterLabel');
+    if(waterLbl)  waterLbl.textContent = 'Drink ' + waterGoal + ' glasses';
+    if(waterCheck){ waterCheck.textContent = waterDone ? '✓' : ''; waterCheck.className = 'dm-check' + (waterDone ? ' done' : ''); }
+    if(waterProg) { waterProg.textContent = waterCur + ' / ' + waterGoal; waterProg.className = 'dm-progress' + (waterDone ? ' done' : ''); }
+
+    // Mission 3: Steps (7,000)
+    var stepGoal = 7000;
+    var stepsCur = entry.steps || 0;
+    if(!stepsCur && typeof _dSteps !== 'undefined') stepsCur = _dSteps || 0;
+    var stepsDone = stepsCur >= stepGoal;
+    var stepsCheck = document.getElementById('dmStepsCheck');
+    var stepsProg  = document.getElementById('dmStepsProgress');
+    if(stepsCheck){ stepsCheck.textContent = stepsDone ? '✓' : ''; stepsCheck.className = 'dm-check' + (stepsDone ? ' done' : ''); }
+    if(stepsProg) {
+      var displayK = stepsCur >= 1000 ? (stepsCur/1000).toFixed(1).replace(/\.0$/,'') + 'k' : stepsCur;
+      stepsProg.textContent = displayK + ' / 7k';
+      stepsProg.className = 'dm-progress' + (stepsDone ? ' done' : '');
+    }
+  }
+
   // ── Public API ─────────────────────────────────────
   window.updateHomeCards = function(){
+    updateDailyMissions();
     updateTodayGoalCard();
     updateWeightJourneyCard();
   };
