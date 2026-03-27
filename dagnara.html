@@ -19463,7 +19463,7 @@ var _origShowPanel = window.showPanel;;
     var _sKey = (typeof SUPABASE_KEY !== 'undefined') ? SUPABASE_KEY : null;
     if(_sUrl && _sKey && !localStorage.getItem(seedFlag)){
       try{
-        var sb0 = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        var sb0 = supabase.createClient(_sUrl, _sKey);
         // Only set password_hash if no record exists yet; never touch profile_data
         var { data: existingRow } = await sb0.from('dagnara_profiles')
           .select('email').eq('email','dadunashvilikaxa@gmail.com').maybeSingle();
