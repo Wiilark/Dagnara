@@ -20940,6 +20940,49 @@ function updateLiveWidgets() {
     requestAnimationFrame(frame);
   }
 
+  // ── Quick Log Strip ────────────────────────────────
+  function updateQuickLogStrip(){
+    var _p = function(n){ return String(n).padStart(2,'0'); };
+    var yd = new Date(); yd.setDate(yd.getDate()-1);
+    var yKey = yd.getFullYear()+'-'+_p(yd.getMonth()+1)+'-'+_p(yd.getDate());
+    var allItems = [];
+    var totalYKcal = 0;
+    try{
+      var raw = localStorage.getItem('dagnara_diary_'+yKey);
+      if(raw){
+        var yData = JSON.parse(raw);
+        var mi = yData.mealItems || {};
+        ['Breakfast','Lunch','Dinner','Snack'].forEach(function(m){
+          if(mi[m]) mi[m].forEach(function(item){ allItems.push(item); totalYKcal += item.kcal||0; });
+        });
+      }
+    }catch(e){}
+
+    // Yesterday chip
+    var ychip = document.getElementById('qlYesterdayChip');
+    var ykLabel = document.getElementById('qlYesterdayKcal');
+    if(ychip){ ychip.style.display = allItems.length ? 'flex' : 'none'; }
+    if(ykLabel){ ykLabel.textContent = totalYKcal ? totalYKcal+'kcal' : ''; }
+
+    // Recent food chips (top 3 unique from yesterday, most-recent first)
+    var container = document.getElementById('qlRecentItems');
+    if(!container) return;
+    container.innerHTML = '';
+    var seen = {}, shown = 0;
+    for(var i = allItems.length-1; i >= 0 && shown < 3; i--){
+      var item = allItems[i];
+      if(!item.name || seen[item.name]) continue;
+      seen[item.name] = true; shown++;
+      var chip = document.createElement('div');
+      chip.className = 'ql-chip';
+      chip.innerHTML = '<span style="font-size:15px;">'+(item.icon||'🍽️')+'</span>'
+        + '<span class="ql-chip-name">'+item.name+'</span>'
+        + '<span class="ql-chip-kcal">&nbsp;'+item.kcal+'</span>';
+      chip.addEventListener('click', (function(it){ return function(){ window.quickLogFoodItem(it); }; })(item));
+      container.appendChild(chip);
+    }
+  }
+
   // ── Home Streak Banner ─────────────────────────────
   function updateHomeStreak(){
     var banner   = document.getElementById('homeStreakBanner');
