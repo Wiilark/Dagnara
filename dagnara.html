@@ -19219,17 +19219,16 @@ var _origShowPanel = window.showPanel;;
       if(!existing.profile){ existing.profile = profile; changed = true; }
       if(changed) saveUsers(u);
     }
-    // Push to Supabase so phone can log in
-    if(SUPABASE_URL && SUPABASE_KEY){
+    // Push to Supabase once — guarded by a localStorage flag
+    var seedFlag = 'dagnara_seed_pushed_v1';
+    if(SUPABASE_URL && SUPABASE_KEY && !localStorage.getItem(seedFlag)){
       try{
         var sb0 = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        var chk = await sb0.from('dagnara_profiles').select('password_hash').eq('email','dadunashvilikaxa@gmail.com').maybeSingle();
-        if(!chk.data || !chk.data.password_hash){
-          await sb0.from('dagnara_profiles').upsert({
-            email:'dadunashvilikaxa@gmail.com', password_hash:hashedPwd,
-            profile_data:profile, updated_at:new Date().toISOString()
-          },{onConflict:'email'});
-        }
+        await sb0.from('dagnara_profiles').upsert({
+          email:'dadunashvilikaxa@gmail.com', password_hash:hashedPwd,
+          profile_data:profile, updated_at:new Date().toISOString()
+        },{onConflict:'email'});
+        localStorage.setItem(seedFlag, '1');
       }catch(e){ console.warn('[Auth] pre-seed push:', e); }
     }
   })();
