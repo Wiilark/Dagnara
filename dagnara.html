@@ -10863,7 +10863,7 @@ function _qsRenderAchievements() {
   try { unlocked = JSON.parse(localStorage.getItem('dagnara_qs_unlocked') || '{}'); } catch(e) {}
   var changed = false;
   QS_ACHIEVEMENTS.forEach(function(a) { if (!unlocked[a.id] && elH >= a.hours) { unlocked[a.id] = true; changed = true; } });
-  if (changed) { try { localStorage.setItem('dagnara_qs_unlocked', JSON.stringify(unlocked)); } catch(e) {} }
+  if (changed) { try { localStorage.setItem('dagnara_qs_unlocked', JSON.stringify(unlocked)); } catch(e) {} if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_qs_unlocked'); }
 
   grid.innerHTML = QS_ACHIEVEMENTS.map(function(a) {
     var done  = !!unlocked[a.id];
