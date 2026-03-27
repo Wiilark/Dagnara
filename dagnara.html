@@ -1004,6 +1004,49 @@ input, textarea { user-select:text; }
 .prog-insight-text strong { color:var(--ink); font-weight:600; }
 
 /* ─── HOME INSIGHT CARD ─── */
+/* ── Daily Mission Card ── */
+#dailyMissionCard {
+  margin:14px 14px 0;
+  background:var(--layer1);
+  border:1px solid var(--line2);
+  border-radius:20px;
+  padding:16px 18px 14px;
+}
+.dm-header {
+  font-family:'DM Sans',sans-serif;
+  font-size:11px; font-weight:700;
+  letter-spacing:0.08em; text-transform:uppercase;
+  color:rgba(196,181,255,0.45);
+  margin-bottom:12px;
+}
+.dm-row {
+  display:flex; align-items:center; gap:12px;
+  padding:9px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.dm-row:last-child { border-bottom:none; padding-bottom:0; }
+.dm-check {
+  width:22px; height:22px; border-radius:50%;
+  border:2px solid rgba(196,181,255,0.25);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; font-size:12px;
+  transition:background 0.25s, border-color 0.25s;
+}
+.dm-check.done {
+  background:#22c55e; border-color:#22c55e; color:#fff;
+}
+.dm-emoji { font-size:17px; flex-shrink:0; }
+.dm-label {
+  font-family:'DM Sans',sans-serif;
+  font-size:14px; font-weight:500; color:var(--ink);
+  flex:1;
+}
+.dm-progress {
+  font-family:'Geist Mono',monospace;
+  font-size:11px; color:var(--ink3);
+  white-space:nowrap;
+}
+.dm-progress.done { color:#22c55e; font-weight:700; }
 .home-insight-card {
   margin:14px 14px 0;
   background:var(--layer1);
