@@ -11137,7 +11137,7 @@ function _qdRenderAchievements() {
   QD_ACHIEVEMENTS.forEach(function(a) {
     if (!unlocked[a.id] && elHours >= a.hours) { unlocked[a.id] = true; newlyUnlocked = true; }
   });
-  if (newlyUnlocked) { try { localStorage.setItem('dagnara_qd_unlocked', JSON.stringify(unlocked)); } catch(e) {} }
+  if (newlyUnlocked) { try { localStorage.setItem('dagnara_qd_unlocked', JSON.stringify(unlocked)); } catch(e) {} if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_qd_unlocked'); }
 
   grid.innerHTML = QD_ACHIEVEMENTS.map(function(a) {
     var done    = !!unlocked[a.id];
