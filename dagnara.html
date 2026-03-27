@@ -9987,6 +9987,7 @@ function _getPillMeds() {
 }
 function _savePillMeds(meds) {
   try { localStorage.setItem('dagnara_pill_meds', JSON.stringify(meds)); } catch(e) {}
+  if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_pill_meds');
 }
 function _getPillLog(day) {
   try { return JSON.parse(localStorage.getItem('dagnara_pill_log_' + day) || '{}'); } catch(e) { return {}; }
