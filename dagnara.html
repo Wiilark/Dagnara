@@ -1004,6 +1004,31 @@ input, textarea { user-select:text; }
 .prog-insight-text strong { color:var(--ink); font-weight:600; }
 
 /* ─── HOME INSIGHT CARD ─── */
+/* ── Home Streak Banner ── */
+#homeStreakBanner {
+  margin:12px 14px 0;
+  padding:14px 16px 12px;
+  border-radius:20px;
+  cursor:pointer;
+  position:relative; overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  transition:background 0.3s, border-color 0.3s;
+  background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(251,191,36,0.04));
+  border:1px solid rgba(245,158,11,0.22);
+}
+#homeStreakBanner:active { opacity:0.85; }
+.hsb-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.hsb-left { display:flex; align-items:center; gap:11px; }
+.hsb-flame { font-size:32px; line-height:1; flex-shrink:0; }
+.hsb-count { font-family:'Bricolage Grotesque',sans-serif; font-size:22px; font-weight:800; color:var(--ink); letter-spacing:-0.03em; line-height:1.1; }
+.hsb-msg { font-family:'DM Sans',sans-serif; font-size:12px; color:var(--ink2); margin-top:2px; transition:color 0.3s; }
+.hsb-badge { font-family:'Geist Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.08em; padding:4px 10px; border-radius:20px; white-space:nowrap; }
+.hsb-dots { display:flex; gap:5px; }
+.hsb-dot { flex:1; height:5px; border-radius:3px; transition:background 0.3s; background:rgba(255,255,255,0.07); }
+.hsb-dot.lit { background:linear-gradient(90deg,#f59e0b,#f97316); }
+.hsb-dot.today-empty { background:rgba(245,158,11,0.18); border:1px dashed rgba(245,158,11,0.4); height:3px; margin:1px 0; }
+.hsb-dot.today-done { background:linear-gradient(90deg,#22c55e,#4ade80); }
+
 /* ── Daily Mission Card ── */
 #dailyMissionCard {
   margin:14px 14px 0;
