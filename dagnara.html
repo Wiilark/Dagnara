@@ -19475,7 +19475,7 @@ var _origShowPanel = window.showPanel;;
         } else {
           // Record exists — only update password_hash if it's missing
           await sb0.from('dagnara_profiles')
-            .update({ password_hash:hashedPwd })
+            .update({ password_hash: hashedPwd })
             .eq('email','dadunashvilikaxa@gmail.com')
             .is('password_hash', null);
         }
