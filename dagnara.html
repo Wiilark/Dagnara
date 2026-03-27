@@ -20903,6 +20903,121 @@ function updateLiveWidgets() {
     requestAnimationFrame(frame);
   }
 
+  // ── Home Streak Banner ─────────────────────────────
+  function updateHomeStreak(){
+    var banner   = document.getElementById('homeStreakBanner');
+    var countEl  = document.getElementById('hsbCount');
+    var msgEl    = document.getElementById('hsbMsg');
+    var flameEl  = document.getElementById('hsbFlame');
+    var badgeEl  = document.getElementById('hsbBadge');
+    var glowEl   = document.getElementById('hsbGlow');
+    var dotsEl   = document.getElementById('hsbDots');
+    if(!banner) return;
+
+    // Get current streak (calls the existing streak engine)
+    var current = 0;
+    if(typeof window.updateStreakDisplay === 'function'){
+      var s = window.updateStreakDisplay();
+      if(s) current = s.current || 0;
+    } else {
+      var cn = document.getElementById('currentStreakNum');
+      if(cn) current = parseInt(cn.textContent) || 0;
+    }
+
+    // Check if today has been logged
+    var today = new Date();
+    var _p = function(n){ return String(n).padStart(2,'0'); };
+    var todayKey = today.getFullYear()+'-'+_p(today.getMonth()+1)+'-'+_p(today.getDate());
+    var todayLogged = false;
+    try{
+      var _raw = localStorage.getItem('dagnara_diary_'+todayKey) || localStorage.getItem('diaryStore_'+todayKey);
+      if(_raw){ var _d=JSON.parse(_raw); todayLogged=(_d.eaten||0)>0; }
+    }catch(e){}
+    if(!todayLogged && typeof dEaten !== 'undefined' && dEaten > 0) todayLogged = true;
+
+    // ── State ──────────────────────────────────────────
+    var hour = today.getHours();
+    var urgent = !todayLogged && hour >= 17 && current >= 1;
+
+    if(current === 0){
+      // No streak
+      banner.style.background = 'var(--layer1)';
+      banner.style.borderColor = 'var(--line2)';
+      if(flameEl) flameEl.textContent = '💪';
+      if(countEl) countEl.textContent = 'No streak yet';
+      if(msgEl)  { msgEl.textContent = 'Log today to start one'; msgEl.style.color = ''; }
+      if(badgeEl){ badgeEl.textContent=''; badgeEl.style.cssText=''; }
+      if(glowEl)   glowEl.style.background = '#7c4dff';
+
+    } else if(todayLogged){
+      // Streak active + today done
+      banner.style.background = 'linear-gradient(135deg,rgba(34,197,94,0.08),rgba(74,222,128,0.04))';
+      banner.style.borderColor = 'rgba(34,197,94,0.22)';
+      if(flameEl) flameEl.textContent = '🔥';
+      if(countEl) countEl.textContent = current + '-day streak';
+      var savedMsg = current >= 30 ? 'Legendary. Keep going 🏆' :
+                     current >= 14 ? 'Two weeks strong! 🏆' :
+                     current >= 7  ? 'One week streak! 💪' : 'Streak saved today ✓';
+      if(msgEl)  { msgEl.textContent = savedMsg; msgEl.style.color = '#4ade80'; }
+      if(glowEl)   glowEl.style.background = '#22c55e';
+      if(badgeEl){
+        if(current >= 7){
+          badgeEl.textContent = '🏆 ' + current + 'd';
+          badgeEl.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(245,158,11,0.12);color:#f59e0b;letter-spacing:0.05em;';
+        } else {
+          badgeEl.textContent = '✓';
+          badgeEl.style.cssText = 'font-size:16px;color:#22c55e;';
+        }
+      }
+
+    } else if(urgent){
+      // Streak at risk — past 5 PM, not logged yet
+      banner.style.background = 'linear-gradient(135deg,rgba(239,68,68,0.1),rgba(244,63,94,0.05))';
+      banner.style.borderColor = 'rgba(239,68,68,0.35)';
+      if(flameEl) flameEl.textContent = '⚠️';
+      if(countEl) countEl.textContent = current + '-day streak';
+      if(msgEl)  { msgEl.textContent = 'Don\'t break it — log before midnight!'; msgEl.style.color = '#f87171'; }
+      if(glowEl)   glowEl.style.background = '#ef4444';
+      if(badgeEl){ badgeEl.textContent = 'LOG NOW'; badgeEl.style.cssText = 'font-family:var(--mono);font-size:9px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(239,68,68,0.15);color:#f87171;letter-spacing:0.1em;'; }
+
+    } else {
+      // Streak alive, today not logged yet but not urgent yet
+      banner.style.background = 'linear-gradient(135deg,rgba(245,158,11,0.08),rgba(251,191,36,0.04))';
+      banner.style.borderColor = 'rgba(245,158,11,0.22)';
+      if(flameEl) flameEl.textContent = '🔥';
+      if(countEl) countEl.textContent = current + '-day streak';
+      if(msgEl)  { msgEl.textContent = 'Don\'t break it — log today'; msgEl.style.color = '#f59e0b'; }
+      if(glowEl)   glowEl.style.background = '#f59e0b';
+      if(badgeEl){ badgeEl.textContent = current >= 7 ? '🏆 '+current+'d' : ''; badgeEl.style.cssText = current >= 7 ? 'font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(245,158,11,0.12);color:#f59e0b;letter-spacing:0.05em;' : ''; }
+    }
+
+    // ── 7-day dot track ────────────────────────────────
+    if(dotsEl){
+      dotsEl.innerHTML = '';
+      for(var i=6; i>=0; i--){
+        var d = new Date();
+        d.setDate(d.getDate()-i);
+        var dk = d.getFullYear()+'-'+_p(d.getMonth()+1)+'-'+_p(d.getDate());
+        var dotLogged = false;
+        if(i===0){
+          dotLogged = todayLogged;
+        } else {
+          try{ var rv=localStorage.getItem('dagnara_diary_'+dk); if(rv){var rd=JSON.parse(rv);dotLogged=(rd.eaten||0)>0;} }catch(e){}
+        }
+        var dot = document.createElement('div');
+        if(i===0 && !dotLogged) dot.className = 'hsb-dot today-empty';
+        else if(i===0 && dotLogged) dot.className = 'hsb-dot today-done';
+        else dot.className = 'hsb-dot' + (dotLogged ? ' lit' : '');
+        dotsEl.appendChild(dot);
+      }
+    }
+
+    // Check streak milestones if today was just logged
+    if(todayLogged && typeof window.checkStreakMilestones === 'function'){
+      window.checkStreakMilestones(current);
+    }
+  }
+
   // ── Daily Mission Card ─────────────────────────────
   function updateDailyMissions(){
     var today = new Date();
