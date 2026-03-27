@@ -25406,41 +25406,8 @@ function drawMacroHistoryCharts() {
     input.click();
   };
 
-  function updateBackupStatus() {
-    var el = document.getElementById('backupLastDate');
-    var banner = document.getElementById('backupWarningBanner');
-    var bannerText = document.getElementById('backupWarningText');
-    var last = null;
-    try { last = localStorage.getItem('dagnara_last_backup'); } catch(e) {}
-
-    if (!last) {
-      if (el) { el.textContent = 'No backup — tap to back up now'; el.style.color = '#ef4444'; }
-      if (banner) { banner.style.display = 'flex'; }
-      if (bannerText) bannerText.textContent = 'Your data has no backup';
-      return;
-    }
-    var days = Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
-    var label = days === 0 ? 'Backed up today ✓' : 'Last backup: ' + days + ' day' + (days===1?'':'s') + ' ago';
-    var color = days === 0 ? 'var(--green)' : (days > 14 ? '#ef4444' : (days > 7 ? '#f59e0b' : 'var(--ink3)'));
-    if (el) { el.textContent = label; el.style.color = color; }
-    if (banner) {
-      if (days > 14) {
-        banner.style.display = 'flex';
-        if (bannerText) bannerText.textContent = 'No backup in ' + days + ' days — back up now';
-      } else {
-        banner.style.display = 'none';
-      }
-    }
-  }
+  function updateBackupStatus() { /* no-op: backup UI removed, sync runs automatically */ }
   window.updateBackupStatus = updateBackupStatus;
-
-  // Run on load and when navigating to profile
-  setTimeout(updateBackupStatus, 800);
-  var _origNav = window.navigateTo;
-  window.navigateTo = function(tab) {
-    if (typeof _origNav === 'function') _origNav.apply(this, arguments);
-    if (tab === 'profile') setTimeout(updateBackupStatus, 300);
-  };
 
   // ── Fix 2: Performance — Service Worker + deferred init ──
 
