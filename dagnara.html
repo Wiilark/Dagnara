@@ -15858,11 +15858,11 @@ function renderDpWeekChart() {
     }
 
     // Headline
-    var name = 'Kakha';
+    var name = '';
     try { var sn = ProfileStore.get('name'); if(sn) name = sn; } catch(e){}
     var label = score>=120?'outstanding':score>=90?'doing great':score>=60?'on the right track':score>=30?'making progress':'getting started';
     var hl = document.getElementById('wiHeadline');
-    if(hl) hl.textContent = name + ", you're " + label + "!";
+    if(hl) hl.textContent = (name ? name + ", you're " : "You're ") + label + "!";
     var sl = document.getElementById('wiSubline');
     if(sl) sl.textContent = score>=90 ? 'Keep it up! Here are targeted tips to push your score even higher.' : 'Increase your score by following the recommendations from Dagnara nutritionists below.';
 
