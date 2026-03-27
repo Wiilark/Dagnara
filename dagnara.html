@@ -10002,11 +10002,18 @@ function _savePillMeds(meds) {
   try { localStorage.setItem('dagnara_pill_meds', JSON.stringify(meds)); } catch(e) {}
   if(typeof CloudSync!=='undefined') CloudSync.scheduleSync('dagnara_pill_meds');
 }
+function _pillLogKey(day) {
+  try {
+    var uid = (typeof ProfileStore !== 'undefined') ? ProfileStore.getUID() : '';
+    return uid ? 'dagnara_pill_log_' + uid + '_' + day : 'dagnara_pill_log_' + day;
+  } catch(e) { return 'dagnara_pill_log_' + day; }
+}
 function _getPillLog(day) {
-  try { return JSON.parse(localStorage.getItem('dagnara_pill_log_' + day) || '{}'); } catch(e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(_pillLogKey(day)) || '{}'); } catch(e) { return {}; }
 }
 function _savePillLog(day, log) {
-  try { localStorage.setItem('dagnara_pill_log_' + day, JSON.stringify(log)); } catch(e) {}
+  try { localStorage.setItem(_pillLogKey(day), JSON.stringify(log)); } catch(e) {}
+  if(typeof CloudSync !== 'undefined') CloudSync.scheduleSync(_pillLogKey(day));
 }
 function _pillDayKey(offset) {
   var d = new Date(); d.setDate(d.getDate() + (offset || 0));
