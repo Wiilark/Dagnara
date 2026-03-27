@@ -20670,6 +20670,49 @@ var CloudSync = (function(){
     }catch(e){ _dot('error'); console.warn('[CloudSync] syncOnLogin:', e); }
   }
 
+  // ── Sync key/value store (pills, programs, quit, achievements) ──
+  var SYNC_KEYS = [
+    'dagnara_pill_meds',
+    'dagnara_programs',
+    'dagnara_quit_smoking',
+    'dagnara_quit_drinking',
+    'dagnara_qs_unlocked',
+    'dagnara_qd_unlocked',
+    'dagnara_streaks',
+    'dagnara_achievements'
+  ];
+
+  async function _pushSync(key){
+    if(!_ready()) return;
+    try{
+      var raw = localStorage.getItem(key);
+      if(!raw) return;
+      var val = JSON.parse(raw);
+      await _client.from('dagnara_sync')
+        .upsert({ email:_email, key:key, value:val, updated_at:new Date().toISOString() }, { onConflict:'email,key' });
+    }catch(e){ console.warn('[CloudSync] pushSync:', key, e); }
+  }
+
+  async function _pullAllSync(){
+    if(!_ready()) return;
+    try{
+      var r = await _client.from('dagnara_sync').select('key,value').eq('email',_email);
+      if(r.error) throw r.error;
+      (r.data||[]).forEach(function(row){
+        if(row.value !== null && row.value !== undefined){
+          try{ localStorage.setItem(row.key, JSON.stringify(row.value)); }catch(e){}
+        }
+      });
+    }catch(e){ console.warn('[CloudSync] pullAllSync:', e); }
+  }
+
+  var _syncTimers = {};
+  function scheduleSync(key){
+    if(!_ready()) return;
+    clearTimeout(_syncTimers[key]);
+    _syncTimers[key] = setTimeout(function(){ _pushSync(key); }, 3000);
+  }
+
   // ── Debounced schedulers (called from save hooks) ───
   function scheduleProfilePush(){
     if(!_ready()) return;
@@ -20688,7 +20731,13 @@ var CloudSync = (function(){
 
   _init();
 
-  return { syncOnLogin:syncOnLogin, scheduleProfilePush:scheduleProfilePush, scheduleDiaryPush:scheduleDiaryPush };
+  return {
+    syncOnLogin: syncOnLogin,
+    scheduleProfilePush: scheduleProfilePush,
+    scheduleDiaryPush: scheduleDiaryPush,
+    scheduleSync: scheduleSync,
+    pushAllSync: function(){ SYNC_KEYS.forEach(function(k){ _pushSync(k); }); }
+  };
 })();
 </script>
 
