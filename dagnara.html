@@ -16423,6 +16423,40 @@ function renderDpWeekChart() {
 </div>
 <!-- /authScreen -->
 
+<!-- PASSWORD RESET MODAL -->
+<div id="pwResetOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(12,8,24,0.92);backdrop-filter:blur(8px);align-items:flex-end;justify-content:center;">
+  <div style="width:100%;max-width:440px;background:var(--layer1);border-radius:28px 28px 0 0;padding:28px 28px max(36px,env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,0.5);">
+    <!-- Step 1: Email -->
+    <div id="pwrStep1">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin-bottom:6px;">Reset password</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink2);line-height:1.5;margin-bottom:22px;">Enter your email — we'll send a 6-digit code.</div>
+      <input id="pwrEmail" class="ai" type="email" placeholder="you@example.com" autocomplete="email" autocapitalize="off" style="margin-bottom:6px;width:100%;box-sizing:border-box;">
+      <div id="pwrErr1" style="font-size:12px;color:#ef4444;min-height:18px;margin-bottom:12px;"></div>
+      <button id="pwrSendBtn" onclick="pwrSendCode()" style="width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,#7c4dff,#a855f7);border:none;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:#fff;cursor:pointer;margin-bottom:10px;">Send code</button>
+      <button onclick="closePwReset()" style="width:100%;padding:13px;border-radius:14px;background:none;border:1.5px solid rgba(124,77,255,0.2);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink2);cursor:pointer;">Cancel</button>
+    </div>
+    <!-- Step 2: OTP -->
+    <div id="pwrStep2" style="display:none;">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin-bottom:6px;">Check your email</div>
+      <div id="pwrEmailSentMsg" style="font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink2);line-height:1.5;margin-bottom:22px;">Enter the 6-digit code we sent you.</div>
+      <input id="pwrOtp" class="ai" type="text" inputmode="numeric" maxlength="6" placeholder="000000" style="letter-spacing:0.35em;text-align:center;font-size:22px;margin-bottom:6px;width:100%;box-sizing:border-box;">
+      <div id="pwrErr2" style="font-size:12px;color:#ef4444;min-height:18px;margin-bottom:12px;"></div>
+      <button id="pwrVerifyBtn" onclick="pwrVerifyOtp()" style="width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,#7c4dff,#a855f7);border:none;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:#fff;cursor:pointer;margin-bottom:10px;">Verify code</button>
+      <button onclick="pwrShowStep(1)" style="width:100%;padding:13px;border-radius:14px;background:none;border:1.5px solid rgba(124,77,255,0.2);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink2);cursor:pointer;">← Back</button>
+    </div>
+    <!-- Step 3: New password -->
+    <div id="pwrStep3" style="display:none;">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-0.02em;margin-bottom:6px;">New password</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink2);margin-bottom:22px;">Choose a strong password for your account.</div>
+      <div style="position:relative;margin-bottom:6px;">
+        <input id="pwrNewPwd" class="ai" type="password" placeholder="New password (min 6 chars)" style="width:100%;box-sizing:border-box;">
+        <button onclick="obTogglePwd('pwrNewPwd',this)" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(196,181,255,0.45);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;padding:4px;">Show</button>
+      </div>
+      <div id="pwrErr3" style="font-size:12px;color:#ef4444;min-height:18px;margin-bottom:12px;"></div>
+      <button id="pwrSaveBtn" onclick="pwrSetPassword()" style="width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,#7c4dff,#a855f7);border:none;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:#fff;cursor:pointer;">Set new password</button>
+    </div>
+  </div>
+</div>
 
 <style>
 .auth-field-wrap { display:flex; flex-direction:column; gap:6px; }
