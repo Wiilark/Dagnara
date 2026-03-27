@@ -8502,7 +8502,7 @@ function updateAllHeightDisplays() {
   var ob5U = document.getElementById('ob5HUnit');
   if (ob5H) {
     if (_heightUnit === 'ft') {
-      var ftin = cmToFtIn(_ob && _ob.height ? _ob.height : h);
+      var ftin = cmToFtIn((typeof _ob!=='undefined' && _ob && _ob.height) ? _ob.height : h);
       ob5H.textContent = ftin.ft + '\'' + ftin.inches + '"';
     } else {
       ob5H.textContent = _ob && _ob.height ? Math.round(_ob.height) : Math.round(h);
