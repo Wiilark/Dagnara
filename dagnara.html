@@ -26975,8 +26975,7 @@ window.undoLastAction = function() {
       'transform:translateX(-50%);background:#1a0a3c;color:#fff;padding:12px 20px;border-radius:12px;' +
       'font-size:13px;font-weight:500;font-family:var(--sans,sans-serif);z-index:99999;max-width:320px;' +
       'text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.2s;';
-    var lastErr = _errLog.length ? ' [' + _errLog[_errLog.length-1].msg.slice(0,80) + ']' : '';
-    t.textContent = '\u26a0\ufe0f Something went wrong. Your data is safe.' + lastErr;
+    t.textContent = '\u26a0\ufe0f Something went wrong. Your data is safe.';
     document.body.appendChild(t);
     requestAnimationFrame(function(){ t.style.opacity = '1'; });
     setTimeout(function(){
