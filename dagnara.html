@@ -21709,13 +21709,9 @@ w
 //
 // ════════════════════════════════════════════════════
 
-var SUPABASE_URL = '';
-var SUPABASE_KEY = '';
-// Loaded from server at runtime — see /api/config
-fetch('/api/config').then(function(r){ return r.json(); }).then(function(cfg){
-  SUPABASE_URL = cfg.supabaseUrl || '';
-  SUPABASE_KEY = cfg.supabaseKey || '';
-}).catch(function(e){ console.warn('[Config] Could not load server config:', e); });
+// SUPABASE_URL and SUPABASE_KEY are set by the shared client init at the top of the file.
+var SUPABASE_URL = window.SUPABASE_URL || '';
+var SUPABASE_KEY = window.SUPABASE_KEY || '';
 
 var CloudSync = (function(){
   var _client  = null;
