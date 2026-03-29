@@ -7139,6 +7139,9 @@ async function fetchOFFResults(query, resultsEl, localCount) {
   }
 }
 
+// ── SANITIZE: escape any HTML special chars in untrusted strings ──
+function _esc(s){ var d=document.createElement('div'); d.appendChild(document.createTextNode(String(s==null?'':s))); return d.innerHTML; }
+
 // ── BUILD FOOD ITEM ROW ──
 function buildFoodItem(food) {
   const isFav = favFoods.some(f => f.name === food.name);
@@ -7147,16 +7150,16 @@ function buildFoodItem(food) {
   div.className = 'food-item';
   div.style.cssText = 'position:relative;';
   div.innerHTML = `
-    <div class="food-item-icon">${food.icon}</div>
+    <div class="food-item-icon">${_esc(food.icon)}</div>
     <div class="food-item-info">
-      <div class="food-item-name">${food.name}${isOFF ? ' <span class="food-api-badge" style="vertical-align:middle;">WEB</span>' : ''}</div>
+      <div class="food-item-name">${_esc(food.name)}${isOFF ? ' <span class="food-api-badge" style="vertical-align:middle;">WEB</span>' : ''}</div>
       <div class="food-item-meta" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <span style="color:var(--purple2);font-weight:600;">${food.kcal} kcal</span>
+        <span style="color:var(--purple2);font-weight:600;">${_esc(food.kcal)} kcal</span>
         <span style="color:rgba(255,255,255,0.2);">·</span>
-        <span style="color:var(--sky);">C${food.carbs}g</span>
-        <span style="color:var(--rose);">P${food.protein}g</span>
-        <span style="color:var(--violet);">F${food.fat}g</span>
-        <span style="color:var(--ink3);font-size:10px;">${food.unit}</span>
+        <span style="color:var(--sky);">C${_esc(food.carbs)}g</span>
+        <span style="color:var(--rose);">P${_esc(food.protein)}g</span>
+        <span style="color:var(--violet);">F${_esc(food.fat)}g</span>
+        <span style="color:var(--ink3);font-size:10px;">${_esc(food.unit)}</span>
       </div>
     </div>
     <button class="food-fav-btn ${isFav ? 'active' : ''}" onclick="event.stopPropagation();toggleFavFood(this, arguments[0])">
