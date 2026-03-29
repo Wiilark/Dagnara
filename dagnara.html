@@ -19643,42 +19643,12 @@ var _origShowPanel = window.showPanel;;
       kcal_goal:'1840', gf_speed:'0.5',
       goal_label:'I want to lose weight'
     };
-    var hashedPwd = await hashPassword('K@xicha1');
     if(!existing){
-      u.push({ email:'dadunashvilikaxa@gmail.com', password:hashedPwd, name:'Kakha',
+      u.push({ email:'dadunashvilikaxa@gmail.com', name:'Kakha',
         addedAt:new Date().toISOString(), profile:profile });
       saveUsers(u);
     } else {
-      // Ensure password is hashed and profile exists
-      var changed = false;
-      if(!isHashed(existing.password)){ existing.password = hashedPwd; changed = true; }
-      if(!existing.profile){ existing.profile = profile; changed = true; }
-      if(changed) saveUsers(u);
-    }
-    // Ensure password_hash exists in Supabase — never overwrite profile_data
-    var seedFlag = 'dagnara_seed_pushed_v1';
-    var _sUrl = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : null;
-    var _sKey = (typeof SUPABASE_KEY !== 'undefined') ? SUPABASE_KEY : null;
-    if(_sUrl && _sKey && !localStorage.getItem(seedFlag)){
-      try{
-        var sb0 = supabase.createClient(_sUrl, _sKey);
-        // Only set password_hash if no record exists yet; never touch profile_data
-        var { data: existingRow } = await sb0.from('dagnara_profiles')
-          .select('email').eq('email','dadunashvilikaxa@gmail.com').maybeSingle();
-        if(!existingRow){
-          await sb0.from('dagnara_profiles').insert({
-            email:'dadunashvilikaxa@gmail.com', password_hash:hashedPwd,
-            profile_data:profile, updated_at:new Date().toISOString()
-          });
-        } else {
-          // Record exists — only update password_hash if it's missing
-          await sb0.from('dagnara_profiles')
-            .update({ password_hash: hashedPwd })
-            .eq('email','dadunashvilikaxa@gmail.com')
-            .is('password_hash', null);
-        }
-        localStorage.setItem(seedFlag, '1');
-      }catch(e){ console.warn('[Auth] pre-seed push:', e); }
+      if(!existing.profile){ existing.profile = profile; saveUsers(u); }
     }
   })();
 
