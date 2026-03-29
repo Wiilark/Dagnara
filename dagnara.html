@@ -21737,8 +21737,13 @@ w
 //
 // ════════════════════════════════════════════════════
 
-var SUPABASE_URL = 'https://evarprvfrjrdwsctxpgf.supabase.co';
-var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2YXJwcnZmcmpyZHdzY3R4cGdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MDgyNTcsImV4cCI6MjA5MDE4NDI1N30.sMswoE9bhW6ibnRc0XHGWjuXZuNmaZo9Zu98hneHoX4';
+var SUPABASE_URL = '';
+var SUPABASE_KEY = '';
+// Loaded from server at runtime — see /api/config
+fetch('/api/config').then(function(r){ return r.json(); }).then(function(cfg){
+  SUPABASE_URL = cfg.supabaseUrl || '';
+  SUPABASE_KEY = cfg.supabaseKey || '';
+}).catch(function(e){ console.warn('[Config] Could not load server config:', e); });
 
 var CloudSync = (function(){
   var _client  = null;
