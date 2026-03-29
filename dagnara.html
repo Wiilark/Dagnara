@@ -8170,7 +8170,14 @@ async function detectFoodsFromPhoto(file) {
     var text = data.content[0].text.trim();
     var match = text.match(/\[[\s\S]*\]/);
     if (!match) { showToast('❌ Could not parse response'); closePhotoOverlay(); return; }
-    var foods = JSON.parse(match[0]);
+    var foods;
+    try { foods = JSON.parse(match[0]); }
+    catch(pe) { showToast('❌ Could not parse food list'); closePhotoOverlay(); return; }
+    // Validate each item has expected numeric fields
+    foods = foods.filter(function(f){
+      return f && typeof f.name === 'string' &&
+             isFinite(f.kcal) && f.kcal >= 0 && f.kcal <= 5000;
+    });
 
     if (!foods.length) { showToast('No food detected in photo'); closePhotoOverlay(); return; }
 
