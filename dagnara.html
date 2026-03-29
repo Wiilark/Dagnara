@@ -8369,11 +8369,12 @@ function closeQuickAdd() {
 }
 
 function confirmQuickAdd() {
-  var kcal = parseInt(document.getElementById('quickAddKcal').value) || 0;
+  function _clamp(v, min, max){ var n = parseFloat(v); return isNaN(n) ? 0 : Math.min(max, Math.max(min, Math.round(n * 10) / 10)); }
+  var kcal    = _clamp(document.getElementById('quickAddKcal').value,    1, 5000);
   if (kcal <= 0) { showToast('Enter calories first'); return; }
-  var carbs   = parseFloat(document.getElementById('quickAddCarbs').value)   || 0;
-  var protein = parseFloat(document.getElementById('quickAddProtein').value) || 0;
-  var fat     = parseFloat(document.getElementById('quickAddFat').value)     || 0;
+  var carbs   = _clamp(document.getElementById('quickAddCarbs').value,   0, 500);
+  var protein = _clamp(document.getElementById('quickAddProtein').value, 0, 500);
+  var fat     = _clamp(document.getElementById('quickAddFat').value,     0, 500);
   var food = { icon: '⚡', name: 'Quick Add', kcal: kcal, carbs: carbs, protein: protein, fat: fat, unit: 'serving', cat: 'Other' };
   closeQuickAdd();
   addFoodItem(food, null);
