@@ -20445,7 +20445,7 @@ var _origShowPanel = window.showPanel;;
   var EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
   var EMAILJS_PUBLIC_KEY  = 'YOUR_PUBLIC_KEY';
 
-  var _pwrEmail = '', _pwrOtpHash = '', _pwrExpires = 0;
+  var _pwrEmail = '';
 
   window.pwrShowStep = function(n){
     [1,2,3].forEach(function(i){
@@ -20464,6 +20464,7 @@ var _origShowPanel = window.showPanel;;
     if(el) el.textContent = msg || '';
   }
 
+  // Step 1 — send Supabase reset email (no OTP needed, Supabase handles it)
   window.pwrSendCode = async function(){
     var email = (document.getElementById('pwrEmail').value||'').trim().toLowerCase();
     if(!email){ _pwrErr(1,'Enter your email address.'); return; }
@@ -20471,67 +20472,34 @@ var _origShowPanel = window.showPanel;;
     var btn = document.getElementById('pwrSendBtn');
     if(btn){ btn.textContent = 'Sending…'; btn.disabled = true; }
     try {
-      var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      var { data } = await sb.from('dagnara_profiles').select('email').eq('email', email).maybeSingle();
-      if(!data){ _pwrErr(1,'No account found for that email.'); return; }
-
-      var otp = String(Math.floor(100000 + Math.random() * 900000));
-      var expires = Date.now() + 15 * 60 * 1000;
-      var otpHash = await hashPassword(otp);
-
-      await sb.from('dagnara_profiles').update({
-        reset_token: otpHash, reset_expires: expires
-      }).eq('email', email);
-
-      _pwrEmail = email; _pwrOtpHash = otpHash; _pwrExpires = expires;
-
-      if(EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY'){
-        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
-          { to_email: email, otp_code: otp }, EMAILJS_PUBLIC_KEY);
-      } else {
-        // Dev mode: show code in toast (remove after EmailJS is configured)
-        if(typeof showToast==='function') showToast('Dev — OTP: ' + otp, 12000);
-      }
-
+      var sb = await window._sbClientReady;
+      if(!sb){ _pwrErr(1,'Cannot connect. Try again.'); return; }
+      var { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+      if(error){ _pwrErr(1, error.message || 'Could not send reset email.'); return; }
+      _pwrEmail = email;
+      // Hide OTP input on step 2 — user just needs to click the email link
+      var otpEl = document.getElementById('pwrOtp');
+      var verBtn = document.getElementById('pwrVerifyBtn');
+      if(otpEl) otpEl.style.display = 'none';
+      if(verBtn) verBtn.style.display = 'none';
       document.getElementById('pwrEmailSentMsg').textContent =
-        'Code sent to ' + email + '. Check spam if needed. Valid 15 min.';
+        'Reset link sent to ' + email + '. Click the link in your email — it will bring you back here to set a new password.';
       pwrShowStep(2);
     } catch(e){
       _pwrErr(1, 'Something went wrong — check your connection.');
       console.warn('[PwReset]', e);
     } finally {
-      if(btn){ btn.textContent = 'Send code'; btn.disabled = false; }
+      if(btn){ btn.textContent = 'Send reset link'; btn.disabled = false; }
     }
   };
 
-  window.pwrVerifyOtp = async function(){
-    var otp = (document.getElementById('pwrOtp').value||'').replace(/\s/g,'');
-    if(otp.length !== 6){ _pwrErr(2,'Enter the 6-digit code.'); return; }
-    if(Date.now() > _pwrExpires){ _pwrErr(2,'Code expired — go back and request a new one.'); return; }
-    _pwrErr(2,'');
-    var btn = document.getElementById('pwrVerifyBtn');
-    if(btn){ btn.textContent = 'Verifying…'; btn.disabled = true; }
-    try {
-      var inputHash = await hashPassword(otp);
-      var matched = (inputHash === _pwrOtpHash);
-      if(!matched){
-        // Re-check Supabase in case session was on another device
-        var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        var { data } = await sb.from('dagnara_profiles').select('reset_token,reset_expires').eq('email', _pwrEmail).maybeSingle();
-        if(data && inputHash === data.reset_token && Date.now() < data.reset_expires){
-          matched = true; _pwrOtpHash = data.reset_token; _pwrExpires = data.reset_expires;
-        }
-      }
-      if(!matched){ _pwrErr(2,'Incorrect code. Try again.'); return; }
-      pwrShowStep(3);
-      document.getElementById('pwrNewPwd').focus();
-    } catch(e){
-      _pwrErr(2,'Error verifying — check your connection.');
-    } finally {
-      if(btn){ btn.textContent = 'Verify code'; btn.disabled = false; }
-    }
-  };
+  // Step 2 is now just a "check your email" message — no OTP to verify
+  window.pwrVerifyOtp = function(){ pwrShowStep(3); };
 
+  // Step 3 — user clicked the email link and landed back on the app;
+  // Supabase SDK has already exchanged the code for a recovery session.
   window.pwrSetPassword = async function(){
     var pwd = document.getElementById('pwrNewPwd').value || '';
     if(pwd.length < 6){ _pwrErr(3,'Password must be at least 6 characters.'); return; }
@@ -20539,21 +20507,12 @@ var _origShowPanel = window.showPanel;;
     var btn = document.getElementById('pwrSaveBtn');
     if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
     try {
-      var newHash = await hashPassword(pwd);
-      var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      await sb.from('dagnara_profiles').update({
-        password_hash: newHash, reset_token: null, reset_expires: null
-      }).eq('email', _pwrEmail);
-      // Update local user record too
-      try {
-        var us = getUsers();
-        var u = us.find(function(x){ return x.email===_pwrEmail; });
-        if(u){ u.password = newHash; saveUsers(us); }
-      } catch(e2){}
+      var sb = await window._sbClientReady;
+      if(!sb){ _pwrErr(3,'Cannot connect.'); return; }
+      var { error } = await sb.auth.updateUser({ password: pwd });
+      if(error){ _pwrErr(3, error.message || 'Failed to update password.'); return; }
       closePwReset();
-      var li = document.getElementById('loginEmail');
-      if(li) li.value = _pwrEmail;
-      if(typeof showToast==='function') showToast('✅ Password updated — log in with your new password!');
+      if(typeof showToast==='function') showToast('✅ Password updated — you are now logged in!');
     } catch(e){
       _pwrErr(3,'Failed to save — check your connection.');
       console.warn('[PwReset]', e);
@@ -20561,6 +20520,18 @@ var _origShowPanel = window.showPanel;;
       if(btn){ btn.textContent = 'Set new password'; btn.disabled = false; }
     }
   };
+
+  // Listen for Supabase password-recovery redirect (user clicked email link)
+  window._sbClientReady.then(function(sb){
+    if(!sb) return;
+    sb.auth.onAuthStateChange(function(event){
+      if(event === 'PASSWORD_RECOVERY'){
+        var ov = document.getElementById('pwResetOverlay');
+        if(ov) ov.style.display = 'flex';
+        pwrShowStep(3);
+      }
+    });
+  });
 
   // ── Check on load ─────────────────────────────────
   var _cu = getCurrentUser();
