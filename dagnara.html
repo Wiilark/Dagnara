@@ -21895,7 +21895,7 @@ var CloudSync = (function(){
       await _pullAllSync();
 
       _dot('synced');
-    }catch(e){ _dot('error'); console.warn('[CloudSync] syncOnLogin:', e); }
+    }catch(e){ _dot('error'); _onFail('syncOnLogin', e); }
   }
 
   // ── Sync key/value store (pills, programs, quit, achievements) ──
