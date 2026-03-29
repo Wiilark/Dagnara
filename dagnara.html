@@ -21794,16 +21794,16 @@ var CloudSync = (function(){
       if(!user){ _dot('error'); return; }
       var safe = Object.assign({}, user.profile||{});
       delete safe.password;
-      // Timestamp every push so conflict resolution can pick the freshest version
       safe._pushed_at = Date.now();
-      // Also persist timestamp locally so local vs cloud comparison works
       user.profile = Object.assign(user.profile||{}, { _pushed_at: safe._pushed_at });
       localStorage.setItem('dagnara_users', JSON.stringify(users));
-      var r = await _client.from('dagnara_profiles')
-        .upsert({ email:_email, profile_data:safe, updated_at:new Date().toISOString() }, { onConflict:'email' });
-      if(r.error) throw r.error;
-      _dot('synced');
-    }catch(e){ _dot('error'); console.warn('[CloudSync] pushProfile:', e); }
+      await _withRetry(async function(){
+        var r = await _client.from('dagnara_profiles')
+          .upsert({ email:_email, profile_data:safe, updated_at:new Date().toISOString() }, { onConflict:'email' });
+        if(r.error) throw r.error;
+      });
+      _dot('synced'); _onSuccess();
+    }catch(e){ _dot('error'); _onFail('pushProfile', e); }
   }
 
   async function _pullProfile(){
