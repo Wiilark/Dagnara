@@ -20534,12 +20534,12 @@ var _origShowPanel = window.showPanel;;
   });
 
   // ── Check on load ─────────────────────────────────
+  // Immediately restore from localStorage so there's no flash, then
+  // validate the Supabase Auth session asynchronously.
   var _cu = getCurrentUser();
   if(_cu){
-    // User has an active session — hide auth and restore profile from users DB
     var sc = document.getElementById('authScreen');
     if(sc) sc.style.display = 'none';
-    // Restore immediately from users DB so profile is ready before window.load
     var _users = (function(){ try{ var u=localStorage.getItem('dagnara_users'); return u?JSON.parse(u):[]; }catch(e){ return []; } })();
     var _me = _users.find(function(u){ return u.email === _cu; });
     if(_me && _me.profile && typeof ProfileStore !== 'undefined'){
@@ -20549,7 +20549,6 @@ var _origShowPanel = window.showPanel;;
       });
       ProfileStore.endBulkRestore();
     }
-    // Sync with Supabase — pull cloud data then push local data
     setTimeout(function(){
       if(typeof CloudSync !== 'undefined'){
         CloudSync.syncOnLogin(_cu);
@@ -20562,6 +20561,33 @@ var _origShowPanel = window.showPanel;;
       }
     }, 1500);
   } else {
+    // Check if Supabase has a valid session (e.g. after password-reset redirect)
+    window._sbClientReady.then(function(sb){
+      if(!sb) return;
+      sb.auth.getSession().then(function(res){
+        var session = res.data && res.data.session;
+        if(session && session.user && session.user.email){
+          var email = session.user.email;
+          setCurrentUser(email);
+          var _users2 = (function(){ try{ var u=localStorage.getItem('dagnara_users'); return u?JSON.parse(u):[]; }catch(e){ return []; } })();
+          var _me2 = _users2.find(function(u){ return u.email===email; });
+          if(_me2 && _me2.profile && typeof ProfileStore!=='undefined'){
+            ProfileStore.startBulkRestore();
+            Object.keys(_me2.profile).forEach(function(k){
+              if(_me2.profile[k]!==undefined) try{ ProfileStore.set(k,String(_me2.profile[k])); }catch(e){}
+            });
+            ProfileStore.endBulkRestore();
+          }
+          var sc2 = document.getElementById('authScreen');
+          if(sc2) sc2.style.display = 'none';
+          if(typeof showDagHome==='function') setTimeout(showDagHome, 200);
+          if(typeof CloudSync!=='undefined'){
+            CloudSync.syncOnLogin(email);
+            setTimeout(function(){ CloudSync.forcePushAll(email); }, 3000);
+          }
+        }
+      });
+    });
     var _rem = getRemembered();
     if(_rem) obShowLogin(); else obGo(0);
   }
