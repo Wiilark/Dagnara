@@ -21725,11 +21725,8 @@ var CloudSync = (function(){
 
   // ── Init ────────────────────────────────────────────
   function _init(){
-    if(!SUPABASE_URL || !SUPABASE_KEY){ _dot('offline'); return; }
-    try{
-      _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      _dot('offline');
-    }catch(e){ console.warn('[CloudSync] init:', e); }
+    if(window._sbClient){ _client = window._sbClient; _dot('offline'); return; }
+    _dot('offline');
   }
 
   function _ready(){ return !!(_client && _email); }
