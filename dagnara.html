@@ -22003,9 +22003,9 @@ var CloudSync = (function(){
         }
       }
 
-      _dot('synced');
+      _dot('synced'); _onSuccess();
       if(typeof showToast==='function') showToast('✅ All data synced to cloud!');
-    }catch(e){ _dot('error'); console.warn('[CloudSync] forcePushAll:', e); }
+    }catch(e){ _dot('error'); _onFail('forcePushAll', e); }
   }
 
 
