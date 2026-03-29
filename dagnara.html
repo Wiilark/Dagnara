@@ -20105,23 +20105,28 @@ var _origShowPanel = window.showPanel;;
       if(errEl2) errEl2.textContent='Email already registered. Log in instead.';
       obGo(1); return;
     }
-    var hashedPwd = await hashPassword(_ob.pwd);
-    var userRecord = { email:_ob.email, password:hashedPwd, profile:profile,
+    var _regSb = await window._sbClientReady;
+    if(!_regSb){
+      var _regErr=document.getElementById('ob1Err');
+      if(_regErr) _regErr.textContent='Cannot connect to server. Try again.'; return;
+    }
+    var _signUpRes = await _regSb.auth.signUp({ email: _ob.email, password: _ob.pwd });
+    if(_signUpRes.error){
+      var _regErr=document.getElementById('ob1Err');
+      if(_regErr) _regErr.textContent = _signUpRes.error.message || 'Registration failed. Try again.';
+      return;
+    }
+    var userRecord = { email:_ob.email, profile:profile,
       device: navigator.userAgent.indexOf('iPhone')>-1?'iPhone':navigator.userAgent.indexOf('Android')>-1?'Android':'Browser',
       addedAt: new Date().toISOString()
     };
     users.push(userRecord);
     saveUsers(users);
-    // Push account to Supabase so any device can log in
-    if(SUPABASE_URL && SUPABASE_KEY){
-      try{
-        var sb2=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-        await sb2.from('dagnara_profiles').upsert({
-          email:_ob.email, password_hash:hashedPwd,
-          profile_data:profile, updated_at:new Date().toISOString()
-        },{onConflict:'email'});
-      }catch(e){ console.warn('[Auth] register push:', e); }
-    }
+    try{
+      await _regSb.from('dagnara_profiles').upsert({
+        email:_ob.email, profile_data:profile, updated_at:new Date().toISOString()
+      },{onConflict:'email'});
+    }catch(e){ console.warn('[Auth] profile push:', e); }
 
     // Set current session
     setCurrentUser(_ob.email);
