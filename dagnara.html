@@ -13,6 +13,23 @@
 <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+// ── Shared Supabase client ────────────────────────────────────────────────────
+// Initialised once from the proxy server. All auth + data calls use this client
+// so the SDK can manage the JWT session automatically (refresh, persist, RLS).
+window._sbClient = null;
+window._sbClientReady = fetch('/api/config')
+  .then(function(r){ return r.json(); })
+  .then(function(cfg){
+    window.SUPABASE_URL = cfg.supabaseUrl || '';
+    window.SUPABASE_KEY = cfg.supabaseKey || '';
+    window._sbClient = supabase.createClient(
+      window.SUPABASE_URL, window.SUPABASE_KEY,
+      { auth: { persistSession: true, storageKey: 'dagnara_sb_session', detectSessionInUrl: true } }
+    );
+    return window._sbClient;
+  }).catch(function(e){ console.warn('[Config]', e); return null; });
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 
