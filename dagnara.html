@@ -8125,14 +8125,6 @@ function closePhotoOverlay() {
 }
 
 async function detectFoodsFromPhoto(file) {
-  var apiKey = localStorage.getItem('dagnara_claude_key');
-  if (!apiKey) {
-    apiKey = prompt('Enter your Anthropic API key for photo food detection\n(stored only on your device, never shared):');
-    if (!apiKey || !apiKey.trim()) { closePhotoOverlay(); return; }
-    localStorage.setItem('dagnara_claude_key', apiKey.trim());
-    apiKey = apiKey.trim();
-  }
-
   try {
     var b64 = await new Promise(function(resolve, reject) {
       var reader = new FileReader();
@@ -8141,36 +8133,16 @@ async function detectFoodsFromPhoto(file) {
       reader.readAsDataURL(file);
     });
 
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var res = await fetch('/api/analyze-food', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: file.type, data: b64 } },
-            { type: 'text', text: 'Identify all food items in this image. Return ONLY a valid JSON array, no other text:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nEstimate realistic calories for the portion you can see. If no food visible, return [].' }
-          ]
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageData: b64, mediaType: file.type })
     });
 
     var data = await res.json();
 
     if (data.error) {
-      if (data.error.type === 'authentication_error') {
-        localStorage.removeItem('dagnara_claude_key');
-        showToast('❌ Invalid API key — cleared, try again');
-      } else {
-        showToast('❌ ' + (data.error.message || 'API error'));
-      }
+      showToast('❌ ' + (data.error.message || data.error || 'API error'));
       closePhotoOverlay();
       return;
     }
