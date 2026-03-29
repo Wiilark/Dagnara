@@ -6254,7 +6254,7 @@ window.getKcalGoal = function(){
     var v = ProfileStore.get('kcal_goal');
     if(v){ window.D_GOAL = parseInt(v); return window.D_GOAL; }
   }catch(e){}
-  return (window.getKcalGoal ? window.getKcalGoal() : 2000);
+  return 2000;
 };
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
