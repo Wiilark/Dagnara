@@ -20151,50 +20151,32 @@ var _origShowPanel = window.showPanel;;
     if(!email){ errEl.textContent='Enter your email.'; return; }
     if(!pwd)  { errEl.textContent='Enter your password.'; return; }
 
+    var _loginSb = await window._sbClientReady;
+    if(!_loginSb){ errEl.textContent='Cannot connect to server.'; return; }
+
+    errEl.textContent=''; errEl.style.color='#a78bfa';
+    var btnEl = document.querySelector('.auth-btn') || document.getElementById('loginBtn');
+    var origText = btnEl ? btnEl.textContent : '';
+    if(btnEl) btnEl.textContent = 'Signing in…';
+
+    var _signInRes = await _loginSb.auth.signInWithPassword({ email: email, password: pwd });
+    if(btnEl) btnEl.textContent = origText;
+    errEl.style.color = '';
+    if(_signInRes.error){ errEl.textContent='Incorrect email or password.'; return; }
+
     var users = getUsers();
     var userIdx = users.findIndex(function(u){ return u.email===email; });
-    var inputHash = await hashPassword(pwd);
-
     if(userIdx < 0){
-      // Not found locally — check Supabase
-      if(!SUPABASE_URL || !SUPABASE_KEY){ errEl.textContent='Incorrect email or password.'; return; }
-      errEl.textContent=''; errEl.style.color='#a78bfa';
-      var btnEl = document.querySelector('.auth-btn') || document.getElementById('loginBtn');
-      var origText = btnEl ? btnEl.textContent : '';
-      if(btnEl) btnEl.textContent = 'Checking…';
       try{
-        var sb3 = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        var r3 = await sb3.from('dagnara_profiles').select('email,password_hash,profile_data').eq('email',email).maybeSingle();
-        if(btnEl) btnEl.textContent = origText;
-        if(!r3.data){ errEl.textContent='Incorrect email or password.'; errEl.style.color=''; return; }
-        if(!r3.data.password_hash || r3.data.password_hash !== inputHash){
-          errEl.textContent='Incorrect email or password.'; errEl.style.color=''; return;
-        }
-        // Password matched — create local user record from cloud profile
-        var cloudProfile = r3.data.profile_data || {};
-        var newUser = { email:email, password:inputHash, profile:cloudProfile, addedAt:new Date().toISOString() };
-        users.push(newUser);
+        var _r3 = await _loginSb.from('dagnara_profiles').select('profile_data').eq('email',email).maybeSingle();
+        var _cloudPro = (_r3.data && _r3.data.profile_data) || {};
+        users.push({ email:email, profile:_cloudPro, addedAt:new Date().toISOString() });
         saveUsers(users);
         userIdx = users.length - 1;
-        errEl.style.color='';
-      }catch(e){
-        if(btnEl) btnEl.textContent = origText;
-        errEl.textContent='Network error. Check connection.'; errEl.style.color=''; return;
-      }
+      }catch(e){ console.warn('[Auth] profile pull:', e); }
     }
 
-    var user = users[userIdx];
-
-    // ── Migration: hash any legacy plaintext password on first login ──
-    if(!isHashed(user.password)){
-      user.password = await hashPassword(user.password);
-      users[userIdx] = user;
-      saveUsers(users);
-    }
-
-    if(inputHash !== user.password){
-      errEl.textContent='Incorrect email or password.'; return;
-    }
+    var user = users[userIdx] || { email:email, profile:{} };
 
     // ── Set session FIRST so ProfileStore derives correct UID ──
     setCurrentUser(email);
