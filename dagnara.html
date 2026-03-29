@@ -21820,11 +21820,13 @@ var CloudSync = (function(){
     if(!_ready()) return;
     _dot('syncing');
     try{
-      var r = await _client.from('dagnara_diary')
-        .upsert({ email:_email, date:date, entry_data:data, updated_at:new Date().toISOString() }, { onConflict:'email,date' });
-      if(r.error) throw r.error;
-      _dot('synced');
-    }catch(e){ _dot('error'); console.warn('[CloudSync] pushDiary:', e); }
+      await _withRetry(async function(){
+        var r = await _client.from('dagnara_diary')
+          .upsert({ email:_email, date:date, entry_data:data, updated_at:new Date().toISOString() }, { onConflict:'email,date' });
+        if(r.error) throw r.error;
+      });
+      _dot('synced'); _onSuccess();
+    }catch(e){ _dot('error'); _onFail('pushDiary', e); }
   }
 
   async function _pullDiary(){
