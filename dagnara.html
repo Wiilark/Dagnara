@@ -20263,8 +20263,9 @@ var _origShowPanel = window.showPanel;;
   // ── Logout ────────────────────────────────────────
   window.confirmLogout=function(){var s=document.getElementById('logoutSheet');if(s)s.style.display='flex';};
   window.closeLogoutSheet=function(){var s=document.getElementById('logoutSheet');if(s)s.style.display='none';};
-  window.doLogout=function(){
+  window.doLogout=async function(){
     closeLogoutSheet(); clearCurrentUser();
+    if(window._sbClient){ try{ await window._sbClient.auth.signOut(); }catch(e){} }
     setTimeout(function(){
       obShowLogin();
       var screen=document.getElementById('authScreen');
