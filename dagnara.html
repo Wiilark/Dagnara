@@ -21828,6 +21828,7 @@ var CloudSync = (function(){
   // ── Full sync on login ───────────────────────────────
   async function syncOnLogin(email){
     _email = email;
+    if(!_client && SUPABASE_URL && SUPABASE_KEY){ _init(); }
     if(!_client){ _dot('offline'); return; }
     _dot('syncing');
     try{
