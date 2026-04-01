@@ -908,7 +908,6 @@ function WeightLogger({ visible, onClose }: { visible: boolean; onClose: () => v
 
 // ── Tab Layout ────────────────────────────────────────────────────────────────
 export default function TabLayout() {
-  const { bottom: bottomInset } = useSafeAreaInsets();
   const loadApp = useAppStore((s) => s.loadApp);
   const messagesOpen = useAppStore((s) => s.messagesOpen);
   const setMessagesOpen = useAppStore((s) => s.setMessagesOpen);
@@ -931,14 +930,10 @@ export default function TabLayout() {
             backgroundColor: colors.layer1,
             borderTopColor: colors.line2,
             borderTopWidth: 1,
-            height: 60 + bottomInset,
-            paddingBottom: bottomInset,
-            paddingTop: 0,
           },
           tabBarActiveTintColor: colors.lavender,
           tabBarInactiveTintColor: 'rgba(90,77,122,1)',
-          tabBarLabelStyle: { fontSize: 10.5, fontWeight: '500', marginTop: 2 },
-          tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', paddingTop: 6, paddingBottom: 4 },
+          tabBarLabelStyle: { fontSize: 10.5, fontWeight: '500' },
         }}
       >
         <Tabs.Screen
@@ -1033,9 +1028,7 @@ const st = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 6,
-    paddingBottom: 4,
-    gap: 3,
+    gap: 4,
   },
   fab: {
     width: 44,
