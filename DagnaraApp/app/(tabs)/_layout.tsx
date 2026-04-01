@@ -74,7 +74,7 @@ function CommandCenterModal({ visible, onClose, onNavigate }: {
   onNavigate: (tab: string) => void;
 }) {
   const { lifeScore, weightHistory, xp, programs, calorieGoal, streak } = useAppStore();
-  const { email } = useAuthStore();
+  const { email, profile } = useAuthStore();
   const { entries } = useDiaryStore();
   const [clock, setClock] = useState('');
 
@@ -88,9 +88,12 @@ function CommandCenterModal({ visible, onClose, onNavigate }: {
   const fat = foods.reduce((s: number, f: any) => s + f.fat, 0);
   const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].kg : null;
   const KCAL_GOAL = calorieGoal || 2000;
-  const CARBS_GOAL = 250; const PROTEIN_GOAL = 150; const FAT_GOAL = 65;
+  // Macro goals derived from calorie goal (50% carbs / 30% protein / ~29% fat)
+  const CARBS_GOAL = Math.round(KCAL_GOAL * 0.50 / 4);
+  const PROTEIN_GOAL = Math.round(KCAL_GOAL * 0.30 / 4);
+  const FAT_GOAL = Math.round(KCAL_GOAL * 0.293 / 9);
   const xpInfo = getXpLevel(xp);
-  const displayName = email ? email.split('@')[0] : 'User';
+  const displayName = (profile as any)?.name || (email ? email.split('@')[0] : 'User');
 
   useEffect(() => {
     if (!visible) return;
@@ -190,7 +193,7 @@ function CommandCenterModal({ visible, onClose, onNavigate }: {
                 <View style={cc.macrosGrid}>
                   {[
                     { label: 'Carbs', val: carbs, goal: CARBS_GOAL, color: colors.honey },
-                    { label: 'Protein', val: protein, goal: PROTEIN_GOAL, color: '#a78bfa' },
+                    { label: 'Protein', val: protein, goal: PROTEIN_GOAL, color: colors.purple2 },
                     { label: 'Fat', val: fat, goal: FAT_GOAL, color: colors.sky },
                   ].map(m => (
                     <View key={m.label} style={cc.macroRow}>
