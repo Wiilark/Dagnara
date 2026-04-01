@@ -925,6 +925,11 @@ export default function DiaryScreen() {
         )}
 
         {/* ── Calorie Ring ── */}
+        <ExpoLinearGradient
+          colors={['rgba(124,77,255,0.14)', 'rgba(34,197,94,0.06)', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={st.calCard}
+        >
         <View style={st.calSection}>
           <View style={st.ringWrap}>
             <Svg width={190} height={190} viewBox="0 0 220 220">
@@ -953,6 +958,7 @@ export default function DiaryScreen() {
             ))}
           </View>
         </View>
+        </ExpoLinearGradient>
 
         {/* ── Macro Strip ── */}
         <View style={st.macroStrip}>
@@ -1665,6 +1671,17 @@ const st = StyleSheet.create({
   sectionHdr: { paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 4, fontSize: 11, fontWeight: '700', letterSpacing: 0.12 * 11, textTransform: 'uppercase', color: colors.ink3 },
 
   // Calorie ring
+  calCard: {
+    marginHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
   calSection: { alignItems: 'center', paddingVertical: spacing.sm },
   ringWrap: { position: 'relative', width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center' },
