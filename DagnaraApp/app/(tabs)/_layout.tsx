@@ -68,8 +68,12 @@ function CcRing({ eaten, goal }: { eaten: number; goal: number }) {
 }
 
 // ── Command Center Modal ──────────────────────────────────────────────────────
-function CommandCenterModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { lifeScore, weightHistory, xp } = useAppStore();
+function CommandCenterModal({ visible, onClose, onNavigate }: {
+  visible: boolean;
+  onClose: () => void;
+  onNavigate: (tab: string) => void;
+}) {
+  const { lifeScore, weightHistory, xp, programs, calorieGoal, streak } = useAppStore();
   const { email } = useAuthStore();
   const { entries } = useDiaryStore();
   const [clock, setClock] = useState('');
@@ -83,7 +87,8 @@ function CommandCenterModal({ visible, onClose }: { visible: boolean; onClose: (
   const protein = foods.reduce((s: number, f: any) => s + f.protein, 0);
   const fat = foods.reduce((s: number, f: any) => s + f.fat, 0);
   const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].kg : null;
-  const KCAL_GOAL = 2000; const CARBS_GOAL = 250; const PROTEIN_GOAL = 150; const FAT_GOAL = 65;
+  const KCAL_GOAL = calorieGoal || 2000;
+  const CARBS_GOAL = 250; const PROTEIN_GOAL = 150; const FAT_GOAL = 65;
   const xpInfo = getXpLevel(xp);
   const displayName = email ? email.split('@')[0] : 'User';
 
@@ -98,8 +103,14 @@ function CommandCenterModal({ visible, onClose }: { visible: boolean; onClose: (
     return () => clearInterval(id);
   }, [visible]);
 
+  const modules = [
+    { icon: '🚭', label: 'Quit Smoking',  key: 'quit_smoking',  tab: '/(tabs)/programs' },
+    { icon: '🍺', label: 'Quit Drinking', key: 'quit_drinking', tab: '/(tabs)/programs' },
+    { icon: '💊', label: 'Pill Reminder', key: 'pill_reminder', tab: '/(tabs)/programs' },
+  ];
+
   return (
-    <Modal visible={visible} animationType="fade" statusBarTranslucent>
+    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen">
       <View style={cc.root}>
         {/* Grid background */}
         <View style={cc.gridBg} pointerEvents="none">
@@ -124,126 +135,142 @@ function CommandCenterModal({ visible, onClose }: { visible: boolean; onClose: (
             </View>
             <View style={cc.headerRight}>
               <Text style={cc.clock}>{clock}</Text>
-              <TouchableOpacity onPress={onClose} style={cc.closeBtn}>
-                <Ionicons name="close" size={18} color="rgba(255,255,255,0.7)" />
+              <TouchableOpacity onPress={onClose} style={cc.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
 
           <ScrollView contentContainerStyle={cc.scroll} showsVerticalScrollIndicator={false}>
-            {/* User Banner */}
-            <LinearGradient colors={['rgba(124,77,255,0.18)', 'rgba(124,77,255,0.05)']}
-              style={cc.userBanner}>
-              <View style={cc.avatarCircle}>
-                <Ionicons name="person" size={26} color={colors.lavender} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={cc.userName}>{displayName}</Text>
-                <Text style={cc.userEmail}>{email ?? 'Not signed in'}</Text>
-                <Text style={cc.userScore}>Life Score: <Text style={{ color: colors.lavender }}>{lifeScore ?? '--'}</Text></Text>
-              </View>
-              <View style={cc.xpBadge}>
-                <Text style={cc.xpBadgeTxt}>{xpInfo.level}</Text>
-              </View>
-            </LinearGradient>
-
-            {/* Stats Row */}
-            <View style={cc.statsRow}>
-              {[
-                { icon: '⚖️', val: latestWeight ? `${latestWeight}kg` : '--', lbl: 'Weight' },
-                { icon: '🔥', val: String(eaten), lbl: 'kcal today' },
-                { icon: '💧', val: String(water), lbl: 'Glasses' },
-              ].map((s, i) => (
-                <View key={s.lbl} style={[cc.statTile, i === 1 && cc.statTileMid]}>
-                  <Text style={cc.statIcon}>{s.icon}</Text>
-                  <Text style={cc.statVal}>{s.val}</Text>
-                  <Text style={cc.statLbl}>{s.lbl}</Text>
+            {/* User Banner — tap to go to profile */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/profile')} activeOpacity={0.85}>
+              <LinearGradient colors={['rgba(124,77,255,0.18)', 'rgba(124,77,255,0.05)']}
+                style={cc.userBanner}>
+                <View style={cc.avatarCircle}>
+                  <Ionicons name="person" size={26} color={colors.lavender} />
                 </View>
-              ))}
-            </View>
-
-            {/* Calorie Ring + Macros */}
-            <View style={cc.ringSection}>
-              <View style={cc.ringWrap}>
-                <CcRing eaten={eaten} goal={KCAL_GOAL} />
-                <View style={cc.ringCenter}>
-                  <Text style={cc.ringVal}>{Math.max(0, KCAL_GOAL - eaten)}</Text>
-                  <Text style={cc.ringLbl}>kcal left</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={cc.userName}>{displayName}</Text>
+                  <Text style={cc.userEmail}>{email ?? 'Not signed in'}</Text>
+                  <Text style={cc.userScore}>Life Score: <Text style={{ color: colors.lavender }}>{lifeScore ?? '--'}</Text>  ·  🔥 {streak} day streak</Text>
                 </View>
-              </View>
-              <View style={cc.macrosGrid}>
+                <View style={cc.xpBadge}>
+                  <Text style={cc.xpBadgeTxt}>{xpInfo.level}</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Stats Row — tap to go to diary */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/diary')} activeOpacity={0.85}>
+              <View style={cc.statsRow}>
                 {[
-                  { label: 'Carbs', val: carbs, goal: CARBS_GOAL, color: colors.honey },
-                  { label: 'Protein', val: protein, goal: PROTEIN_GOAL, color: '#a78bfa' },
-                  { label: 'Fat', val: fat, goal: FAT_GOAL, color: colors.sky },
-                ].map(m => (
-                  <View key={m.label} style={cc.macroRow}>
-                    <Text style={cc.macroLbl}>{m.label}</Text>
-                    <View style={cc.macroBarBg}>
-                      <View style={[cc.macroBarFill, {
-                        width: `${Math.min(100, m.goal > 0 ? m.val / m.goal * 100 : 0)}%` as any,
-                        backgroundColor: m.color,
-                      }]} />
+                  { icon: '⚖️', val: latestWeight ? `${latestWeight}kg` : '--', lbl: 'Weight' },
+                  { icon: '🔥', val: String(eaten), lbl: 'kcal today' },
+                  { icon: '💧', val: String(water), lbl: 'Glasses' },
+                ].map((s, i) => (
+                  <View key={s.lbl} style={[cc.statTile, i === 1 && cc.statTileMid]}>
+                    <Text style={cc.statIcon}>{s.icon}</Text>
+                    <Text style={cc.statVal}>{s.val}</Text>
+                    <Text style={cc.statLbl}>{s.lbl}</Text>
+                  </View>
+                ))}
+              </View>
+            </TouchableOpacity>
+
+            {/* Calorie Ring + Macros — tap to go to diary */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/diary')} activeOpacity={0.85}>
+              <View style={cc.ringSection}>
+                <View style={cc.ringWrap}>
+                  <CcRing eaten={eaten} goal={KCAL_GOAL} />
+                  <View style={cc.ringCenter}>
+                    <Text style={cc.ringVal}>{Math.max(0, KCAL_GOAL - eaten)}</Text>
+                    <Text style={cc.ringLbl}>kcal left</Text>
+                  </View>
+                </View>
+                <View style={cc.macrosGrid}>
+                  {[
+                    { label: 'Carbs', val: carbs, goal: CARBS_GOAL, color: colors.honey },
+                    { label: 'Protein', val: protein, goal: PROTEIN_GOAL, color: '#a78bfa' },
+                    { label: 'Fat', val: fat, goal: FAT_GOAL, color: colors.sky },
+                  ].map(m => (
+                    <View key={m.label} style={cc.macroRow}>
+                      <Text style={cc.macroLbl}>{m.label}</Text>
+                      <View style={cc.macroBarBg}>
+                        <View style={[cc.macroBarFill, {
+                          width: `${Math.min(100, m.goal > 0 ? m.val / m.goal * 100 : 0)}%` as any,
+                          backgroundColor: m.color,
+                        }]} />
+                      </View>
+                      <Text style={cc.macroVal}>{m.val}g</Text>
                     </View>
-                    <Text style={cc.macroVal}>{m.val}g</Text>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
-            {/* Active Mission */}
-            <View style={cc.missionCard}>
-              <View style={cc.missionHead}>
-                <Text style={cc.missionTitle}>ACTIVE MISSION</Text>
-                <Text style={cc.missionPct}>{Math.round(Math.min(100, eaten / KCAL_GOAL * 100))}%</Text>
+            {/* Active Mission — tap to go to diary */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/diary')} activeOpacity={0.85}>
+              <View style={cc.missionCard}>
+                <View style={cc.missionHead}>
+                  <Text style={cc.missionTitle}>DAILY NUTRITION GOAL</Text>
+                  <Text style={cc.missionPct}>{Math.round(Math.min(100, eaten / KCAL_GOAL * 100))}%</Text>
+                </View>
+                <View style={cc.missionBar}>
+                  <View style={[cc.missionFill, {
+                    width: `${Math.min(100, KCAL_GOAL > 0 ? eaten / KCAL_GOAL * 100 : 0)}%` as any,
+                  }]} />
+                </View>
+                <Text style={cc.missionSub}>{eaten} / {KCAL_GOAL} kcal logged</Text>
               </View>
-              <Text style={cc.missionName}>Daily Nutrition Goal</Text>
-              <View style={cc.missionBar}>
-                <View style={[cc.missionFill, {
-                  width: `${Math.min(100, KCAL_GOAL > 0 ? eaten / KCAL_GOAL * 100 : 0)}%` as any,
-                }]} />
+            </TouchableOpacity>
+
+            {/* XP Progress — tap to go to progress */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/progress')} activeOpacity={0.85}>
+              <View style={cc.xpCard}>
+                <View style={cc.xpCardHead}>
+                  <Text style={cc.xpCardTitle}>XP PROGRESS</Text>
+                  <Text style={cc.xpCardVal}>{xp} XP</Text>
+                </View>
+                <View style={cc.xpBar}>
+                  <View style={[cc.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} />
+                </View>
+                <Text style={cc.xpMeta}>{xpInfo.name} · {xpInfo.toNext} XP to next level</Text>
               </View>
-              <Text style={cc.missionSub}>{eaten} / {KCAL_GOAL} kcal logged</Text>
-            </View>
+            </TouchableOpacity>
 
-            {/* XP Progress */}
-            <View style={cc.xpCard}>
-              <View style={cc.xpCardHead}>
-                <Text style={cc.xpCardTitle}>XP PROGRESS</Text>
-                <Text style={cc.xpCardVal}>{xp} XP</Text>
-              </View>
-              <View style={cc.xpBar}>
-                <View style={[cc.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} />
-              </View>
-              <Text style={cc.xpMeta}>{xpInfo.name} · {xpInfo.toNext} XP to next level</Text>
-            </View>
+            {/* 30-Day Calendar — tap to go to progress */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/progress')} activeOpacity={0.85}>
+              <CalendarGrid entries={entries} dark />
+            </TouchableOpacity>
 
-            {/* 30-Day Calendar */}
-            <CalendarGrid entries={entries} dark />
+            {/* 7-Day Chart — tap to go to progress */}
+            <TouchableOpacity onPress={() => onNavigate('/(tabs)/progress')} activeOpacity={0.85}>
+              <WeekChart entries={entries} dark />
+            </TouchableOpacity>
 
-            {/* 7-Day Chart */}
-            <WeekChart entries={entries} dark />
-
-            {/* Module Status */}
+            {/* Programs Status — tap to go to programs */}
             <View style={cc.modulesCard}>
-              <Text style={cc.moduleTitle}>MODULE STATUS</Text>
+              <Text style={cc.moduleTitle}>PROGRAMS</Text>
               <View style={cc.modulesGrid}>
-                {[
-                  { icon: '🥦', label: 'Nutrition', on: true },
-                  { icon: '💧', label: 'Hydration', on: true },
-                  { icon: '🏃', label: 'Movement', on: false },
-                  { icon: '😴', label: 'Sleep', on: false },
-                  { icon: '🧘', label: 'Stress', on: false },
-                  { icon: '💊', label: 'Meds', on: false },
-                ].map(m => (
-                  <View key={m.label} style={[cc.moduleItem, m.on && cc.moduleItemOn]}>
-                    <Text style={cc.moduleIcon}>{m.icon}</Text>
-                    <Text style={[cc.moduleLbl, m.on && { color: colors.lavender }]}>{m.label}</Text>
-                    <View style={[cc.moduleDot, { backgroundColor: m.on ? '#4ade80' : 'rgba(255,255,255,0.15)' }]} />
-                  </View>
-                ))}
+                {modules.map(m => {
+                  const on = !!programs[m.key];
+                  return (
+                    <TouchableOpacity key={m.key} onPress={() => onNavigate(m.tab)}
+                      style={[cc.moduleItem, on && cc.moduleItemOn]} activeOpacity={0.75}>
+                      <Text style={cc.moduleIcon}>{m.icon}</Text>
+                      <Text style={[cc.moduleLbl, on && { color: colors.lavender }]}>{m.label}</Text>
+                      <View style={[cc.moduleDot, { backgroundColor: on ? '#4ade80' : 'rgba(255,255,255,0.15)' }]} />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
+
+            {/* Exit button at the bottom */}
+            <TouchableOpacity onPress={onClose} style={cc.exitBtn} activeOpacity={0.8}>
+              <Ionicons name="close-circle-outline" size={18} color="rgba(196,181,255,0.7)" />
+              <Text style={cc.exitBtnTxt}>CLOSE COMMAND CENTER</Text>
+            </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </View>
@@ -1006,7 +1033,7 @@ export default function TabLayout() {
         onExercise={() => setExerciseOpen(true)}
         onActivity={() => setActivityOpen(true)}
       />
-      <CommandCenterModal visible={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <CommandCenterModal visible={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(tab) => { setCmdOpen(false); router.push(tab as any); }} />
       <MoodLogger visible={moodOpen} onClose={() => setMoodOpen(false)} />
       <WeightLogger visible={weightOpen} onClose={() => setWeightOpen(false)} />
       <SleepLogger visible={sleepOpen} onClose={() => setSleepOpen(false)} />
@@ -1103,12 +1130,34 @@ const cc = StyleSheet.create({
     fontFamily: 'monospace',
   },
   closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  exitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(196,181,255,0.2)',
+    backgroundColor: 'rgba(196,181,255,0.05)',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  exitBtnTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(196,181,255,0.7)',
+    letterSpacing: 1.2,
+    fontFamily: 'monospace',
   },
   scroll: {
     padding: 16,
