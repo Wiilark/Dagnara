@@ -990,7 +990,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            tabBarButton: () => null,
+            href: null,
             tabBarStyle: { display: 'none' },
           }}
         />
