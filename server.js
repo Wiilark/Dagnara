@@ -38,12 +38,6 @@ const configLimiter = rateLimit({
   legacyHeaders: false
 });
 
-const restaurantLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 // ── Allowed image MIME types ───────────────────────────────────────────────────
 const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
@@ -110,44 +104,75 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
   }
 });
 
-// ── Restaurant food search (Nutritionix proxy) ────────────────────────────────
-// Set NUTRITIONIX_APP_ID and NUTRITIONIX_API_KEY in your .env to enable.
-// Free tier: 500 req/day at developer.nutritionix.com
-app.get('/api/search-restaurant', restaurantLimiter, async (req, res) => {
-  const query = (req.query.q ?? '').toString().trim();
-  if (!query) return res.json({ items: [] });
 
-  const appId  = process.env.NUTRITIONIX_APP_ID;
-  const apiKey = process.env.NUTRITIONIX_API_KEY;
+// ── Recipe URL import ─────────────────────────────────────────────────────────
+// Fetches HTML from a recipe URL, extracts title + ingredients via Claude.
+const recipeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many recipe imports — please wait a moment.' } }
+});
 
-  if (!appId || !apiKey) {
-    return res.status(503).json({ error: 'Restaurant search not configured. Set NUTRITIONIX_APP_ID and NUTRITIONIX_API_KEY.' });
+app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
+  const { url } = req.body ?? {};
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: { message: 'url is required' } });
+  }
+  // Only allow http/https URLs
+  let parsed;
+  try { parsed = new URL(url); } catch { return res.status(400).json({ error: { message: 'Invalid URL' } }); }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return res.status(400).json({ error: { message: 'Only http/https URLs are supported' } });
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: { message: 'Recipe import not configured on this server' } });
   }
 
   try {
-    const response = await fetch(
-      `https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(query)}&branded=true&common=false&branded_type=1`,
-      { headers: { 'x-app-id': appId, 'x-app-key': apiKey, 'x-remote-user-id': '0' } }
-    );
-    if (!response.ok) return res.json({ items: [] });
-    const data = await response.json();
+    // Fetch the page HTML (5 second timeout)
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    const pageRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DagnaraBot/1.0)' },
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    const html = await pageRes.text();
 
-    const items = (data.branded ?? []).slice(0, 25).map((item) => ({
-      name: item.food_name,
-      brand: item.brand_name,
-      kcal: Math.round(item.nf_calories ?? 0),
-      protein: Math.round(item.nf_protein ?? 0),
-      carbs: Math.round(item.nf_total_carbohydrate ?? 0),
-      fat: Math.round(item.nf_total_fat ?? 0),
-      fiber: Math.round(item.nf_dietary_fiber ?? 0),
-      sugar: Math.round(item.nf_sugars ?? 0),
-      sodium: Math.round(item.nf_sodium ?? 0),
-      serving: item.serving_qty + ' ' + item.serving_unit,
-    }));
-    res.json({ items });
+    // Strip HTML tags and truncate
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 6000);
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: `Extract this recipe and return ONLY valid JSON, no other text:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient or dish","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\n\nIf you cannot determine macros, estimate realistically. Page text:\n${text}`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    res.json(data);
   } catch (err) {
-    console.error('[search-restaurant]', err.message);
-    res.json({ items: [] });
+    console.error('[import-recipe]', err.message);
+    res.status(500).json({ error: { message: 'Failed to fetch or parse recipe' } });
   }
 });
 

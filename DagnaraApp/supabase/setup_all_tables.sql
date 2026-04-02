@@ -51,6 +51,11 @@ create policy "Users manage own diary"
   using  (email = auth.jwt() ->> 'email')
   with check (email = auth.jwt() ->> 'email');
 
+-- ── 4. Indexes for query performance at scale ─────────────────────────────────
+create index if not exists dagnara_profiles_email_idx   on public.dagnara_profiles(email);
+create index if not exists dagnara_app_state_email_idx  on public.dagnara_app_state(email);
+create index if not exists dagnara_diary_email_date_idx on public.dagnara_diary(email, date);
+
 -- ── Done ──────────────────────────────────────────────────────────────────────
 -- All three tables are now created with Row Level Security enabled.
 -- Each user can only read and write their own rows.

@@ -16,7 +16,7 @@ import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { useDiaryStore, FoodItem } from '../../src/store/diaryStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
-import { analyzeFood, searchRestaurant } from '../../src/lib/api';
+import { analyzeFood, importRecipe } from '../../src/lib/api';
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
@@ -511,12 +511,15 @@ export default function DiaryScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<OFFProduct[]>([]);
   const [searching, setSearching] = useState(false);
-  const [foodTab, setFoodTab] = useState<'search'|'recent'|'favorites'|'browse'|'create'|'restaurant'>('search');
+  const [foodTab, setFoodTab] = useState<'search'|'recent'|'favorites'|'browse'|'create'|'restaurant'|'url'>('search');
+
+  // Recipe URL import
+  const [recipeUrl, setRecipeUrl] = useState('');
+  const [importingRecipe, setImportingRecipe] = useState(false);
 
   // Restaurant search
   const [restaurantQuery, setRestaurantQuery] = useState('');
   const [restaurantResults, setRestaurantResults] = useState<RestaurantItem[]>([]);
-  const [restaurantSearching, setRestaurantSearching] = useState(false);
 
   // Step tracking
   const [stepCount, setStepCount] = useState(0);
@@ -527,6 +530,8 @@ export default function DiaryScreen() {
   const [scanning, setScanning] = useState(false);
   const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
   const [barcodeProduct, setBarcodeProduct] = useState<OFFProduct | null>(null);
+  const [barcodeFetching, setBarcodeFetching] = useState(false);
+  const scanLockRef = useRef(false);
 
   // Serving size modal
   const [servingModalVisible, setServingModalVisible] = useState(false);
@@ -580,7 +585,7 @@ export default function DiaryScreen() {
   useEffect(() => { loadEntry(selectedDate); }, [selectedDate]);
 
   useEffect(() => {
-    AsyncStorage.getItem('dagnara_food_favorites').then(raw => {
+    AsyncStorage.getItem(`dagnara_food_favorites_${email ?? 'anon'}`).then(raw => {
       if (raw) setFavorites(JSON.parse(raw));
     });
   }, []);
@@ -595,7 +600,7 @@ export default function DiaryScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setFavorites(updated);
-    await AsyncStorage.setItem('dagnara_food_favorites', JSON.stringify(updated));
+    await AsyncStorage.setItem(`dagnara_food_favorites_${email ?? 'anon'}`, JSON.stringify(updated));
   }
 
   async function handleStressSave(level: number) {
@@ -626,17 +631,9 @@ export default function DiaryScreen() {
     return () => sub?.remove?.();
   }, []);
 
-  async function doRestaurantSearch(q: string) {
+  function doRestaurantSearch(q: string) {
     if (!q.trim()) { setRestaurantResults([]); return; }
-    setRestaurantSearching(true);
-    // Try backend (Nutritionix) first, fall back to local static data
-    const remote = await searchRestaurant(q);
-    if (remote.length > 0) {
-      setRestaurantResults(remote as RestaurantItem[]);
-    } else {
-      setRestaurantResults(searchLocalRestaurants(q));
-    }
-    setRestaurantSearching(false);
+    setRestaurantResults(searchLocalRestaurants(q));
   }
 
   async function addRestaurantItem(item: RestaurantItem) {
@@ -654,7 +651,7 @@ export default function DiaryScreen() {
       meal: searchMeal,
     };
     await addFood(selectedDate, food);
-    checkAndUpdateStreak(selectedDate);
+    await checkAndUpdateStreak(selectedDate);
     await addXp(10);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSearchVisible(false);
@@ -700,7 +697,7 @@ export default function DiaryScreen() {
       meal: searchMeal,
     };
     await addFood(selectedDate, food);
-    checkAndUpdateStreak(selectedDate);
+    await checkAndUpdateStreak(selectedDate);
     await addXp(10);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setServingModalVisible(false);
@@ -717,19 +714,58 @@ export default function DiaryScreen() {
     setScanning(true);
   }
 
+  async function handleImportRecipeUrl() {
+    if (!recipeUrl.trim()) return;
+    setImportingRecipe(true);
+    try {
+      const data = await importRecipe(recipeUrl.trim());
+      const rawText = data?.content?.[0]?.text ?? '';
+      let parsed: any = null;
+      try { parsed = rawText ? JSON.parse(rawText) : null; } catch { parsed = null; }
+      const items: any[] = parsed?.items ?? [];
+      if (items.length === 0) { Alert.alert('Nothing found', 'Could not extract recipe items. Try a direct recipe page URL.'); return; }
+      for (const item of items) {
+        const food: FoodItem = {
+          id: `${Date.now()}_${Math.random()}`,
+          icon: item.icon ?? '🍽️',
+          name: item.name ?? 'Unknown',
+          kcal: item.kcal ?? 0,
+          carbs: item.carbs ?? 0,
+          protein: item.protein ?? 0,
+          fat: item.fat ?? 0,
+          unit: item.unit ?? 'serving',
+          meal: searchMeal,
+        };
+        await addFood(selectedDate, food);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRecipeUrl('');
+      setSearchVisible(false);
+      Alert.alert('Recipe imported!', `Added ${items.length} item${items.length !== 1 ? 's' : ''} from the recipe.`);
+    } catch (err: any) {
+      if (err?.message === 'SETUP_REQUIRED') {
+        Alert.alert('Not set up', 'Recipe import requires a deployed server. Set EXPO_PUBLIC_API_URL in your .env.');
+      } else {
+        Alert.alert('Import failed', err?.message ?? 'Could not import recipe. Try a different URL.');
+      }
+    } finally {
+      setImportingRecipe(false);
+    }
+  }
+
   async function processBase64Image(base64: string) {
     setAnalyzing(true);
     try {
       const data = await analyzeFood(base64, 'image/jpeg');
-      const rawText = data?.content?.[0]?.text ?? '';
+      const rawText = (data?.content ?? []).find((c: any) => c?.type === 'text')?.text ?? '';
       let items: any[] = [];
-      try { items = rawText ? JSON.parse(rawText) : []; } catch { items = []; }
+      try { items = Array.isArray(JSON.parse(rawText)) ? JSON.parse(rawText) : []; } catch { items = []; }
       for (const item of items) {
         const food: FoodItem = { id: `${Date.now()}_${Math.random()}`, icon: item.icon ?? '🍽️', name: item.name ?? 'Unknown food', kcal: item.kcal ?? 0, carbs: item.carbs ?? 0, protein: item.protein ?? 0, fat: item.fat ?? 0, unit: item.unit ?? 'serving', meal: 'breakfast' };
         await addFood(selectedDate, food);
       }
       if (items.length === 0) Alert.alert('No food detected', 'Try a clearer photo.');
-      else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); checkAndUpdateStreak(selectedDate); await addXp(items.length * 10); }
+      else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await checkAndUpdateStreak(selectedDate); await addXp(items.length * 10); }
     } catch (err: any) {
       if (err?.message === 'SETUP_REQUIRED') {
         Alert.alert('Not set up', 'Food photo analysis requires a deployed server.\nSee EXPO_PUBLIC_API_URL in your .env file.');
@@ -776,7 +812,7 @@ export default function DiaryScreen() {
     await addFood(selectedDate, food);
     await addXp(10);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    checkAndUpdateStreak(selectedDate);
+    await checkAndUpdateStreak(selectedDate);
   }
 
   async function repeatYesterday() {
@@ -787,7 +823,7 @@ export default function DiaryScreen() {
     for (const f of yFoods) { await addFood(selectedDate, { ...f, id: `${Date.now()}_${Math.random()}` }); }
     await addXp(yFoods.length * 5);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    checkAndUpdateStreak(selectedDate);
+    await checkAndUpdateStreak(selectedDate);
   }
 
   async function handleAddCalories(kcal: number, name: string) {
@@ -1047,7 +1083,7 @@ export default function DiaryScreen() {
                 if (yFoods.length === 0) { Alert.alert('Nothing to copy', `No ${MEAL_LABEL[meal]} logged yesterday.`); return; }
                 for (const f of yFoods) await addFood(selectedDate, { ...f, id: `${Date.now()}_${Math.random()}` });
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                checkAndUpdateStreak(selectedDate);
+                await checkAndUpdateStreak(selectedDate);
               }}>
                 <Text style={[st.skipTxt]}>Copy</Text>
               </TouchableOpacity>
@@ -1220,12 +1256,22 @@ export default function DiaryScreen() {
       <StressBreathingModal visible={stressVisible} onClose={() => setStressVisible(false)} onSave={handleStressSave} />
       <MoodModal visible={moodVisible} onClose={() => setMoodVisible(false)} onSave={handleMoodSave} />
 
+      {/* Barcode fetching overlay */}
+      <Modal visible={barcodeFetching} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#1a1a1a', borderRadius: 16, padding: 32, alignItems: 'center', gap: 16 }}>
+            <ActivityIndicator size="large" color={colors.lavender} />
+            <Text style={{ color: '#fff', fontSize: 15 }}>Looking up product…</Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* Barcode Scanner Modal */}
       <Modal visible={scanning} animationType="slide" presentationStyle="fullScreen">
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setScanning(false)} style={{ padding: 8 }}>
+              <TouchableOpacity onPress={() => { setScanning(false); scanLockRef.current = false; setSearchVisible(true); }} style={{ padding: 8 }}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginLeft: 8 }}>Scan Barcode</Text>
@@ -1235,7 +1281,10 @@ export default function DiaryScreen() {
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
               onBarcodeScanned={scanning ? async ({ data }) => {
+                if (scanLockRef.current) return;
+                scanLockRef.current = true;
                 setScanning(false);
+                setBarcodeFetching(true);
                 try {
                   const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${data}.json`);
                   const json = await res.json();
@@ -1244,7 +1293,6 @@ export default function DiaryScreen() {
                     setPendingProduct(json.product as OFFProduct);
                     setServingQty('100');
                     setServingModalVisible(true);
-                    setSearchVisible(true);
                   } else {
                     Alert.alert('Not found', 'This barcode is not in our database. Try searching manually.');
                     setSearchVisible(true);
@@ -1252,9 +1300,29 @@ export default function DiaryScreen() {
                 } catch {
                   Alert.alert('Error', 'Could not fetch barcode data.');
                   setSearchVisible(true);
+                } finally {
+                  setBarcodeFetching(false);
+                  scanLockRef.current = false;
                 }
               } : undefined}
-            />
+            >
+              {/* Aiming overlay */}
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: 260, height: 160, position: 'relative' }}>
+                  {/* Corner brackets */}
+                  {[
+                    { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+                    { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+                    { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+                    { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+                  ].map((style, i) => (
+                    <View key={i} style={[{ position: 'absolute', width: 24, height: 24, borderColor: '#fff' }, style]} />
+                  ))}
+                  {/* Center scan line */}
+                  <View style={{ position: 'absolute', top: '50%', left: 8, right: 8, height: 1, backgroundColor: 'rgba(255,80,80,0.7)' }} />
+                </View>
+              </View>
+            </CameraView>
             <View style={{ padding: 24, alignItems: 'center' }}>
               <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>Point your camera at a barcode</Text>
             </View>
@@ -1385,16 +1453,18 @@ export default function DiaryScreen() {
           </View>
 
           {/* Tabs */}
-          <View style={st.foodTabRow}>
-            {(['search','recent','favorites','browse','create'] as const).map(t => (
-              <TouchableOpacity key={t} style={[st.foodTabBtn, foodTab === t && st.foodTabBtnActive]}
-                onPress={() => setFoodTab(t)}>
-                <Text style={[st.foodTabTxt, foodTab === t && st.foodTabTxtActive]}>
-                  {t === 'search' ? '🔍 Search' : t === 'recent' ? '🕐 Recent' : t === 'favorites' ? '❤️ Saved' : t === 'browse' ? '📂 Browse' : '➕ Create'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={st.foodTabRow}>
+              {(['search','recent','favorites','browse','create','url'] as const).map(t => (
+                <TouchableOpacity key={t} style={[st.foodTabBtn, foodTab === t && st.foodTabBtnActive]}
+                  onPress={() => setFoodTab(t)}>
+                  <Text style={[st.foodTabTxt, foodTab === t && st.foodTabTxtActive]}>
+                    {t === 'search' ? '🔍 Search' : t === 'recent' ? '🕐 Recent' : t === 'favorites' ? '❤️ Saved' : t === 'browse' ? '📂 Browse' : t === 'create' ? '➕ Create' : '🔗 URL'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
 
           {/* Tab content */}
           {foodTab === 'search' && (
@@ -1489,7 +1559,7 @@ export default function DiaryScreen() {
                 <TouchableOpacity style={st.foodResult} onPress={async () => {
                   await addFood(selectedDate, { ...f, id: `${Date.now()}_${Math.random()}`, meal: searchMeal });
                   await addXp(10);
-                  checkAndUpdateStreak(selectedDate);
+                  await checkAndUpdateStreak(selectedDate);
                   setSearchVisible(false);
                 }}>
                   <Text style={{ fontSize: 24, marginRight: 8 }}>{f.icon}</Text>
@@ -1573,13 +1643,49 @@ export default function DiaryScreen() {
                   };
                   await addFood(selectedDate, food);
                   await addXp(10);
-                  checkAndUpdateStreak(selectedDate);
+                  await checkAndUpdateStreak(selectedDate);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setCustomFood({ name: '', kcal: '', protein: '', carbs: '', fat: '', fiber: '', sodium: '' });
                   setSearchVisible(false);
                 }}>
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Add to {MEAL_LABEL[searchMeal]}</Text>
               </TouchableOpacity>
+            </ScrollView>
+          )}
+
+          {foodTab === 'url' && (
+            <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+              <View style={{ gap: 8 }}>
+                <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '700' }}>Import from recipe URL</Text>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, lineHeight: 18 }}>
+                  Paste a recipe page URL (e.g. from AllRecipes, BBC Good Food, Yummly) and we'll extract the ingredients and estimate nutrition automatically.
+                </Text>
+              </View>
+              <View style={{ gap: 8 }}>
+                <Text style={{ color: colors.ink3, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>RECIPE URL</Text>
+                <TextInput
+                  style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 12, padding: 12, color: colors.ink, fontSize: 14 }}
+                  placeholder="https://www.allrecipes.com/recipe/..."
+                  placeholderTextColor={colors.ink3}
+                  value={recipeUrl}
+                  onChangeText={setRecipeUrl}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  autoComplete="url"
+                />
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: importingRecipe ? colors.layer2 : colors.purple, borderRadius: 14, padding: 14, alignItems: 'center', opacity: importingRecipe ? 0.7 : 1 }}
+                onPress={handleImportRecipeUrl}
+                disabled={importingRecipe}
+              >
+                {importingRecipe
+                  ? <ActivityIndicator color={colors.white} />
+                  : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Import recipe</Text>}
+              </TouchableOpacity>
+              <Text style={{ color: colors.ink3, fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
+                Requires a deployed Dagnara server with ANTHROPIC_API_KEY configured.
+              </Text>
             </ScrollView>
           )}
         </SafeAreaView>

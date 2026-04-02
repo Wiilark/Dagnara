@@ -9,7 +9,38 @@
       "Bash(gh repo:*)",
       "Bash(gh api:*)",
       "Bash(echo \"exit: $?\")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep -n \"^// ──\\\\|^window\\\\.\\\\|^function \\\\|^}$\\\\|^}\\\\\\)\" \"C:\\\\Users\\\\Wilark\\\\Desktop\\\\DAGNARA\\\\dagnara.html\")",
+      "Bash(grep:*)",
+      "Bash(echo \"exit:$?\")",
+      "Skill(update-config)",
+      "Bash(jq:*)",
+      "Bash(npm install:*)",
+      "Bash(npm start:*)",
+      "Bash(curl:*)",
+      "Bash(npm run:*)",
+      "Bash(npm --version)",
+      "Bash(npx:*)",
+      "Read(//c/Users/Wilark/Desktop/DAGNARA/DagnaraApp/$USERPROFILE/.config/ngrok/**)",
+      "Read(//c/Users/Wilark/Desktop/DAGNARA/DagnaraApp/$USERPROFILE/AppData/Local/ngrok/**)",
+      "Bash(\"C:\\\\Users\\\\Wilark\\\\Desktop\\\\DAGNARA\\\\DagnaraApp\\\\node_modules\\\\@expo\\\\ngrok-bin-win32-x64\\\\ngrok.exe\" authtoken:*)",
+      "Bash(pkill -f localtunnel)",
+      "Bash(pkill -f \"lt --port\")",
+      "Bash(jobs:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *\"dagnara.html\" ]]; then cd \"C:/Users/Wilark/Desktop/DAGNARA\" && git add dagnara.html && git commit -m \"Auto-sync: $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin master; fi 2>/dev/null || true",
+            "statusMessage": "Syncing to GitHub..."
+          }
+        ]
+      }
     ]
   }
 }

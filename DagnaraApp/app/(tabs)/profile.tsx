@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel, calcTDEE } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
+import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
 const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Mediterranean'];
@@ -51,21 +52,22 @@ export default function ProfileScreen() {
     weight: '', height: '', waist: '', chest: '', hips: '', arms: '',
   });
 
-  // Load persisted measurements + prefs on mount
+  // Load persisted measurements + prefs on mount (scoped to this user)
+  const p = email ?? 'anon';
   useEffect(() => {
     AsyncStorage.multiGet([
-      'body_measurements', 'unit_weight', 'unit_height', 'unit_water', 'unit_energy',
-      'notif_checkin', 'notif_meals', 'notif_streak',
+      `${p}_body_measurements`, `${p}_unit_weight`, `${p}_unit_height`, `${p}_unit_water`, `${p}_unit_energy`,
+      `${p}_notif_checkin`, `${p}_notif_meals`, `${p}_notif_streak`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
-      if (m['body_measurements']) setMeasurements(JSON.parse(m['body_measurements']));
-      if (m['unit_weight'])  setUnitWeight(m['unit_weight'] as any);
-      if (m['unit_height'])  setUnitHeight(m['unit_height'] as any);
-      if (m['unit_water'])   setUnitWater(m['unit_water'] as any);
-      if (m['unit_energy'])  setUnitEnergy(m['unit_energy'] as any);
-      if (m['notif_checkin']) setNotifCheckIn(m['notif_checkin'] === 'true');
-      if (m['notif_meals'])   setNotifMeals(m['notif_meals'] === 'true');
-      if (m['notif_streak'])  setNotifStreak(m['notif_streak'] === 'true');
+      if (m[`${p}_body_measurements`]) setMeasurements(JSON.parse(m[`${p}_body_measurements`]!));
+      if (m[`${p}_unit_weight`])  setUnitWeight(m[`${p}_unit_weight`] as any);
+      if (m[`${p}_unit_height`])  setUnitHeight(m[`${p}_unit_height`] as any);
+      if (m[`${p}_unit_water`])   setUnitWater(m[`${p}_unit_water`] as any);
+      if (m[`${p}_unit_energy`])  setUnitEnergy(m[`${p}_unit_energy`] as any);
+      if (m[`${p}_notif_checkin`]) setNotifCheckIn(m[`${p}_notif_checkin`] === 'true');
+      if (m[`${p}_notif_meals`])   setNotifMeals(m[`${p}_notif_meals`] === 'true');
+      if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
     });
   }, []);
 
@@ -78,29 +80,19 @@ export default function ProfileScreen() {
   }, [tdeeModal]);
 
   async function handleSave() {
-    setProfile(draft);
-    await supabase.from('dagnara_profiles').upsert(
-      { email, profile_data: draft, updated_at: new Date().toISOString() },
-      { onConflict: 'email' }
-    );
+    await setProfile(draft);
     setEditing(false);
   }
 
   async function handleSaveMeasurements() {
-    await AsyncStorage.setItem('body_measurements', JSON.stringify(measurements));
+    await AsyncStorage.setItem(`${p}_body_measurements`, JSON.stringify(measurements));
     // Sync weight & height back into the profile
     const updated = {
       ...profile,
       ...(measurements.weight ? { weight: measurements.weight } : {}),
       ...(measurements.height ? { height: measurements.height } : {}),
     };
-    setProfile(updated);
-    try {
-      await supabase.from('dagnara_profiles').upsert(
-        { email, profile_data: updated, updated_at: new Date().toISOString() },
-        { onConflict: 'email' }
-      );
-    } catch {}
+    await setProfile(updated);
     setMeasureModal(false);
   }
 
@@ -426,13 +418,13 @@ export default function ProfileScreen() {
             <View style={sst.card}>
               {[
                 { icon: '⚖️', label: 'Weight unit', current: unitWeight, options: ['kg', 'lbs'] as const, bg: colors.sky + '1a',
-                  onToggle: () => { const v = unitWeight === 'kg' ? 'lbs' : 'kg'; setUnitWeight(v); AsyncStorage.setItem('unit_weight', v); } },
+                  onToggle: () => { const v = unitWeight === 'kg' ? 'lbs' : 'kg'; setUnitWeight(v); AsyncStorage.setItem(`${p}_unit_weight`, v); } },
                 { icon: '📏', label: 'Height unit', current: unitHeight, options: ['cm', 'm'] as const, bg: colors.green + '1a',
-                  onToggle: () => { const v = unitHeight === 'cm' ? 'm' : 'cm'; setUnitHeight(v); AsyncStorage.setItem('unit_height', v); } },
+                  onToggle: () => { const v = unitHeight === 'cm' ? 'm' : 'cm'; setUnitHeight(v); AsyncStorage.setItem(`${p}_unit_height`, v); } },
                 { icon: '💧', label: 'Water unit', current: unitWater, options: ['ml', 'fl oz'] as const, bg: colors.sky + '1a',
-                  onToggle: () => { const v = unitWater === 'ml' ? 'fl oz' : 'ml'; setUnitWater(v); AsyncStorage.setItem('unit_water', v); } },
+                  onToggle: () => { const v = unitWater === 'ml' ? 'fl oz' : 'ml'; setUnitWater(v); AsyncStorage.setItem(`${p}_unit_water`, v); } },
                 { icon: '🔥', label: 'Energy unit', current: unitEnergy, options: ['kcal', 'kJ'] as const, bg: colors.honey + '1a',
-                  onToggle: () => { const v = unitEnergy === 'kcal' ? 'kJ' : 'kcal'; setUnitEnergy(v); AsyncStorage.setItem('unit_energy', v); } },
+                  onToggle: () => { const v = unitEnergy === 'kcal' ? 'kJ' : 'kcal'; setUnitEnergy(v); AsyncStorage.setItem(`${p}_unit_energy`, v); } },
               ].map(({ icon, label, current, options, bg, onToggle }, i, arr) => (
                 <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]} onPress={onToggle}>
                   <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
@@ -451,11 +443,11 @@ export default function ProfileScreen() {
             <View style={sst.card}>
               {[
                 { icon: '🔔', label: 'Daily check-in reminder', bg: colors.purple + '1a', value: notifCheckIn,
-                  onToggle: (v: boolean) => { setNotifCheckIn(v); AsyncStorage.setItem('notif_checkin', String(v)); } },
+                  onToggle: (v: boolean) => { setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
                 { icon: '🥗', label: 'Meal reminders', bg: colors.green + '1a', value: notifMeals,
-                  onToggle: (v: boolean) => { setNotifMeals(v); AsyncStorage.setItem('notif_meals', String(v)); } },
+                  onToggle: (v: boolean) => { setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
                 { icon: '🔥', label: 'Streak protection', bg: colors.honey + '1a', value: notifStreak,
-                  onToggle: (v: boolean) => { setNotifStreak(v); AsyncStorage.setItem('notif_streak', String(v)); } },
+                  onToggle: (v: boolean) => { setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
               ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
                 <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
                   <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>

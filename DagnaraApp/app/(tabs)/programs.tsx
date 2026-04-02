@@ -8,14 +8,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
+import { useAuthStore } from '../../src/store/authStore';
 
-// ── Storage keys ──────────────────────────────────────────────────────────────
-const KEYS = {
-  QS:       'dagnara_quit_smoking',
-  QD:       'dagnara_quit_drinking',
-  PILLS:    'dagnara_pill_meds',
-  PILL_LOG: (day: string) => `dagnara_pill_log_${day}`,
-};
+// ── Storage keys (scoped per user to prevent data leakage between accounts) ───
+function makeKeys(email: string) {
+  return {
+    QS:       `dagnara_quit_smoking_${email}`,
+    QD:       `dagnara_quit_drinking_${email}`,
+    PILLS:    `dagnara_pill_meds_${email}`,
+    PILL_LOG: (day: string) => `dagnara_pill_log_${day}_${email}`,
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QsData {
@@ -157,6 +160,8 @@ function todayKey(): string {
 
 // ── Quit Smoking Modal ────────────────────────────────────────────────────────
 function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { email } = useAuthStore();
+  const KEYS = makeKeys(email ?? 'anon');
   const [data, setData] = useState<QsData | null>(null);
   const [elapsed, setElapsed] = useState(0); // ms
   const intervalRef = useRef<any>(null);
@@ -328,6 +333,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
 
 // ── Quit Drinking Modal ───────────────────────────────────────────────────────
 function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { email } = useAuthStore();
+  const KEYS = makeKeys(email ?? 'anon');
   const [data, setData] = useState<QdData | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<any>(null);
@@ -492,6 +499,8 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
 
 // ── Pill Reminder Modal ───────────────────────────────────────────────────────
 function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { email } = useAuthStore();
+  const KEYS = makeKeys(email ?? 'anon');
   const [meds, setMeds] = useState<Medication[]>([]);
   const [log, setLog] = useState<PillLog>({});
   // Add/Edit sheet
@@ -824,7 +833,7 @@ export default function ProgramsScreen() {
             <TouchableOpacity
               key={prog.id}
               style={st.card}
-              onPress={() => hasDetail ? openProgram(prog.id) : setProgram(prog.id, !isActive)}
+              onPress={() => hasDetail ? openProgram(prog.id) : void setProgram(prog.id, !isActive)}
               activeOpacity={0.75}
             >
               <View style={[st.iconWrap, { backgroundColor: prog.color + '22' }]}>
@@ -839,7 +848,7 @@ export default function ProgramsScreen() {
               ) : (
                 <Switch
                   value={isActive}
-                  onValueChange={(v) => setProgram(prog.id, v)}
+                  onValueChange={(v) => void setProgram(prog.id, v)}
                   thumbColor={isActive ? prog.color : colors.ink3}
                   trackColor={{ false: 'rgba(255,255,255,0.1)', true: prog.color + '44' }}
                 />
