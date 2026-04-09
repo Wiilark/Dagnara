@@ -6,6 +6,18 @@ const { rateLimit } = require('express-rate-limit');
 
 const app = express();
 
+// ── Stripe client (lazy — only errors when routes are actually called) ─────────
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
+
+// ── Supabase admin client for webhook (service role key bypasses RLS) ──────────
+let supabaseAdmin = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+  const { createClient } = require('@supabase/supabase-js');
+  supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+}
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet());
 
@@ -20,24 +32,104 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.use(express.json({ limit: '20mb' })); // base64 images can be large
+// ── Stripe webhook — MUST be before express.json() ────────────────────────────
+// Stripe requires the raw request body to verify the signature.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      req.headers['stripe-signature'],
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('[stripe-webhook] signature verify failed:', err.message);
+    return res.status(400).json({ error: 'Webhook signature invalid' });
+  }
+
+  // Merge subscription fields into profile_data without overwriting user data
+  async function syncSubscription(customerId, status, subscriptionId, periodEnd) {
+    if (!supabaseAdmin) {
+      console.warn('[stripe-webhook] SUPABASE_SERVICE_KEY not set — skipping DB update');
+      return;
+    }
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      const email = customer.deleted ? null : customer.email;
+      if (!email) return;
+
+      const { data: row } = await supabaseAdmin
+        .from('dagnara_profiles')
+        .select('profile_data')
+        .eq('email', email)
+        .maybeSingle();
+
+      await supabaseAdmin
+        .from('dagnara_profiles')
+        .upsert({
+          email,
+          profile_data: {
+            ...(row?.profile_data ?? {}),
+            stripeCustomerId: customerId,
+            subscriptionId,
+            subscriptionStatus: status,
+            subscriptionPeriodEnd: periodEnd,
+          },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+    } catch (err) {
+      console.error('[stripe-webhook] syncSubscription failed:', err.message);
+    }
+  }
+
+  const obj = event.data.object;
+  switch (event.type) {
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated': {
+      const end = new Date(obj.current_period_end * 1000).toISOString();
+      await syncSubscription(obj.customer, obj.status, obj.id, end);
+      break;
+    }
+    case 'customer.subscription.deleted':
+      await syncSubscription(obj.customer, 'canceled', obj.id, null);
+      break;
+    case 'invoice.payment_failed':
+      await syncSubscription(obj.customer, 'past_due', obj.subscription, null);
+      break;
+  }
+
+  res.json({ received: true });
+});
+
+app.use(express.json({ limit: '10mb' })); // base64 images can be large
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
 const analyzeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // 20 photo analyses per 15 min per IP
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { message: 'Too many requests — please wait before analysing another photo.' } }
 });
 
 const configLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 30,             // 30 config fetches per minute per IP (page reloads)
+  windowMs: 60 * 1000,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false
 });
 
+const stripeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many requests.' } }
+});
 
 // ── Allowed image MIME types ───────────────────────────────────────────────────
 const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
@@ -60,7 +152,6 @@ app.get('/api/config', configLimiter, (req, res) => {
 app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
   const { imageData, mediaType } = req.body;
 
-  // Input validation
   if (!imageData || !mediaType) {
     return res.status(400).json({ error: { message: 'imageData and mediaType are required' } });
   }
@@ -81,23 +172,34 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
+        model: 'claude-haiku-4-5',
+        max_tokens: 400,
+        temperature: 0,
+        system: [{
+          type: 'text',
+          text: 'You are a nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nEstimate realistic macros for visible portions. Return [] if no food.',
+          cache_control: { type: 'ephemeral' }
+        }],
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
-            { type: 'text', text: 'Identify all food items in this image. Return ONLY a valid JSON array, no other text:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nEstimate realistic calories for the portion you can see. If no food visible, return [].' }
+            { type: 'text', text: 'List all food items in this image.' }
           ]
         }]
       })
     });
 
     const data = await response.json();
-    res.json(data);
+    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
+    const text = data?.content?.[0]?.text ?? '';
+    let items = [];
+    try { const p = JSON.parse(text); items = Array.isArray(p) ? p : []; } catch { items = []; }
+    res.json({ items });
   } catch (err) {
     console.error('[analyze-food]', err.message);
     res.status(500).json({ error: { message: 'Failed to contact Anthropic API' } });
@@ -106,7 +208,6 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
 
 
 // ── Recipe URL import ─────────────────────────────────────────────────────────
-// Fetches HTML from a recipe URL, extracts title + ingredients via Claude.
 const recipeLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -120,7 +221,6 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: { message: 'url is required' } });
   }
-  // Only allow http/https URLs
   let parsed;
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: { message: 'Invalid URL' } }); }
   if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -132,7 +232,6 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
   }
 
   try {
-    // Fetch the page HTML (5 second timeout)
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 5000);
     const pageRes = await fetch(url, {
@@ -142,56 +241,129 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
     clearTimeout(t);
     const html = await pageRes.text();
 
-    // Strip HTML tags and truncate
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim()
-      .slice(0, 6000);
+    // Extract structured recipe data first (JSON-LD), fall back to stripped text
+    let recipeText = '';
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch) {
+      recipeText = jsonLdMatch[1].trim().slice(0, 3000);
+    } else {
+      recipeText = html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .slice(0, 3000);
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        temperature: 0,
+        system: [{
+          type: 'text',
+          text: 'You are a nutrition extraction assistant. Return ONLY valid JSON — no prose, no markdown. Format:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\nEstimate realistic macros per serving if not provided.',
+          cache_control: { type: 'ephemeral' }
+        }],
         messages: [{
           role: 'user',
-          content: `Extract this recipe and return ONLY valid JSON, no other text:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient or dish","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\n\nIf you cannot determine macros, estimate realistically. Page text:\n${text}`
+          content: `Extract this recipe:\n\n${recipeText}`
         }]
       })
     });
 
     const data = await response.json();
-    res.json(data);
+    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
+    const responseText = data?.content?.[0]?.text ?? '';
+    let recipe = { name: 'Imported Recipe', servings: 1, items: [] };
+    try { const p = JSON.parse(responseText); if (p && typeof p === 'object' && !Array.isArray(p)) recipe = p; } catch {}
+    res.json(recipe);
   } catch (err) {
     console.error('[import-recipe]', err.message);
     res.status(500).json({ error: { message: 'Failed to fetch or parse recipe' } });
   }
 });
 
-// ── Static app ────────────────────────────────────────────────────────────────
-// Registered AFTER all /api routes so the wildcard does not intercept them.
-const fs = require('fs');
-const distDir  = path.join(__dirname, 'dist');
-const distIndex = path.join(distDir, 'index.html');
-const legacyIndex = path.join(__dirname, 'index.html');
-const fallbackIndex = path.join(__dirname, 'dagnara.html');
+// ── Stripe: Create checkout session ──────────────────────────────────────────
+app.post('/api/stripe/create-checkout-session', stripeLimiter, async (req, res) => {
+  if (!stripe || !process.env.STRIPE_PRICE_ID) {
+    return res.status(503).json({ error: { message: 'Stripe not configured on this server' } });
+  }
 
-if (fs.existsSync(distIndex)) {
-  app.use(express.static(distDir));
-  app.get('*', (req, res) => res.sendFile(distIndex));
-} else if (fs.existsSync(legacyIndex)) {
-  app.get('/', (req, res) => res.sendFile(legacyIndex));
-} else {
-  app.get('/', (req, res) => res.sendFile(fallbackIndex));
-}
+  const { email } = req.body ?? {};
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: { message: 'email is required' } });
+  }
+
+  try {
+    // Find or create Stripe customer for this email
+    const existing = await stripe.customers.list({ email, limit: 1 });
+    const customer = existing.data[0] ?? await stripe.customers.create({ email });
+
+    const publicUrl = process.env.PUBLIC_URL ?? 'https://9ysummpd.up.railway.app';
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      mode: 'subscription',
+      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      success_url: `${publicUrl}/premium-success`,
+      cancel_url: `${publicUrl}/premium-cancel`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('[create-checkout-session]', err.message);
+    res.status(500).json({ error: { message: 'Failed to create checkout session' } });
+  }
+});
+
+// ── Stripe: Customer portal (manage / cancel subscription) ───────────────────
+app.post('/api/stripe/portal-session', stripeLimiter, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: { message: 'Stripe not configured on this server' } });
+  }
+
+  const { email } = req.body ?? {};
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: { message: 'email is required' } });
+  }
+
+  try {
+    const existing = await stripe.customers.list({ email, limit: 1 });
+    const customer = existing.data[0];
+    if (!customer) {
+      return res.status(404).json({ error: { message: 'No subscription found for this account' } });
+    }
+
+    const publicUrl = process.env.PUBLIC_URL ?? 'https://9ysummpd.up.railway.app';
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customer.id,
+      return_url: `${publicUrl}/premium-success`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('[portal-session]', err.message);
+    res.status(500).json({ error: { message: 'Failed to create portal session' } });
+  }
+});
+
+// ── Stripe redirect pages ─────────────────────────────────────────────────────
+const publicDir = path.join(__dirname, 'public');
+app.get('/premium-success', (req, res) => res.sendFile(path.join(publicDir, 'premium-success.html')));
+app.get('/premium-cancel',  (req, res) => res.sendFile(path.join(publicDir, 'premium-cancel.html')));
+
+// ── Landing page ──────────────────────────────────────────────────────────────
+// Registered AFTER all /api routes so the wildcard does not intercept them.
+const landingIndex = path.join(__dirname, 'index.html');
+app.get('/', (req, res) => res.sendFile(landingIndex));
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
