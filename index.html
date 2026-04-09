@@ -11,29 +11,35 @@
   <meta name="theme-color" content="#0d0a1a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0d0a1a;
-      --bg2:       #130f24;
-      --layer1:    #1a1530;
-      --layer2:    #221d3a;
+      --bg:        #0b0914;
+      --bg2:       #110e20;
+      --layer1:    #18132d;
+      --layer2:    #201a38;
+      --layer3:    #2a2245;
       --purple:    #7c4dff;
       --purple2:   #5c35cc;
       --purpleGlow:#9c27b0;
-      --lavender:  #b39ddb;
-      --ink:       #f0ecff;
-      --ink2:      rgba(240,236,255,0.82);
-      --ink3:      rgba(240,236,255,0.45);
+      --violet:    #a78bfa;
+      --lavender:  #c4b5fd;
+      --ink:       #f4f0ff;
+      --ink2:      rgba(244,240,255,0.72);
+      --ink3:      rgba(244,240,255,0.42);
       --line:      rgba(124,77,255,0.12);
       --line2:     rgba(124,77,255,0.22);
-      --green:     #4caf7d;
-      --honey:     #f5a623;
+      --line3:     rgba(124,77,255,0.38);
+      --green:     #34d399;
+      --honey:     #fbbf24;
+      --rose:      #f87171;
+      --purpleTint:rgba(124,77,255,0.08);
       --r:         16px;
       --r-lg:      22px;
       --r-xl:      30px;
+      --r-pill:    999px;
     }
 
     html { scroll-behavior: smooth; }
@@ -49,656 +55,1310 @@
     a { color: inherit; text-decoration: none; }
     img { max-width: 100%; display: block; }
 
-    /* ── NAV ── */
+    /* ─── SCROLL ANIMATIONS ─── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(36px);
+      transition: opacity 0.7s cubic-bezier(.22,.68,0,1.2), transform 0.7s cubic-bezier(.22,.68,0,1.2);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-48px);
+      transition: opacity 0.75s cubic-bezier(.22,.68,0,1.2), transform 0.75s cubic-bezier(.22,.68,0,1.2);
+    }
+    .reveal-left.visible { opacity: 1; transform: none; }
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(48px);
+      transition: opacity 0.75s cubic-bezier(.22,.68,0,1.2), transform 0.75s cubic-bezier(.22,.68,0,1.2);
+    }
+    .reveal-right.visible { opacity: 1; transform: none; }
+    .delay-1 { transition-delay: 0.1s; }
+    .delay-2 { transition-delay: 0.2s; }
+    .delay-3 { transition-delay: 0.3s; }
+    .delay-4 { transition-delay: 0.4s; }
+
+    /* ─── NAV ─── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 18px 48px;
-      background: rgba(13,10,26,0.85);
-      backdrop-filter: blur(20px);
+      padding: 0 48px; height: 68px;
+      background: rgba(11,9,20,0.8);
+      backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--line);
+      transition: background 0.3s;
     }
     .logo {
-      font-size: 22px; font-weight: 800;
-      background: linear-gradient(135deg, var(--purple), var(--lavender));
+      font-size: 20px; font-weight: 900; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--lavender) 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    .nav-links { display: flex; align-items: center; gap: 32px; }
-    .nav-links a { color: var(--ink2); font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links { display: flex; align-items: center; gap: 36px; }
+    .nav-links a {
+      color: var(--ink2); font-size: 14px; font-weight: 500;
+      transition: color 0.2s; letter-spacing: -0.1px;
+    }
     .nav-links a:hover { color: var(--ink); }
     .nav-cta {
-      padding: 10px 22px; border-radius: var(--r);
+      padding: 10px 24px; border-radius: var(--r-pill);
       background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
-      font-size: 14px; font-weight: 600; color: #fff;
-      transition: opacity 0.2s; cursor: pointer; border: none;
+      font-size: 14px; font-weight: 700; color: #fff;
+      border: none; cursor: pointer;
+      box-shadow: 0 2px 20px rgba(124,77,255,0.4);
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
     }
-    .nav-cta:hover { opacity: 0.88; }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 28px rgba(124,77,255,0.55); }
 
-    /* ── HERO ── */
+    /* ─── HERO ─── */
     .hero {
       min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      padding: 120px 24px 80px;
+      display: flex; align-items: center;
+      padding: 100px 48px 80px;
       position: relative; overflow: hidden;
     }
-    .hero-glow {
-      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-      width: 900px; height: 600px;
-      background: radial-gradient(ellipse at 50% 0%, rgba(124,77,255,0.28) 0%, transparent 70%);
+    .hero-bg-glow {
+      position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+      width: 1200px; height: 800px;
+      background: radial-gradient(ellipse at 50% 20%, rgba(124,77,255,0.22) 0%, rgba(156,39,176,0.08) 40%, transparent 70%);
       pointer-events: none;
     }
+    .hero-bg-grid {
+      position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(124,77,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,77,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse at 50% 0%, rgba(0,0,0,0.6) 0%, transparent 70%);
+    }
     .hero-inner {
-      display: flex; align-items: center; gap: 80px;
-      max-width: 1100px; width: 100%; position: relative; z-index: 1;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 60px; position: relative; z-index: 1;
     }
-    .hero-text { flex: 1; }
-    .hero-badge {
+    .hero-text { flex: 1; max-width: 560px; }
+    .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 999px;
-      background: var(--line); border: 1px solid var(--line2);
-      font-size: 12px; font-weight: 700; color: var(--lavender);
-      letter-spacing: 0.8px; text-transform: uppercase;
-      margin-bottom: 24px;
+      padding: 6px 14px; border-radius: var(--r-pill);
+      background: var(--purpleTint); border: 1px solid var(--line2);
+      font-size: 11px; font-weight: 700; color: var(--lavender);
+      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 28px;
     }
-    .hero-badge span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .hero-eyebrow-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
     h1 {
-      font-size: clamp(38px, 5vw, 64px);
-      font-weight: 900; line-height: 1.1;
-      margin-bottom: 20px;
-      letter-spacing: -1px;
+      font-size: clamp(44px, 5.5vw, 72px);
+      font-weight: 900; line-height: 1.05;
+      letter-spacing: -2px; margin-bottom: 24px;
     }
-    h1 em {
-      font-style: normal;
-      background: linear-gradient(135deg, var(--purple), var(--lavender));
+    h1 .accent {
+      font-style: italic;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--lavender) 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
     }
     .hero-sub {
-      font-size: 18px; color: var(--ink2); max-width: 480px;
-      margin-bottom: 40px; line-height: 1.7;
+      font-size: 18px; color: var(--ink2); max-width: 460px;
+      line-height: 1.75; margin-bottom: 44px; font-weight: 400;
     }
-    .hero-btns { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 16px 32px; border-radius: var(--r);
-      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
-      font-size: 16px; font-weight: 700; color: #fff;
+    .hero-store-btns { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
+    .store-badge {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 24px; border-radius: var(--r);
+      background: var(--ink); color: #0b0914;
+      font-weight: 700; cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
-      box-shadow: 0 4px 32px rgba(124,77,255,0.35);
-      cursor: pointer; border: none;
+      box-shadow: 0 4px 24px rgba(244,240,255,0.12);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(124,77,255,0.45); }
-    .btn-ghost {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 16px 28px; border-radius: var(--r);
-      border: 1px solid var(--line2); background: transparent;
-      font-size: 16px; font-weight: 600; color: var(--ink2);
-      transition: border-color 0.2s, color 0.2s; cursor: pointer;
+    .store-badge:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(244,240,255,0.2); }
+    .store-badge svg { flex-shrink: 0; }
+    .store-badge-text { display: flex; flex-direction: column; }
+    .store-badge-sub { font-size: 10px; font-weight: 500; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+    .store-badge-name { font-size: 16px; font-weight: 800; line-height: 1.3; letter-spacing: -0.3px; }
+    .store-badge.ghost {
+      background: transparent; color: var(--ink);
+      border: 1px solid var(--line3); box-shadow: none;
     }
-    .btn-ghost:hover { border-color: var(--purple); color: var(--ink); }
-    .hero-note { margin-top: 20px; font-size: 13px; color: var(--ink3); }
-    .hero-note span { color: var(--green); font-weight: 600; }
+    .store-badge.ghost:hover { border-color: var(--purple); box-shadow: 0 4px 24px rgba(124,77,255,0.2); }
+    .hero-meta { display: flex; align-items: center; gap: 20px; }
+    .hero-stars { display: flex; align-items: center; gap: 6px; }
+    .hero-stars svg { color: var(--honey); }
+    .hero-rating { font-size: 14px; font-weight: 700; }
+    .hero-meta-sep { width: 1px; height: 16px; background: var(--line2); }
+    .hero-meta-txt { font-size: 13px; color: var(--ink3); }
+    .hero-meta-txt strong { color: var(--ink2); font-weight: 600; }
 
-    /* ── PHONE MOCKUP ── */
-    .phone-wrap {
-      flex-shrink: 0; position: relative;
-      width: 280px; height: 560px;
+    /* ─── HERO PHONES ─── */
+    .hero-phones {
+      position: relative; flex-shrink: 0;
+      width: 340px; height: 640px;
     }
-    .phone {
-      width: 100%; height: 100%;
+    .phone-frame {
+      position: absolute;
       background: var(--layer1);
       border-radius: 44px;
       border: 2px solid var(--line2);
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 8px 64px rgba(124,77,255,0.25);
       overflow: hidden;
-      position: relative;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    }
+    .phone-main {
+      width: 280px; height: 580px;
+      right: 0; top: 0; z-index: 2;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 0 80px rgba(124,77,255,0.3);
+    }
+    .phone-back {
+      width: 240px; height: 480px;
+      left: 0; bottom: 0; z-index: 1;
+      transform: rotate(-6deg);
+      opacity: 0.75;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
     }
     .phone-notch {
-      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-      width: 100px; height: 28px; background: var(--bg);
-      border-radius: 20px; z-index: 2;
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      width: 90px; height: 26px;
+      background: var(--bg); border-radius: 20px; z-index: 10;
     }
-    .phone-screen {
-      position: absolute; inset: 0;
-      padding: 64px 16px 24px;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .phone-header { font-size: 11px; color: var(--ink3); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
-    .phone-title { font-size: 20px; font-weight: 800; text-align: center; }
-    .phone-ring-wrap { display: flex; justify-content: center; margin: 4px 0; }
-    .phone-ring {
-      width: 100px; height: 100px; position: relative;
-    }
-    .phone-ring svg { position: absolute; inset: 0; }
-    .phone-ring-center {
+    .phone-content { position: absolute; inset: 0; padding: 52px 14px 20px; }
+
+    /* Main phone — diary screen */
+    .ps-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .ps-date { font-size: 10px; color: var(--ink3); font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; }
+    .ps-streak { font-size: 10px; color: var(--honey); font-weight: 700; }
+    .ps-title { font-size: 19px; font-weight: 800; text-align: center; margin-bottom: 10px; letter-spacing: -0.3px; }
+    .ps-ring-area { display: flex; justify-content: center; margin-bottom: 10px; }
+    .ps-ring { width: 110px; height: 110px; position: relative; }
+    .ps-ring svg { position: absolute; inset: 0; }
+    .ps-ring-center {
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .ring-num { font-size: 20px; font-weight: 800; }
-    .ring-lbl { font-size: 8px; color: var(--ink3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .phone-macros { display: flex; gap: 6px; }
-    .phone-macro {
+    .ps-ring-kcal { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+    .ps-ring-sub { font-size: 8px; color: var(--ink3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ps-macros { display: flex; gap: 6px; margin-bottom: 10px; }
+    .ps-macro {
       flex: 1; background: var(--layer2); border-radius: 10px;
-      padding: 8px 6px; text-align: center;
+      padding: 7px 4px; text-align: center;
     }
-    .macro-val { font-size: 13px; font-weight: 700; }
-    .macro-lbl { font-size: 8px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.5px; }
-    .phone-meals { display: flex; flex-direction: column; gap: 6px; }
-    .phone-meal {
+    .ps-macro-val { font-size: 12px; font-weight: 800; }
+    .ps-macro-lbl { font-size: 7px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+    .ps-meals { display: flex; flex-direction: column; gap: 5px; }
+    .ps-meal {
       background: var(--layer2); border-radius: 10px;
-      padding: 8px 10px;
+      padding: 7px 10px;
       display: flex; align-items: center; gap: 8px;
     }
-    .meal-icon { font-size: 16px; }
-    .meal-info { flex: 1; }
-    .meal-name { font-size: 10px; font-weight: 600; }
-    .meal-cal { font-size: 9px; color: var(--ink3); }
-    .meal-bar-wrap { width: 40px; height: 4px; background: var(--line2); border-radius: 2px; overflow: hidden; }
-    .meal-bar { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--purple), var(--purpleGlow)); }
-    .phone-glow {
-      position: absolute; inset: 0; pointer-events: none;
-      background: linear-gradient(180deg, rgba(124,77,255,0.15) 0%, transparent 40%);
-    }
-
-    /* ── STATS BAR ── */
-    .stats-bar {
-      background: var(--bg2);
-      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-      padding: 32px 24px;
-    }
-    .stats-inner {
-      max-width: 1000px; margin: 0 auto;
-      display: flex; align-items: center; justify-content: space-around;
-      gap: 24px; flex-wrap: wrap;
-    }
-    .stat { text-align: center; }
-    .stat-num { font-size: 36px; font-weight: 900; color: var(--ink); }
-    .stat-num span {
-      background: linear-gradient(135deg, var(--purple), var(--lavender));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .stat-lbl { font-size: 13px; color: var(--ink3); font-weight: 500; margin-top: 2px; }
-    .stat-divider { width: 1px; height: 48px; background: var(--line2); }
-
-    /* ── SECTIONS COMMON ── */
-    section { padding: 100px 24px; }
-    .section-label {
-      font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
-      color: var(--lavender); margin-bottom: 12px;
-    }
-    .section-title { font-size: clamp(28px, 4vw, 46px); font-weight: 900; letter-spacing: -0.5px; margin-bottom: 16px; }
-    .section-title em {
-      font-style: normal;
-      background: linear-gradient(135deg, var(--purple), var(--lavender));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .section-sub { font-size: 17px; color: var(--ink2); max-width: 560px; line-height: 1.7; margin-bottom: 60px; }
-    .center { text-align: center; }
-    .center .section-sub { margin-left: auto; margin-right: auto; }
-
-    /* ── FEATURES ── */
-    .features { background: var(--bg); }
-    .features-grid {
-      max-width: 1100px; margin: 0 auto;
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;
-    }
-    .feature-card {
-      background: var(--layer1);
-      border: 1px solid var(--line2);
-      border-radius: var(--r-lg);
-      padding: 32px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      position: relative; overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--purple), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(124,77,255,0.2); }
-    .feature-card:hover::before { opacity: 1; }
-    .feature-icon {
-      width: 48px; height: 48px; border-radius: 14px;
-      background: linear-gradient(135deg, var(--purple), var(--purpleGlow));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; margin-bottom: 20px;
-      box-shadow: 0 4px 20px rgba(124,77,255,0.35);
-    }
-    .feature-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
-    .feature-desc { font-size: 14px; color: var(--ink2); line-height: 1.7; }
-
-    /* ── HOW IT WORKS ── */
-    .how { background: var(--bg2); }
-    .steps {
-      max-width: 900px; margin: 0 auto;
-      display: flex; flex-direction: column; gap: 0;
-      position: relative;
-    }
-    .steps::before {
-      content: '';
-      position: absolute; left: 28px; top: 28px; bottom: 28px; width: 2px;
-      background: linear-gradient(180deg, var(--purple), transparent);
-      opacity: 0.4;
-    }
-    .step {
-      display: flex; gap: 32px; align-items: flex-start;
-      padding: 36px 0;
-      border-bottom: 1px solid var(--line);
-      position: relative;
-    }
-    .step:last-child { border-bottom: none; }
-    .step-num {
-      flex-shrink: 0; width: 58px; height: 58px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--purple), var(--purpleGlow));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 900;
-      box-shadow: 0 4px 24px rgba(124,77,255,0.4);
-      position: relative; z-index: 1;
-    }
-    .step-content { flex: 1; padding-top: 10px; }
-    .step-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-    .step-desc { font-size: 15px; color: var(--ink2); line-height: 1.7; }
-
-    /* ── PRICING ── */
-    .pricing { background: var(--bg); }
-    .pricing-grid {
-      max-width: 860px; margin: 0 auto;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
-    }
-    .pricing-card {
-      background: var(--layer1);
-      border: 1px solid var(--line2);
-      border-radius: var(--r-xl);
-      padding: 40px 36px;
-      position: relative;
-    }
-    .pricing-card.featured {
-      border-color: var(--purple);
-      box-shadow: 0 0 0 1px var(--purple), 0 16px 64px rgba(124,77,255,0.25);
-    }
-    .pricing-card.featured::before {
-      content: 'MOST POPULAR';
-      position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
-      padding: 4px 16px; border-radius: 999px;
-      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
-      font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #fff;
-      white-space: nowrap;
-    }
-    .plan-name { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink3); margin-bottom: 16px; }
-    .plan-price { font-size: 48px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
-    .plan-price sub { font-size: 18px; font-weight: 600; color: var(--ink3); vertical-align: bottom; }
-    .plan-period { font-size: 13px; color: var(--ink3); margin-bottom: 32px; }
-    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
-    .plan-features li { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--ink2); }
-    .plan-features li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-    .plan-features li.dim { color: var(--ink3); }
-    .plan-features li.dim::before { content: '✕'; color: var(--ink3); }
-    .plan-btn {
-      width: 100%; padding: 16px; border-radius: var(--r);
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      border: none; transition: opacity 0.2s;
-    }
-    .plan-btn.gradient {
-      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
-      color: #fff; box-shadow: 0 4px 24px rgba(124,77,255,0.35);
-    }
-    .plan-btn.gradient:hover { opacity: 0.88; }
-    .plan-btn.outline {
-      background: transparent; border: 1px solid var(--line2);
-      color: var(--ink2);
-    }
-    .plan-btn.outline:hover { border-color: var(--purple); color: var(--ink); }
-
-    /* ── DOWNLOAD CTA ── */
-    .download {
-      background: linear-gradient(135deg, var(--bg2) 0%, var(--bg) 100%);
-      position: relative; overflow: hidden;
-    }
-    .download-glow {
-      position: absolute; bottom: -100px; left: 50%; transform: translateX(-50%);
-      width: 700px; height: 400px;
-      background: radial-gradient(ellipse, rgba(124,77,255,0.2) 0%, transparent 70%);
+    .ps-meal-icon { font-size: 15px; }
+    .ps-meal-info { flex: 1; }
+    .ps-meal-name { font-size: 10px; font-weight: 600; }
+    .ps-meal-cal { font-size: 9px; color: var(--ink3); }
+    .ps-meal-bar { height: 3px; background: var(--line2); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+    .ps-meal-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--purple), var(--purpleGlow)); }
+    .ps-glow {
+      position: absolute; top: 0; left: 0; right: 0; height: 160px;
+      background: linear-gradient(180deg, rgba(124,77,255,0.18) 0%, transparent 100%);
       pointer-events: none;
     }
-    .download-inner { max-width: 680px; margin: 0 auto; text-align: center; position: relative; z-index: 1; }
-    .store-btns { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; }
-    .store-btn {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 28px; border-radius: var(--r);
-      background: var(--layer1); border: 1px solid var(--line2);
-      font-size: 14px; font-weight: 600; transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .store-btn:hover { border-color: var(--purple); box-shadow: 0 4px 24px rgba(124,77,255,0.2); }
-    .store-btn svg { width: 24px; height: 24px; }
-    .store-btn-sub { font-size: 10px; color: var(--ink3); font-weight: 400; text-transform: uppercase; letter-spacing: 0.5px; display: block; }
-    .store-btn-name { font-size: 15px; font-weight: 700; display: block; }
 
-    /* ── FOOTER ── */
+    /* Back phone — progress screen */
+    .pp-header { font-size: 9px; color: var(--ink3); font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+    .pp-title { font-size: 15px; font-weight: 800; margin-bottom: 12px; }
+    .pp-stat-row { display: flex; gap: 5px; margin-bottom: 12px; }
+    .pp-stat { flex: 1; background: var(--layer2); border-radius: 8px; padding: 8px 6px; }
+    .pp-stat-val { font-size: 14px; font-weight: 800; }
+    .pp-stat-lbl { font-size: 7px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.5px; }
+    .pp-chart { background: var(--layer2); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+    .pp-chart-title { font-size: 8px; color: var(--ink3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .pp-chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 40px; }
+    .pp-bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--line2); }
+    .pp-bar.active { background: linear-gradient(180deg, var(--purple), var(--purpleGlow)); }
+    .pp-xp { background: var(--purpleTint); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+    .pp-xp-icon { font-size: 14px; }
+    .pp-xp-info { flex: 1; }
+    .pp-xp-label { font-size: 9px; color: var(--lavender); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pp-xp-val { font-size: 12px; font-weight: 800; }
+    .pp-xp-bar { height: 3px; background: var(--line2); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .pp-xp-bar-fill { width: 68%; height: 100%; background: linear-gradient(90deg, var(--purple), var(--lavender)); border-radius: 2px; }
+
+    /* ─── TRUST BAR ─── */
+    .trust-bar {
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      background: var(--bg2); padding: 28px 48px;
+    }
+    .trust-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-around;
+      gap: 20px; flex-wrap: wrap;
+    }
+    .trust-stat { text-align: center; }
+    .trust-num {
+      font-size: 32px; font-weight: 900; letter-spacing: -1px; line-height: 1;
+      background: linear-gradient(135deg, var(--purple), var(--lavender));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .trust-lbl { font-size: 12px; color: var(--ink3); font-weight: 500; margin-top: 4px; }
+    .trust-divider { width: 1px; height: 40px; background: var(--line2); }
+
+    /* ─── FEATURE SECTIONS ─── */
+    .feature-section {
+      padding: 120px 48px;
+      position: relative; overflow: hidden;
+    }
+    .feature-section:nth-child(even) { background: var(--bg2); }
+    .feature-section:nth-child(odd) { background: var(--bg); }
+    .feature-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; gap: 80px;
+    }
+    .feature-inner.flip { flex-direction: row-reverse; }
+    .feature-copy { flex: 1; }
+    .feature-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 14px; border-radius: var(--r-pill);
+      background: var(--purpleTint); border: 1px solid var(--line2);
+      font-size: 11px; font-weight: 700; color: var(--lavender);
+      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 24px;
+    }
+    .feature-copy h2 {
+      font-size: clamp(28px, 3.5vw, 46px);
+      font-weight: 900; letter-spacing: -1px; line-height: 1.1;
+      margin-bottom: 18px;
+    }
+    .feature-copy h2 em {
+      font-style: italic;
+      background: linear-gradient(135deg, var(--purple), var(--lavender));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .feature-copy p {
+      font-size: 17px; color: var(--ink2); line-height: 1.8;
+      margin-bottom: 36px; max-width: 480px;
+    }
+    .feature-bullets { display: flex; flex-direction: column; gap: 14px; }
+    .feature-bullet { display: flex; align-items: flex-start; gap: 14px; }
+    .feature-bullet-icon {
+      width: 32px; height: 32px; flex-shrink: 0;
+      background: var(--purpleTint); border: 1px solid var(--line2);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 15px; margin-top: 2px;
+    }
+    .feature-bullet-text strong { display: block; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .feature-bullet-text span { font-size: 13px; color: var(--ink3); line-height: 1.5; }
+
+    /* Feature phone mockup */
+    .feature-phone-wrap { flex-shrink: 0; position: relative; }
+    .feature-phone {
+      width: 260px; height: 530px;
+      background: var(--layer1);
+      border-radius: 42px; border: 2px solid var(--line2);
+      overflow: hidden; position: relative;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 80px rgba(124,77,255,0.2), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    }
+    .feature-phone-glow {
+      position: absolute; width: 300px; height: 300px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,77,255,0.25) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .feature-phone-glow.top-right { top: -80px; right: -80px; }
+    .feature-phone-glow.top-left { top: -80px; left: -80px; }
+    .fp-notch {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 22px; background: var(--bg);
+      border-radius: 20px; z-index: 10;
+    }
+    .fp-content { position: absolute; inset: 0; padding: 46px 12px 16px; }
+    .fp-top-glow {
+      position: absolute; top: 0; left: 0; right: 0; height: 130px;
+      background: linear-gradient(180deg, rgba(124,77,255,0.16) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* Feature phone screens */
+    /* Screen A: AI Scan */
+    .scan-viewfinder {
+      background: #000; border-radius: 16px; height: 170px;
+      position: relative; overflow: hidden; margin-bottom: 10px;
+    }
+    .scan-grid {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(124,77,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(124,77,255,0.3) 1px, transparent 1px);
+      background-size: 30px 30px; opacity: 0.5;
+    }
+    .scan-frame {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 120px; height: 80px;
+    }
+    .scan-corner {
+      position: absolute; width: 16px; height: 16px;
+      border-color: var(--purple); border-style: solid;
+    }
+    .scan-corner.tl { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+    .scan-corner.tr { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
+    .scan-corner.bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
+    .scan-corner.br { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+    .scan-label {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(124,77,255,0.85); border-radius: 6px;
+      padding: 3px 10px; font-size: 9px; font-weight: 700; color: #fff; white-space: nowrap;
+    }
+    .scan-emoji { position: absolute; font-size: 32px; top: 50%; left: 50%; transform: translate(-50%,-60%); }
+    .scan-result-title { font-size: 10px; color: var(--ink3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .scan-result-item {
+      background: var(--layer2); border-radius: 9px;
+      padding: 7px 10px; margin-bottom: 5px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .scan-item-left { display: flex; align-items: center; gap: 7px; }
+    .scan-item-icon { font-size: 14px; }
+    .scan-item-name { font-size: 10px; font-weight: 600; }
+    .scan-item-weight { font-size: 9px; color: var(--ink3); }
+    .scan-item-kcal { font-size: 11px; font-weight: 800; color: var(--lavender); }
+    .scan-confirm {
+      margin-top: 8px; width: 100%; padding: 10px;
+      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
+      border: none; border-radius: 10px; color: #fff;
+      font-size: 11px; font-weight: 800; cursor: pointer; letter-spacing: 0.3px;
+    }
+
+    /* Screen B: Macros deep dive */
+    .macro-screen-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
+    .macro-goal-card {
+      background: linear-gradient(135deg, rgba(124,77,255,0.2), rgba(156,39,176,0.15));
+      border: 1px solid var(--line2); border-radius: 14px;
+      padding: 12px; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .macro-goal-ring { width: 52px; height: 52px; flex-shrink: 0; position: relative; }
+    .macro-goal-ring svg { position: absolute; inset: 0; }
+    .macro-goal-ring-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .macro-goal-ring-center span:first-child { font-size: 12px; font-weight: 900; }
+    .macro-goal-ring-center span:last-child { font-size: 7px; color: var(--ink3); text-transform: uppercase; }
+    .macro-goal-info { flex: 1; }
+    .macro-goal-title { font-size: 11px; font-weight: 800; margin-bottom: 2px; }
+    .macro-goal-sub { font-size: 9px; color: var(--ink3); }
+    .macro-rows { display: flex; flex-direction: column; gap: 6px; }
+    .macro-row { background: var(--layer2); border-radius: 9px; padding: 8px 10px; }
+    .macro-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .macro-row-name { font-size: 10px; font-weight: 700; }
+    .macro-row-vals { font-size: 9px; color: var(--ink3); }
+    .macro-row-bar { height: 4px; background: var(--line2); border-radius: 2px; overflow: hidden; }
+    .macro-row-fill { height: 100%; border-radius: 2px; }
+
+    /* Screen C: Habits / Programs */
+    .habits-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
+    .habit-card {
+      background: var(--layer2); border-radius: 12px;
+      padding: 10px 12px; margin-bottom: 7px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .habit-icon-wrap {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      flex-shrink: 0;
+    }
+    .habit-info { flex: 1; }
+    .habit-name { font-size: 11px; font-weight: 700; }
+    .habit-days { font-size: 9px; color: var(--ink3); margin-top: 1px; }
+    .habit-dots { display: flex; gap: 3px; margin-top: 5px; }
+    .habit-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .habit-dot.done { background: var(--green); }
+    .habit-dot.miss { background: var(--line2); }
+    .habit-streak { font-size: 11px; font-weight: 800; color: var(--honey); }
+
+    /* ─── TESTIMONIALS ─── */
+    .testimonials {
+      padding: 120px 48px; background: var(--bg);
+      position: relative; overflow: hidden;
+    }
+    .testimonials-glow {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 800px; height: 500px;
+      background: radial-gradient(ellipse, rgba(124,77,255,0.1) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .testimonials-inner { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+    .section-header { text-align: center; margin-bottom: 64px; }
+    .section-tag {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      letter-spacing: 1.4px; text-transform: uppercase; color: var(--lavender);
+      margin-bottom: 14px;
+    }
+    .section-headline {
+      font-size: clamp(28px, 3.5vw, 44px); font-weight: 900;
+      letter-spacing: -1px; line-height: 1.1;
+    }
+    .section-headline em {
+      font-style: italic;
+      background: linear-gradient(135deg, var(--purple), var(--lavender));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .testimonials-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    }
+    .testi-card {
+      background: var(--layer1); border: 1px solid var(--line2);
+      border-radius: var(--r-lg); padding: 32px;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      position: relative;
+    }
+    .testi-card::before {
+      content: '"'; position: absolute; top: 16px; right: 24px;
+      font-size: 72px; font-weight: 900; line-height: 1;
+      color: var(--purple); opacity: 0.18; font-family: Georgia, serif;
+    }
+    .testi-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 60px rgba(124,77,255,0.22);
+      border-color: var(--line3);
+    }
+    .testi-stars { display: flex; gap: 4px; margin-bottom: 16px; }
+    .testi-stars svg { width: 16px; height: 16px; color: var(--honey); }
+    .testi-quote { font-size: 15px; color: var(--ink2); line-height: 1.75; margin-bottom: 24px; font-weight: 400; }
+    .testi-author { display: flex; align-items: center; gap: 12px; }
+    .testi-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--purpleGlow));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .testi-name { font-size: 14px; font-weight: 700; }
+    .testi-handle { font-size: 12px; color: var(--ink3); }
+    .testi-badge {
+      margin-left: auto; padding: 3px 10px; border-radius: var(--r-pill);
+      background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.25);
+      font-size: 10px; font-weight: 700; color: var(--green); white-space: nowrap;
+    }
+
+    /* ─── PRICING ─── */
+    .pricing { padding: 120px 48px; background: var(--bg2); }
+    .pricing-inner { max-width: 900px; margin: 0 auto; }
+    .pricing-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 64px;
+    }
+    .plan-card {
+      background: var(--layer1); border: 1px solid var(--line2);
+      border-radius: var(--r-xl); padding: 44px 40px; position: relative;
+    }
+    .plan-card.popular {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 1px var(--purple), 0 24px 80px rgba(124,77,255,0.28);
+    }
+    .popular-badge {
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      padding: 5px 18px; border-radius: var(--r-pill);
+      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
+      font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: #fff; white-space: nowrap;
+      text-transform: uppercase;
+    }
+    .plan-name { font-size: 12px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink3); margin-bottom: 20px; }
+    .plan-price-row { display: flex; align-items: baseline; gap: 4px; margin-bottom: 6px; }
+    .plan-currency { font-size: 22px; font-weight: 700; color: var(--ink2); }
+    .plan-amount { font-size: 56px; font-weight: 900; letter-spacing: -3px; line-height: 1; }
+    .plan-period { font-size: 13px; color: var(--ink3); margin-bottom: 36px; }
+    .plan-divider { height: 1px; background: var(--line); margin-bottom: 28px; }
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
+    .plan-features li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink2); }
+    .plan-features li .check { color: var(--green); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .plan-features li .cross { color: var(--ink3); font-size: 13px; flex-shrink: 0; }
+    .plan-features li.muted { color: var(--ink3); }
+    .plan-cta {
+      width: 100%; padding: 16px; border-radius: var(--r);
+      font-size: 15px; font-weight: 800; cursor: pointer; border: none;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      letter-spacing: -0.2px;
+    }
+    .plan-cta.filled {
+      background: linear-gradient(90deg, var(--purple), var(--purpleGlow));
+      color: #fff; box-shadow: 0 4px 28px rgba(124,77,255,0.4);
+    }
+    .plan-cta.filled:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(124,77,255,0.55); }
+    .plan-cta.outlined {
+      background: transparent; border: 1px solid var(--line2); color: var(--ink2);
+    }
+    .plan-cta.outlined:hover { border-color: var(--purple); color: var(--ink); }
+
+    /* ─── DOWNLOAD CTA ─── */
+    .download-cta {
+      padding: 140px 48px;
+      position: relative; overflow: hidden;
+      background: var(--bg);
+      text-align: center;
+    }
+    .download-cta-glow {
+      position: absolute; bottom: -150px; left: 50%; transform: translateX(-50%);
+      width: 900px; height: 600px;
+      background: radial-gradient(ellipse, rgba(124,77,255,0.25) 0%, rgba(156,39,176,0.1) 40%, transparent 70%);
+      pointer-events: none;
+    }
+    .download-cta-top-glow {
+      position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 400px;
+      background: radial-gradient(ellipse, rgba(124,77,255,0.15) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .download-cta-inner { max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+    .download-cta-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; border-radius: var(--r-pill);
+      background: var(--purpleTint); border: 1px solid var(--line2);
+      font-size: 11px; font-weight: 700; color: var(--lavender);
+      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 32px;
+    }
+    .download-cta h2 {
+      font-size: clamp(36px, 5vw, 64px); font-weight: 900;
+      letter-spacing: -2px; line-height: 1.05; margin-bottom: 20px;
+    }
+    .download-cta h2 em {
+      font-style: italic;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--lavender) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .download-cta p {
+      font-size: 18px; color: var(--ink2); margin-bottom: 48px;
+      line-height: 1.7;
+    }
+    .download-cta-btns { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; }
+    .download-note { font-size: 13px; color: var(--ink3); }
+
+    /* ─── FOOTER ─── */
     footer {
       background: var(--bg2);
       border-top: 1px solid var(--line);
-      padding: 48px 24px 32px;
+      padding: 64px 48px 40px;
     }
     .footer-inner { max-width: 1100px; margin: 0 auto; }
     .footer-top {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 40px; flex-wrap: wrap; margin-bottom: 40px;
+      display: flex; gap: 60px; flex-wrap: wrap;
+      padding-bottom: 48px; margin-bottom: 32px;
+      border-bottom: 1px solid var(--line);
     }
-    .footer-brand { max-width: 300px; }
-    .footer-brand .logo { font-size: 24px; margin-bottom: 12px; display: block; }
-    .footer-brand p { font-size: 13px; color: var(--ink3); line-height: 1.7; }
-    .footer-links { display: flex; gap: 60px; flex-wrap: wrap; }
-    .footer-col h4 { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink3); margin-bottom: 16px; }
-    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-brand { flex: 1; min-width: 200px; max-width: 320px; }
+    .footer-brand .logo { font-size: 24px; margin-bottom: 14px; display: block; }
+    .footer-brand p { font-size: 13px; color: var(--ink3); line-height: 1.8; }
+    .footer-cols { display: flex; gap: 60px; flex-wrap: wrap; }
+    .footer-col h4 { font-size: 11px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: var(--ink3); margin-bottom: 18px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
     .footer-col ul li a { font-size: 13px; color: var(--ink2); transition: color 0.2s; }
     .footer-col ul li a:hover { color: var(--ink); }
     .footer-bottom {
       display: flex; align-items: center; justify-content: space-between;
-      padding-top: 24px; border-top: 1px solid var(--line);
       flex-wrap: wrap; gap: 12px;
     }
     .footer-bottom p { font-size: 12px; color: var(--ink3); }
 
-    /* ── RESPONSIVE ── */
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1024px) {
+      .hero { padding: 100px 32px 80px; }
+      .hero-phones { width: 280px; height: 560px; }
+      .phone-main { width: 240px; height: 500px; }
+      .phone-back { width: 200px; height: 410px; }
+      .feature-inner { gap: 48px; }
+      .feature-phone { width: 220px; height: 450px; }
+    }
     @media (max-width: 900px) {
-      nav { padding: 16px 20px; }
+      nav { padding: 0 20px; }
       .nav-links { display: none; }
-      .hero-inner { flex-direction: column; gap: 60px; text-align: center; align-items: center; }
-      .hero-sub { margin-left: auto; margin-right: auto; }
-      .hero-btns { justify-content: center; }
-      .hero-note { text-align: center; }
-      .phone-wrap { width: 240px; height: 480px; }
-      .stat-divider { display: none; }
-      .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
-      .footer-top { flex-direction: column; }
+      .hero { padding: 90px 24px 60px; }
+      .hero-inner { flex-direction: column; align-items: center; text-align: center; gap: 48px; }
+      .hero-sub { margin: 0 auto 44px; }
+      .hero-store-btns { justify-content: center; }
+      .hero-meta { justify-content: center; }
+      .hero-phones { width: 280px; height: 500px; }
+      .phone-main { width: 240px; height: 490px; }
+      .phone-back { width: 190px; height: 390px; }
+      .trust-bar { padding: 24px 20px; }
+      .trust-divider { display: none; }
+      .feature-section { padding: 80px 24px; }
+      .feature-inner { flex-direction: column !important; gap: 48px; align-items: center; }
+      .feature-copy p { max-width: 100%; }
+      .testimonials { padding: 80px 24px; }
+      .testimonials-grid { grid-template-columns: 1fr; gap: 16px; }
+      .pricing { padding: 80px 24px; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 440px; margin: 64px auto 0; }
+      .download-cta { padding: 100px 24px; }
+      footer { padding: 48px 24px 32px; }
+      .footer-top { gap: 40px; }
     }
     @media (max-width: 480px) {
-      section { padding: 72px 20px; }
-      .hero { padding: 100px 20px 60px; }
+      .hero-phones { width: 240px; height: 440px; }
+      .phone-main { width: 210px; height: 430px; }
+      .phone-back { display: none; }
+      .store-badge { padding: 10px 18px; }
+      .store-badge-name { font-size: 14px; }
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
+<!-- ─── NAV ─── -->
 <nav>
   <span class="logo">Dagnara</span>
   <div class="nav-links">
     <a href="#features">Features</a>
-    <a href="#how">How it works</a>
+    <a href="#testimonials">Reviews</a>
     <a href="#pricing">Pricing</a>
   </div>
-  <a href="#download"><button class="nav-cta">Download App</button></a>
+  <a href="#download"><button class="nav-cta">Get the app</button></a>
 </nav>
 
-<!-- HERO -->
+<!-- ─── HERO ─── -->
 <section class="hero" id="hero">
-  <div class="hero-glow"></div>
+  <div class="hero-bg-glow"></div>
+  <div class="hero-bg-grid"></div>
   <div class="hero-inner">
+
     <div class="hero-text">
-      <div class="hero-badge"><span></span> AI-Powered Nutrition</div>
-      <h1>Eat smarter.<br /><em>Train harder.</em><br />Live better.</h1>
-      <p class="hero-sub">Dagnara tracks your calories, macros, and habits — then coaches you with AI insights that actually move the needle.</p>
-      <div class="hero-btns">
-        <a href="#download"><button class="btn-primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.39-1.32 2.76-2.53 3.99M12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25"/></svg>
-          App Store
-        </button></a>
-        <a href="#download"><button class="btn-ghost">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.29.16.64.16.94 0l11.67-6.74-2.7-2.7L3.18 23.76zM20.77 9.29c-.3-.73-.87-1.3-1.6-1.6L4.12.42c-.3-.14-.64-.14-.94 0-.58.29-.94.89-.94 1.54v20.08c0 .65.36 1.25.94 1.54.29.14.64.14.94 0l15.05-8.64a2.1 2.1 0 0 0 1.07-1.83c0-.64-.19-1.24-.47-1.82zM3.18.24l9.91 9.91-2.7 2.7L3.18.24z"/></svg>
-          Google Play
-        </button></a>
+      <div class="hero-eyebrow reveal">
+        <span class="hero-eyebrow-dot"></span>
+        AI-Powered Nutrition
       </div>
-      <p class="hero-note"><span>Free to start</span> — No credit card required</p>
+      <h1 class="reveal delay-1">
+        Eat better.<br />
+        <span class="accent">Feel stronger.</span><br />
+        Live fuller.
+      </h1>
+      <p class="hero-sub reveal delay-2">
+        Dagnara tracks your calories, macros, and habits — then coaches you with AI insights that actually move the needle.
+      </p>
+      <div class="hero-store-btns reveal delay-3">
+        <a href="#download" class="store-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.39-1.32 2.76-2.53 3.99M12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25"/>
+          </svg>
+          <div class="store-badge-text">
+            <span class="store-badge-sub">Download on the</span>
+            <span class="store-badge-name">App Store</span>
+          </div>
+        </a>
+        <a href="#download" class="store-badge ghost">
+          <svg width="20" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3.18 23.76c.29.16.64.16.94 0l11.67-6.74-2.7-2.7L3.18 23.76zM20.77 9.29c-.3-.73-.87-1.3-1.6-1.6L4.12.42c-.3-.14-.64-.14-.94 0-.58.29-.94.89-.94 1.54v20.08c0 .65.36 1.25.94 1.54.29.14.64.14.94 0l15.05-8.64a2.1 2.1 0 0 0 1.07-1.83c0-.64-.19-1.24-.47-1.82zM3.18.24l9.91 9.91-2.7 2.7L3.18.24z"/>
+          </svg>
+          <div class="store-badge-text">
+            <span class="store-badge-sub">Get it on</span>
+            <span class="store-badge-name">Google Play</span>
+          </div>
+        </a>
+      </div>
+      <div class="hero-meta reveal delay-4">
+        <div class="hero-stars">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <span class="hero-rating">4.8</span>
+        <div class="hero-meta-sep"></div>
+        <span class="hero-meta-txt"><strong>50,000+</strong> active users</span>
+        <div class="hero-meta-sep"></div>
+        <span class="hero-meta-txt">Free to start</span>
+      </div>
     </div>
 
-    <!-- Phone mockup -->
-    <div class="phone-wrap">
-      <div class="phone">
+    <!-- Dual phone mockup -->
+    <div class="hero-phones reveal-right">
+      <!-- Back phone: progress screen -->
+      <div class="phone-frame phone-back">
         <div class="phone-notch"></div>
-        <div class="phone-screen">
-          <div class="phone-glow"></div>
-          <div class="phone-header">Thursday</div>
-          <div class="phone-title">Today's Diary</div>
+        <div class="phone-content" style="padding:44px 12px 16px;">
+          <div class="pp-header">Progress</div>
+          <div class="pp-title">This Week</div>
+          <div class="pp-stat-row">
+            <div class="pp-stat">
+              <div class="pp-stat-val" style="color:#34d399">−0.8<span style="font-size:10px;font-weight:600">kg</span></div>
+              <div class="pp-stat-lbl">Lost</div>
+            </div>
+            <div class="pp-stat">
+              <div class="pp-stat-val">7</div>
+              <div class="pp-stat-lbl">Days</div>
+            </div>
+            <div class="pp-stat">
+              <div class="pp-stat-val" style="color:#7c4dff">94%</div>
+              <div class="pp-stat-lbl">Goals</div>
+            </div>
+          </div>
+          <div class="pp-chart">
+            <div class="pp-chart-title">Calories This Week</div>
+            <div class="pp-chart-bars">
+              <div class="pp-bar" style="height:55%"></div>
+              <div class="pp-bar" style="height:70%"></div>
+              <div class="pp-bar" style="height:48%"></div>
+              <div class="pp-bar" style="height:82%"></div>
+              <div class="pp-bar" style="height:60%"></div>
+              <div class="pp-bar" style="height:75%"></div>
+              <div class="pp-bar active" style="height:65%"></div>
+            </div>
+          </div>
+          <div class="pp-xp">
+            <div class="pp-xp-icon">⚡</div>
+            <div class="pp-xp-info">
+              <div class="pp-xp-label">Level 12 · Warrior</div>
+              <div class="pp-xp-val">3,240 XP</div>
+              <div class="pp-xp-bar"><div class="pp-xp-bar-fill"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <div class="phone-ring-wrap">
-            <div class="phone-ring">
-              <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(124,77,255,0.15)" stroke-width="9"/>
-                <circle cx="50" cy="50" r="42" fill="none" stroke="url(#ringGrad)" stroke-width="9"
-                  stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="80"
-                  transform="rotate(-90 50 50)"/>
+      <!-- Main phone: diary screen -->
+      <div class="phone-frame phone-main">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ps-glow"></div>
+          <div class="ps-header">
+            <span class="ps-date">Wednesday</span>
+            <span class="ps-streak">🔥 14 days</span>
+          </div>
+          <div class="ps-title">Today's Diary</div>
+          <div class="ps-ring-area">
+            <div class="ps-ring">
+              <svg width="110" height="110" viewBox="0 0 110 110">
+                <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(124,77,255,0.15)" stroke-width="10"/>
+                <circle cx="55" cy="55" r="46" fill="none" stroke="url(#rg1)" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="86"
+                  transform="rotate(-90 55 55)"/>
                 <defs>
-                  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <linearGradient id="rg1" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stop-color="#7c4dff"/>
                     <stop offset="100%" stop-color="#9c27b0"/>
                   </linearGradient>
                 </defs>
               </svg>
-              <div class="phone-ring-center">
-                <div class="ring-num">1,420</div>
-                <div class="ring-lbl">kcal</div>
+              <div class="ps-ring-center">
+                <div class="ps-ring-kcal">1,480</div>
+                <div class="ps-ring-sub">/ 2,100 kcal</div>
               </div>
             </div>
           </div>
-
-          <div class="phone-macros">
-            <div class="phone-macro">
-              <div class="macro-val" style="color:#7c4dff">142g</div>
-              <div class="macro-lbl">Carbs</div>
+          <div class="ps-macros">
+            <div class="ps-macro">
+              <div class="ps-macro-val" style="color:#7c4dff">148g</div>
+              <div class="ps-macro-lbl">Carbs</div>
             </div>
-            <div class="phone-macro">
-              <div class="macro-val" style="color:#4caf7d">98g</div>
-              <div class="macro-lbl">Protein</div>
+            <div class="ps-macro">
+              <div class="ps-macro-val" style="color:#34d399">112g</div>
+              <div class="ps-macro-lbl">Protein</div>
             </div>
-            <div class="phone-macro">
-              <div class="macro-val" style="color:#f5a623">44g</div>
-              <div class="macro-lbl">Fat</div>
+            <div class="ps-macro">
+              <div class="ps-macro-val" style="color:#fbbf24">48g</div>
+              <div class="ps-macro-lbl">Fat</div>
             </div>
           </div>
-
-          <div class="phone-meals">
-            <div class="phone-meal">
-              <div class="meal-icon">🥚</div>
-              <div class="meal-info">
-                <div class="meal-name">Breakfast</div>
-                <div class="meal-cal">380 kcal</div>
+          <div class="ps-meals">
+            <div class="ps-meal">
+              <div class="ps-meal-icon">🥚</div>
+              <div class="ps-meal-info">
+                <div class="ps-meal-name">Breakfast</div>
+                <div class="ps-meal-cal">380 kcal</div>
+                <div class="ps-meal-bar"><div class="ps-meal-bar-fill" style="width:56%"></div></div>
               </div>
-              <div class="meal-bar-wrap"><div class="meal-bar" style="width:60%"></div></div>
             </div>
-            <div class="phone-meal">
-              <div class="meal-icon">🥗</div>
-              <div class="meal-info">
-                <div class="meal-name">Lunch</div>
-                <div class="meal-cal">620 kcal</div>
+            <div class="ps-meal">
+              <div class="ps-meal-icon">🥗</div>
+              <div class="ps-meal-info">
+                <div class="ps-meal-name">Lunch</div>
+                <div class="ps-meal-cal">640 kcal</div>
+                <div class="ps-meal-bar"><div class="ps-meal-bar-fill" style="width:88%"></div></div>
               </div>
-              <div class="meal-bar-wrap"><div class="meal-bar" style="width:85%"></div></div>
             </div>
-            <div class="phone-meal">
-              <div class="meal-icon">🍗</div>
-              <div class="meal-info">
-                <div class="meal-name">Dinner</div>
-                <div class="meal-cal">420 kcal</div>
+            <div class="ps-meal">
+              <div class="ps-meal-icon">🍗</div>
+              <div class="ps-meal-info">
+                <div class="ps-meal-name">Dinner</div>
+                <div class="ps-meal-cal">460 kcal</div>
+                <div class="ps-meal-bar"><div class="ps-meal-bar-fill" style="width:66%"></div></div>
               </div>
-              <div class="meal-bar-wrap"><div class="meal-bar" style="width:50%"></div></div>
+            </div>
+            <div class="ps-meal">
+              <div class="ps-meal-icon">🍎</div>
+              <div class="ps-meal-info">
+                <div class="ps-meal-name">Snack</div>
+                <div class="ps-meal-cal">120 kcal</div>
+                <div class="ps-meal-bar"><div class="ps-meal-bar-fill" style="width:22%"></div></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
   </div>
 </section>
 
-<!-- STATS BAR -->
-<div class="stats-bar">
-  <div class="stats-inner">
-    <div class="stat"><div class="stat-num"><span>50K+</span></div><div class="stat-lbl">Active users</div></div>
-    <div class="stat-divider"></div>
-    <div class="stat"><div class="stat-num"><span>4.8★</span></div><div class="stat-lbl">App Store rating</div></div>
-    <div class="stat-divider"></div>
-    <div class="stat"><div class="stat-num"><span>2M+</span></div><div class="stat-lbl">Meals logged</div></div>
-    <div class="stat-divider"></div>
-    <div class="stat"><div class="stat-num"><span>500K+</span></div><div class="stat-lbl">Foods in database</div></div>
+<!-- ─── TRUST BAR ─── -->
+<div class="trust-bar">
+  <div class="trust-inner">
+    <div class="trust-stat reveal">
+      <div class="trust-num">50K+</div>
+      <div class="trust-lbl">Active users</div>
+    </div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat reveal delay-1">
+      <div class="trust-num">4.8★</div>
+      <div class="trust-lbl">App Store rating</div>
+    </div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat reveal delay-2">
+      <div class="trust-num">2M+</div>
+      <div class="trust-lbl">Meals logged</div>
+    </div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat reveal delay-3">
+      <div class="trust-num">500K+</div>
+      <div class="trust-lbl">Foods in database</div>
+    </div>
   </div>
 </div>
 
-<!-- FEATURES -->
-<section class="features" id="features">
-  <div style="max-width:1100px;margin:0 auto;">
-    <div class="center">
-      <div class="section-label">Features</div>
-      <h2 class="section-title">Everything you need to <em>crush your goals</em></h2>
-      <p class="section-sub">From AI food recognition to personalized macro targets — Dagnara has the tools serious nutrition tracking demands.</p>
+<!-- ─── FEATURE 1: AI Photo Logging ─── -->
+<section class="feature-section" id="features">
+  <div class="feature-inner">
+    <div class="feature-copy reveal-left">
+      <div class="feature-tag">AI Recognition</div>
+      <h2>Log any meal<br />in <em>seconds</em></h2>
+      <p>Just take a photo. Dagnara's AI instantly identifies every ingredient, estimates portion sizes, and fills in your diary — no searching, no guessing.</p>
+      <div class="feature-bullets">
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">📸</div>
+          <div class="feature-bullet-text">
+            <strong>Snap &amp; track</strong>
+            <span>Point your camera at any meal and get instant macro breakdowns.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">🍽️</div>
+          <div class="feature-bullet-text">
+            <strong>500,000+ food database</strong>
+            <span>Manual search, barcode scan, or restaurant menus — all in one place.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">🔗</div>
+          <div class="feature-bullet-text">
+            <strong>Recipe URL import</strong>
+            <span>Paste any recipe link and Dagnara calculates per-serving nutrition automatically.</span>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">📸</div>
-        <div class="feature-title">AI Photo Logging</div>
-        <p class="feature-desc">Snap a photo of any meal and our AI instantly identifies every food item and calculates accurate macros — no barcode scanning needed.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎯</div>
-        <div class="feature-title">Smart Macro Targets</div>
-        <p class="feature-desc">Your TDEE is calculated from body stats and activity level. Protein, carbs, and fat targets adapt to your weight goal — cut, maintain, or bulk.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <div class="feature-title">Progress Tracking</div>
-        <p class="feature-desc">Visual weight history, XP-based streaks, and weekly trends keep you motivated and show exactly how far you've come.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🍽️</div>
-        <div class="feature-title">Recipe Import</div>
-        <p class="feature-desc">Paste any recipe URL and Dagnara automatically extracts ingredients, calculates per-serving macros, and saves it to your library.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">💪</div>
-        <div class="feature-title">Training Programs</div>
-        <p class="feature-desc">Follow structured workout programs synced to your nutrition goals — fuel your training with the right macros at the right time.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔔</div>
-        <div class="feature-title">Smart Reminders</div>
-        <p class="feature-desc">Customizable meal reminders, hydration nudges, and check-ins keep you consistent without being annoying.</p>
+    <div class="feature-phone-wrap reveal-right">
+      <div class="feature-phone-glow top-right"></div>
+      <div class="feature-phone">
+        <div class="fp-notch"></div>
+        <div class="fp-top-glow"></div>
+        <div class="fp-content">
+          <div style="font-size:15px;font-weight:800;margin-bottom:10px;">Log a Meal</div>
+          <div class="scan-viewfinder">
+            <div class="scan-grid"></div>
+            <div class="scan-emoji">🍝</div>
+            <div class="scan-frame">
+              <div class="scan-corner tl"></div>
+              <div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div>
+              <div class="scan-corner br"></div>
+            </div>
+            <div class="scan-label">✓ Spaghetti Bolognese detected</div>
+          </div>
+          <div class="scan-result-title">Detected items</div>
+          <div class="scan-result-item">
+            <div class="scan-item-left">
+              <span class="scan-item-icon">🍝</span>
+              <div>
+                <div class="scan-item-name">Spaghetti Bolognese</div>
+                <div class="scan-item-weight">320g · serving</div>
+              </div>
+            </div>
+            <div class="scan-item-kcal">580 kcal</div>
+          </div>
+          <div class="scan-result-item">
+            <div class="scan-item-left">
+              <span class="scan-item-icon">🥖</span>
+              <div>
+                <div class="scan-item-name">Garlic Bread</div>
+                <div class="scan-item-weight">45g · 1 slice</div>
+              </div>
+            </div>
+            <div class="scan-item-kcal">148 kcal</div>
+          </div>
+          <button class="scan-confirm">Add to Diary — 728 kcal</button>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section class="how" id="how">
-  <div style="max-width:900px;margin:0 auto;">
-    <div class="center" style="margin-bottom:60px;">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">Up and tracking in <em>under 3 minutes</em></h2>
+<!-- ─── FEATURE 2: Smart Macros ─── -->
+<section class="feature-section">
+  <div class="feature-inner flip">
+    <div class="feature-copy reveal-right">
+      <div class="feature-tag">Personalized Goals</div>
+      <h2>Macros built<br />for <em>your body</em></h2>
+      <p>Your TDEE is calculated from your actual stats — age, weight, height, and activity level. Protein, carbs, and fat targets adapt as your goals change.</p>
+      <div class="feature-bullets">
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">🎯</div>
+          <div class="feature-bullet-text">
+            <strong>Cut, maintain, or bulk</strong>
+            <span>Switch goals anytime — your targets recalculate instantly.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">📊</div>
+          <div class="feature-bullet-text">
+            <strong>Daily &amp; weekly view</strong>
+            <span>See your macro balance at a glance with visual rings and bars.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">💡</div>
+          <div class="feature-bullet-text">
+            <strong>AI insights</strong>
+            <span>Get notified when you're consistently under or over on a macro.</span>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <div class="step-title">Create your profile</div>
-          <p class="step-desc">Enter your age, height, weight, and goal. Dagnara instantly calculates your personal TDEE and sets daily calorie and macro targets — no guesswork.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <div class="step-title">Log your first meal</div>
-          <p class="step-desc">Search 500,000+ foods, scan a barcode, or just take a photo. AI recognizes your meal and fills in everything automatically.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <div class="step-title">Watch the results come</div>
-          <p class="step-desc">Daily rings, weekly trends, and XP streaks make the habit stick. Most users hit their first goal within 8 weeks.</p>
+    <div class="feature-phone-wrap reveal-left">
+      <div class="feature-phone-glow top-left"></div>
+      <div class="feature-phone">
+        <div class="fp-notch"></div>
+        <div class="fp-top-glow"></div>
+        <div class="fp-content">
+          <div class="macro-screen-title">Your Macros</div>
+          <div class="macro-goal-card">
+            <div class="macro-goal-ring">
+              <svg width="52" height="52" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(124,77,255,0.2)" stroke-width="5"/>
+                <circle cx="26" cy="26" r="22" fill="none" stroke="url(#mg1)" stroke-width="5"
+                  stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="42"
+                  transform="rotate(-90 26 26)"/>
+                <defs>
+                  <linearGradient id="mg1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#7c4dff"/>
+                    <stop offset="100%" stop-color="#9c27b0"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="macro-goal-ring-center">
+                <span>70%</span>
+                <span>done</span>
+              </div>
+            </div>
+            <div class="macro-goal-info">
+              <div class="macro-goal-title">1,480 / 2,100 kcal</div>
+              <div class="macro-goal-sub">620 kcal remaining today</div>
+            </div>
+          </div>
+          <div class="macro-rows">
+            <div class="macro-row">
+              <div class="macro-row-top">
+                <span class="macro-row-name" style="color:#7c4dff">Carbohydrates</span>
+                <span class="macro-row-vals">148g / 220g</span>
+              </div>
+              <div class="macro-row-bar"><div class="macro-row-fill" style="width:67%;background:linear-gradient(90deg,#7c4dff,#9c27b0)"></div></div>
+            </div>
+            <div class="macro-row">
+              <div class="macro-row-top">
+                <span class="macro-row-name" style="color:#34d399">Protein</span>
+                <span class="macro-row-vals">112g / 160g</span>
+              </div>
+              <div class="macro-row-bar"><div class="macro-row-fill" style="width:70%;background:#34d399"></div></div>
+            </div>
+            <div class="macro-row">
+              <div class="macro-row-top">
+                <span class="macro-row-name" style="color:#fbbf24">Fat</span>
+                <span class="macro-row-vals">48g / 65g</span>
+              </div>
+              <div class="macro-row-bar"><div class="macro-row-fill" style="width:74%;background:#fbbf24"></div></div>
+            </div>
+            <div class="macro-row">
+              <div class="macro-row-top">
+                <span class="macro-row-name" style="color:#60a5fa">Fiber</span>
+                <span class="macro-row-vals">18g / 30g</span>
+              </div>
+              <div class="macro-row-bar"><div class="macro-row-fill" style="width:60%;background:#60a5fa"></div></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
+<!-- ─── FEATURE 3: Habits & Streaks ─── -->
+<section class="feature-section">
+  <div class="feature-inner">
+    <div class="feature-copy reveal-left">
+      <div class="feature-tag">Build Habits</div>
+      <h2>Streaks that<br /><em>keep you going</em></h2>
+      <p>XP points, level badges, and daily streaks turn consistency into a game. Most users hit their first goal within 8 weeks of starting.</p>
+      <div class="feature-bullets">
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">🔥</div>
+          <div class="feature-bullet-text">
+            <strong>Daily streaks</strong>
+            <span>Keep your streak alive — missing a day breaks momentum.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">⚡</div>
+          <div class="feature-bullet-text">
+            <strong>XP &amp; leveling system</strong>
+            <span>Earn XP for every meal logged. Level up from Rookie to Legend.</span>
+          </div>
+        </div>
+        <div class="feature-bullet">
+          <div class="feature-bullet-icon">💪</div>
+          <div class="feature-bullet-text">
+            <strong>Training programs</strong>
+            <span>Structured workout programs synced to your nutrition goals.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="feature-phone-wrap reveal-right">
+      <div class="feature-phone-glow top-right"></div>
+      <div class="feature-phone">
+        <div class="fp-notch"></div>
+        <div class="fp-top-glow"></div>
+        <div class="fp-content">
+          <div class="habits-title">My Habits</div>
+          <div class="habit-card">
+            <div class="habit-icon-wrap" style="background:rgba(124,77,255,0.15)">🥗</div>
+            <div class="habit-info">
+              <div class="habit-name">Log every meal</div>
+              <div class="habit-days">Daily goal</div>
+              <div class="habit-dots">
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot done"></div>
+              </div>
+            </div>
+            <div class="habit-streak">🔥 14</div>
+          </div>
+          <div class="habit-card">
+            <div class="habit-icon-wrap" style="background:rgba(52,211,153,0.15)">💧</div>
+            <div class="habit-info">
+              <div class="habit-name">Drink 2L water</div>
+              <div class="habit-days">Daily goal</div>
+              <div class="habit-dots">
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot done"></div><div class="habit-dot miss"></div>
+                <div class="habit-dot done"></div>
+              </div>
+            </div>
+            <div class="habit-streak">🔥 6</div>
+          </div>
+          <div class="habit-card">
+            <div class="habit-icon-wrap" style="background:rgba(251,191,36,0.15)">💪</div>
+            <div class="habit-info">
+              <div class="habit-name">Workout</div>
+              <div class="habit-days">4x per week</div>
+              <div class="habit-dots">
+                <div class="habit-dot done"></div><div class="habit-dot miss"></div>
+                <div class="habit-dot done"></div><div class="habit-dot done"></div>
+                <div class="habit-dot miss"></div><div class="habit-dot done"></div>
+                <div class="habit-dot miss"></div>
+              </div>
+            </div>
+            <div class="habit-streak">🔥 4</div>
+          </div>
+          <div class="pp-xp" style="margin-top:10px">
+            <div class="pp-xp-icon">⚡</div>
+            <div class="pp-xp-info">
+              <div class="pp-xp-label">Level 12 · Warrior</div>
+              <div class="pp-xp-val">3,240 / 4,800 XP</div>
+              <div class="pp-xp-bar"><div class="pp-xp-bar-fill"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TESTIMONIALS ─── -->
+<section class="testimonials" id="testimonials">
+  <div class="testimonials-glow"></div>
+  <div class="testimonials-inner">
+    <div class="section-header">
+      <div class="section-tag reveal">What users say</div>
+      <h2 class="section-headline reveal delay-1">Real people.<br /><em>Real results.</em></h2>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testi-card reveal delay-1">
+        <div class="testi-stars">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testi-quote">"Lost 12 lbs in 2 months without feeling like I was on a diet. The AI photo logging makes it so easy I actually stick to it."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">S</div>
+          <div>
+            <div class="testi-name">Sarah M.</div>
+            <div class="testi-handle">Weight loss goal</div>
+          </div>
+          <div class="testi-badge">−12 lbs</div>
+        </div>
+      </div>
+      <div class="testi-card reveal delay-2">
+        <div class="testi-stars">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testi-quote">"I've tried MyFitnessPal, Cronometer, all of them. Dagnara is the first one that actually keeps me coming back. The XP system is addictive."</p>
+        <div class="testi-author">
+          <div class="testi-avatar" style="background:linear-gradient(135deg,#059669,#34d399)">M</div>
+          <div>
+            <div class="testi-name">Marcus T.</div>
+            <div class="testi-handle">Muscle building goal</div>
+          </div>
+          <div class="testi-badge">+8 lbs muscle</div>
+        </div>
+      </div>
+      <div class="testi-card reveal delay-3">
+        <div class="testi-stars">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <p class="testi-quote">"The AI photo scanning is insane. I eat at restaurants all the time and it just works. Finally an app that fits my real life."</p>
+        <div class="testi-author">
+          <div class="testi-avatar" style="background:linear-gradient(135deg,#7c3aed,#c4b5fd)">E</div>
+          <div>
+            <div class="testi-name">Emma R.</div>
+            <div class="testi-handle">Healthy eating goal</div>
+          </div>
+          <div class="testi-badge">90-day streak</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ─── -->
 <section class="pricing" id="pricing">
-  <div style="max-width:1100px;margin:0 auto;">
-    <div class="center">
-      <div class="section-label">Pricing</div>
-      <h2 class="section-title">Start free. <em>Upgrade when ready.</em></h2>
-      <p class="section-sub">Core tracking is always free. Premium unlocks the AI features and advanced analytics that take you further.</p>
+  <div class="pricing-inner">
+    <div class="section-header">
+      <div class="section-tag reveal">Pricing</div>
+      <h2 class="section-headline reveal delay-1">Start free.<br /><em>Upgrade when ready.</em></h2>
     </div>
-    <div class="pricing-grid" style="margin:0 auto;">
-      <div class="pricing-card">
+    <div class="pricing-grid">
+      <div class="plan-card reveal delay-1">
         <div class="plan-name">Free</div>
-        <div class="plan-price"><sub>$</sub>0</div>
-        <div class="plan-period">Forever free</div>
+        <div class="plan-price-row">
+          <span class="plan-currency">$</span>
+          <span class="plan-amount">0</span>
+        </div>
+        <div class="plan-period">Forever free · No credit card</div>
+        <div class="plan-divider"></div>
         <ul class="plan-features">
-          <li>Calorie &amp; macro tracking</li>
-          <li>500K+ food database</li>
-          <li>Manual food logging</li>
-          <li>7-day diary history</li>
-          <li class="dim">AI photo recognition</li>
-          <li class="dim">Recipe URL import</li>
-          <li class="dim">Advanced analytics</li>
+          <li><span class="check">✓</span> Calorie &amp; macro tracking</li>
+          <li><span class="check">✓</span> 500K+ food database</li>
+          <li><span class="check">✓</span> Manual food logging</li>
+          <li><span class="check">✓</span> 7-day diary history</li>
+          <li><span class="check">✓</span> XP streaks &amp; leveling</li>
+          <li class="muted"><span class="cross">✕</span> AI photo recognition</li>
+          <li class="muted"><span class="cross">✕</span> Recipe URL import</li>
+          <li class="muted"><span class="cross">✕</span> Advanced analytics</li>
         </ul>
-        <a href="#download"><button class="plan-btn outline">Download Free</button></a>
+        <a href="#download"><button class="plan-cta outlined">Download Free</button></a>
       </div>
-      <div class="pricing-card featured">
+      <div class="plan-card popular reveal delay-2">
+        <div class="popular-badge">Most Popular</div>
         <div class="plan-name">Premium</div>
-        <div class="plan-price"><sub>$</sub>9<sub>.99</sub></div>
-        <div class="plan-period">per month &middot; cancel anytime</div>
+        <div class="plan-price-row">
+          <span class="plan-currency">$</span>
+          <span class="plan-amount">9</span>
+          <span style="font-size:22px;font-weight:600;color:var(--ink3);align-self:flex-end;padding-bottom:6px">.99</span>
+        </div>
+        <div class="plan-period">per month · cancel anytime</div>
+        <div class="plan-divider"></div>
         <ul class="plan-features">
-          <li>Everything in Free</li>
-          <li>AI photo food recognition</li>
-          <li>Recipe URL import</li>
-          <li>Unlimited diary history</li>
-          <li>Advanced macro analytics</li>
-          <li>Priority support</li>
-          <li>Early access to new features</li>
+          <li><span class="check">✓</span> Everything in Free</li>
+          <li><span class="check">✓</span> AI photo food recognition</li>
+          <li><span class="check">✓</span> Recipe URL import</li>
+          <li><span class="check">✓</span> Unlimited diary history</li>
+          <li><span class="check">✓</span> Advanced macro analytics</li>
+          <li><span class="check">✓</span> Training programs</li>
+          <li><span class="check">✓</span> Priority support</li>
+          <li><span class="check">✓</span> Early access to new features</li>
         </ul>
-        <a href="#download"><button class="plan-btn gradient">Get Premium</button></a>
+        <a href="#download"><button class="plan-cta filled">Get Premium</button></a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- DOWNLOAD -->
-<section class="download" id="download">
-  <div class="download-glow"></div>
-  <div class="download-inner">
-    <div class="section-label">Download</div>
-    <h2 class="section-title">Start your journey<br /><em>today</em></h2>
-    <p class="section-sub" style="margin-left:auto;margin-right:auto;text-align:center;">Free to download. Free to start. Available on iOS and Android.</p>
-    <div class="store-btns">
-      <a href="https://apps.apple.com/app/dagnara" class="store-btn">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.39-1.32 2.76-2.53 3.99M12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25"/></svg>
-        <div>
-          <span class="store-btn-sub">Download on the</span>
-          <span class="store-btn-name">App Store</span>
+<!-- ─── DOWNLOAD CTA ─── -->
+<section class="download-cta" id="download">
+  <div class="download-cta-glow"></div>
+  <div class="download-cta-top-glow"></div>
+  <div class="download-cta-inner">
+    <div class="download-cta-tag reveal">
+      <span class="hero-eyebrow-dot"></span>
+      Free Download
+    </div>
+    <h2 class="reveal delay-1">Start your<br /><em>journey today.</em></h2>
+    <p class="reveal delay-2">Free to download. Free to start.<br />Available on iOS and Android.</p>
+    <div class="download-cta-btns reveal delay-3">
+      <a href="https://apps.apple.com/app/dagnara" class="store-badge" style="padding:14px 28px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.39-1.32 2.76-2.53 3.99M12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25"/>
+        </svg>
+        <div class="store-badge-text">
+          <span class="store-badge-sub">Download on the</span>
+          <span class="store-badge-name" style="font-size:18px">App Store</span>
         </div>
       </a>
-      <a href="https://play.google.com/store/apps/details?id=com.dagnara.app" class="store-btn">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.29.16.64.16.94 0l11.67-6.74-2.7-2.7L3.18 23.76zM20.77 9.29c-.3-.73-.87-1.3-1.6-1.6L4.12.42c-.3-.14-.64-.14-.94 0-.58.29-.94.89-.94 1.54v20.08c0 .65.36 1.25.94 1.54.29.14.64.14.94 0l15.05-8.64a2.1 2.1 0 0 0 1.07-1.83c0-.64-.19-1.24-.47-1.82zM3.18.24l9.91 9.91-2.7 2.7L3.18.24z"/></svg>
-        <div>
-          <span class="store-btn-sub">Get it on</span>
-          <span class="store-btn-name">Google Play</span>
+      <a href="https://play.google.com/store/apps/details?id=com.dagnara.app" class="store-badge ghost" style="padding:14px 28px;">
+        <svg width="22" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3.18 23.76c.29.16.64.16.94 0l11.67-6.74-2.7-2.7L3.18 23.76zM20.77 9.29c-.3-.73-.87-1.3-1.6-1.6L4.12.42c-.3-.14-.64-.14-.94 0-.58.29-.94.89-.94 1.54v20.08c0 .65.36 1.25.94 1.54.29.14.64.14.94 0l15.05-8.64a2.1 2.1 0 0 0 1.07-1.83c0-.64-.19-1.24-.47-1.82zM3.18.24l9.91 9.91-2.7 2.7L3.18.24z"/>
+        </svg>
+        <div class="store-badge-text">
+          <span class="store-badge-sub">Get it on</span>
+          <span class="store-badge-name" style="font-size:18px">Google Play</span>
         </div>
       </a>
     </div>
+    <p class="download-note reveal delay-4">No credit card required · Cancel anytime</p>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ─── FOOTER ─── -->
 <footer>
   <div class="footer-inner">
     <div class="footer-top">
       <div class="footer-brand">
         <span class="logo">Dagnara</span>
-        <p>AI-powered nutrition tracking that helps you eat smarter, train harder, and live better.</p>
+        <p>AI-powered nutrition tracking that helps you eat smarter, train harder, and live better — every single day.</p>
       </div>
-      <div class="footer-links">
+      <div class="footer-cols">
         <div class="footer-col">
           <h4>Product</h4>
           <ul>
@@ -718,10 +1378,33 @@
     </div>
     <div class="footer-bottom">
       <p>&copy; 2026 Dagnara. All rights reserved.</p>
-      <p>Made with &hearts; for people who care about what they eat.</p>
+      <p>Made with ♥ for people who care about what they eat.</p>
     </div>
   </div>
 </footer>
 
+<script>
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(el => {
+    observer.observe(el);
+  });
+
+  // Nav background on scroll
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.style.background = window.scrollY > 40
+      ? 'rgba(11,9,20,0.96)'
+      : 'rgba(11,9,20,0.8)';
+  }, { passive: true });
+</script>
 </body>
 </html>
