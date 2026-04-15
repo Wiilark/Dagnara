@@ -1014,6 +1014,8 @@ export default function DiaryScreen() {
   const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const scanLockRef = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const mealYPositions = useRef<Record<string, number>>({});
 
   // Serving size modal
   const [servingModalVisible, setServingModalVisible] = useState(false);
@@ -1248,7 +1250,16 @@ export default function DiaryScreen() {
   useEffect(() => {
     if (pendingAddMeal) {
       setPendingAddMeal(null);
-      openFoodSearch(pendingAddMeal as Meal);
+      const y = mealYPositions.current[pendingAddMeal];
+      if (y != null) {
+        scrollViewRef.current?.scrollTo({ y, animated: true });
+      } else {
+        // Layout not measured yet (just navigated in) — wait one frame
+        setTimeout(() => {
+          const y2 = mealYPositions.current[pendingAddMeal];
+          scrollViewRef.current?.scrollTo({ y: y2 ?? 0, animated: true });
+        }, 300);
+      }
     }
   }, [pendingAddMeal]);
 
@@ -1576,7 +1587,7 @@ export default function DiaryScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
 
         {/* ── Calorie Ring ── */}
         <ExpoLinearGradient
@@ -1721,7 +1732,7 @@ export default function DiaryScreen() {
           const accent = MEAL_ACCENT[meal];
           const skipped = skippedMeals[meal];
           return (
-            <View key={meal} style={st.mealCard}>
+            <View key={meal} style={st.mealCard} onLayout={(e) => { mealYPositions.current[meal] = e.nativeEvent.layout.y; }}>
               {/* Header row — tapping it opens food search */}
               <TouchableOpacity style={st.mealHeader} onPress={() => !skipped && openFoodSearch(meal)} activeOpacity={skipped ? 1 : 0.75}>
                 <View style={st.mealIconWrap}><Text style={[st.mealEmoji, skipped && { opacity: 0.4 }]}>{MEAL_ICONS[meal]}</Text></View>
