@@ -343,7 +343,6 @@ const barcodeLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.ip),
 });
 
 app.get('/api/barcode/:code', barcodeLimiter, async (req, res) => {
