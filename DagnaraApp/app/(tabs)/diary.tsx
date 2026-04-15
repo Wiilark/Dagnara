@@ -1249,17 +1249,10 @@ export default function DiaryScreen() {
 
   useEffect(() => {
     if (pendingAddMeal) {
+      const meal = pendingAddMeal as Meal;
       setPendingAddMeal(null);
-      const y = mealYPositions.current[pendingAddMeal];
-      if (y != null) {
-        scrollViewRef.current?.scrollTo({ y, animated: true });
-      } else {
-        // Layout not measured yet (just navigated in) — wait one frame
-        setTimeout(() => {
-          const y2 = mealYPositions.current[pendingAddMeal];
-          scrollViewRef.current?.scrollTo({ y: y2 ?? 0, animated: true });
-        }, 300);
-      }
+      // Small delay so the diary screen is fully mounted before opening the modal
+      setTimeout(() => openFoodSearch(meal), 300);
     }
   }, [pendingAddMeal]);
 
