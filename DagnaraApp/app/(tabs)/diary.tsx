@@ -1067,6 +1067,7 @@ export default function DiaryScreen() {
 
   // AI text estimation
   const [aiEstimating, setAiEstimating] = useState(false);
+  const [aiEstimateQuery, setAiEstimateQuery] = useState('');
 
   // Programs card data
   const [programsCardData, setProgramsCardData] = useState<ProgramsCardData>({});
@@ -1486,7 +1487,7 @@ export default function DiaryScreen() {
   }
 
   async function handleAiEstimate() {
-    const q = searchQuery.trim();
+    const q = aiEstimateQuery.trim();
     if (!q) return;
     setAiEstimating(true);
     try {
@@ -2220,30 +2221,35 @@ export default function DiaryScreen() {
                 <View style={{ height: 1, backgroundColor: colors.line, marginVertical: spacing.xs }} />
               )}
               {/* Ask AI */}
-              {searchQuery.trim().length > 0 && (
-                <View style={{ backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3, borderRadius: radius.lg, padding: spacing.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1, gap: spacing.xs }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                        <Text style={{ fontSize: fontSize.sm }}>✨</Text>
-                        <Text style={{ fontSize: fontSize.sm, color: colors.lavender, fontWeight: '700' }}>Estimate with AI</Text>
-                      </View>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }} numberOfLines={1}>"{searchQuery.trim()}"</Text>
-                    </View>
-                    <TouchableOpacity onPress={handleAiEstimate} disabled={aiEstimating}
-                      style={{ borderRadius: radius.md, overflow: 'hidden', marginLeft: spacing.sm }}>
-                      <ExpoLinearGradient
-                        colors={aiEstimating ? [colors.layer2, colors.layer2] : [colors.purple, colors.purpleGlow]}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, justifyContent: 'center', alignItems: 'center', minWidth: 64 }}>
-                        {aiEstimating
-                          ? <ActivityIndicator size="small" color={colors.lavender} />
-                          : <Text style={{ color: colors.ink, fontSize: fontSize.sm, fontWeight: '800', letterSpacing: 0.5 }}>GO</Text>}
-                      </ExpoLinearGradient>
-                    </TouchableOpacity>
-                  </View>
+              <View style={{ backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3, borderRadius: radius.lg, padding: spacing.sm, gap: spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Text style={{ fontSize: fontSize.sm }}>✨</Text>
+                  <Text style={{ fontSize: fontSize.sm, color: colors.lavender, fontWeight: '700' }}>Describe what you ate</Text>
                 </View>
-              )}
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.base, minHeight: 46 }}
+                    placeholder="e.g. 1 cup cooked rice, large apple..."
+                    placeholderTextColor={colors.ink3}
+                    value={aiEstimateQuery}
+                    onChangeText={setAiEstimateQuery}
+                    returnKeyType="done"
+                    onSubmitEditing={handleAiEstimate}
+                    multiline={false}
+                  />
+                  <TouchableOpacity onPress={handleAiEstimate} disabled={aiEstimating || !aiEstimateQuery.trim()}
+                    style={{ borderRadius: radius.md, overflow: 'hidden', alignSelf: 'stretch' }}>
+                    <ExpoLinearGradient
+                      colors={aiEstimating || !aiEstimateQuery.trim() ? [colors.layer2, colors.layer2] : [colors.purple, colors.purpleGlow]}
+                      start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                      style={{ flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'center', alignItems: 'center', minWidth: 64 }}>
+                      {aiEstimating
+                        ? <ActivityIndicator size="small" color={colors.lavender} />
+                        : <Text style={{ color: colors.ink, fontSize: fontSize.sm, fontWeight: '800', letterSpacing: 0.5 }}>GO</Text>}
+                    </ExpoLinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </ScrollView>
           )}
 
