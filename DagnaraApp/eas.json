@@ -17,16 +17,19 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://9ysummpd.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://www.dagnara.com"
       }
     },
     "production": {
       "autoIncrement": true,
+      "ios": {
+        "autoIncrement": true
+      },
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://9ysummpd.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://www.dagnara.com"
       }
     }
   },
