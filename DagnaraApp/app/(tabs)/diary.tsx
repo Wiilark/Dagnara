@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Pedometer } from 'expo-sensors';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { analyzeFood, importRecipe, estimateNutrition } from '../../src/lib/api';
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
+import { searchLocalFoods, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
@@ -43,10 +44,10 @@ function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max
 /** Format a number to at most 2 decimal places, stripping trailing zeros */
 function r2(v: number): string { return parseFloat(v.toFixed(2)).toString(); }
 
-// Raw OpenFoodFacts product shape (barcode lookups + search)
+// Raw OpenFoodFacts product shape (barcode lookups only — no longer used for search)
 interface OFFProduct { id?: string; product_name?: string; brands?: string; nutriments?: Record<string, number>; serving_size?: string; }
 
-// Unified food result — used for all search flows (USDA + barcode)
+// Unified food result — used for all search flows (local DB + barcode)
 interface FoodSearchResult {
   id: string;
   name: string;
@@ -78,6 +79,21 @@ function offToResult(p: OFFProduct): FoodSearchResult | null {
   };
 }
 
+/** Convert a LocalFood entry to the FoodSearchResult shape used by the search UI */
+function localFoodToResult(f: LocalFood): FoodSearchResult {
+  return {
+    id: f.id,
+    name: f.name,
+    kcal100: f.kcal,
+    protein100: f.protein,
+    carbs100: f.carbs,
+    fat100: f.fat,
+    fiber100: f.fiber,
+    sugar100: f.sugar,
+    sodium100: f.sodium,
+  };
+}
+
 interface AiItem {
   icon: string; name: string; kcal: number; carbs: number; protein: number; fat: number; unit: string;
   weight_g?: number;
@@ -91,55 +107,26 @@ interface ProgramsCardData {
   pillsCount?: number; // number of meds tracked
 }
 
-// ── Food Quality Grade (A–F, per 100g) ───────────────────────────────────────
-// Inspired by Lifesum's food grading system
-function gradeFood(n: any): { grade: string; color: string } {
-  if (!n) return { grade: '?', color: colors.ink3 };
-  let score = 50; // start neutral
-  const kcal    = offKcal(n);
-  const protein = n['proteins_100g'] ?? 0;
-  const fiber   = n['fiber_100g'] ?? 0;
-  const sugar   = n['sugars_100g'] ?? 0;
-  const fat     = n['fat_100g'] ?? 0;
-  const saturated = n['saturated-fat_100g'] ?? fat * 0.4;
-  const sodium  = (n['sodium_100g'] ?? 0) * 1000; // to mg
-
-  // Positives
-  score += Math.min(20, protein * 0.8);      // protein up to +20
-  score += Math.min(15, fiber * 2.5);        // fiber up to +15
-
-  // Negatives
-  score -= Math.min(20, sugar * 0.8);        // sugar up to -20
-  score -= Math.min(15, saturated * 1.2);    // sat fat up to -15
-  score -= Math.min(10, (sodium / 100));     // sodium up to -10
-  score -= Math.min(10, Math.max(0, (kcal - 200) / 50)); // high kcal penalty
-
-  if (score >= 75) return { grade: 'A', color: '#22c55e' };
-  if (score >= 60) return { grade: 'B', color: '#84cc16' };
-  if (score >= 45) return { grade: 'C', color: '#f59e0b' };
-  if (score >= 30) return { grade: 'D', color: '#f97316' };
-  return { grade: 'F', color: '#ef4444' };
-}
-
 /** Grade a logged FoodItem — returns Nutri-Score A–E with official colors */
 function gradeFoodItem(f: FoodItem): { grade: string; color: string } {
   if (!f.kcal || f.kcal <= 0) return { grade: '?', color: colors.ink3 };
   const pPct = ((f.protein ?? 0) * 4 / f.kcal) * 100;
-  let score = 40;
+  let score = 42;
   score += Math.min(30, pPct * 0.7);
-  if ((f.fiber  ?? 0) > 0) score += Math.min(10, (f.fiber  ?? 0) * 2);
+  if ((f.fiber  ?? 0) > 0) score += Math.min(10, (f.fiber  ?? 0) * 3);
+  if (f.kcal < 150) score += Math.min(8, (150 - f.kcal) / 12);
   if ((f.sugar  ?? 0) > 15) score -= Math.min(15, ((f.sugar  ?? 0) - 15) * 0.5);
   if ((f.sodium ?? 0) > 500) score -= Math.min(10, ((f.sodium ?? 0) - 500) / 100);
   score -= Math.min(10, Math.max(0, (f.kcal - 400) / 50));
-  if (score >= 75) return { grade: 'A', color: colors.nutriA };
-  if (score >= 60) return { grade: 'B', color: colors.nutriB };
-  if (score >= 45) return { grade: 'C', color: colors.nutriC };
+  if (score >= 70) return { grade: 'A', color: colors.nutriA };
+  if (score >= 57) return { grade: 'B', color: colors.nutriB };
+  if (score >= 43) return { grade: 'C', color: colors.nutriC };
   if (score >= 30) return { grade: 'D', color: colors.nutriD };
   return { grade: 'E', color: colors.nutriE };
 }
 
-/** Returns kcal per 100g — tries kcal field first, falls back from kJ */
-function offKcal(n: any): number {
+/** Returns kcal per 100g — used only by barcode (OFF) lookups */
+function offKcal(n: Record<string, number>): number {
   if (!n) return 0;
   if (n['energy-kcal_100g'] != null) return n['energy-kcal_100g'];
   if (n['energy-kcal']      != null) return n['energy-kcal'];
@@ -148,97 +135,9 @@ function offKcal(n: any): number {
   return 0;
 }
 
-// Cleans up USDA's ALL-CAPS scientific names into readable Title Case
-function cleanFoodName(raw: string): string {
-  // Remove trailing comma-separated qualifiers like ", RAW" ", COOKED" etc after the main name
-  const trimmed = raw
-    .replace(/,\s*(raw|cooked|baked|boiled|fried|dried|frozen|canned|fresh|roasted|grilled|steamed|whole|sliced|diced|chopped|ground|boneless|skinless|flesh only|drained|with skin|without skin|ns as to|not further defined|nfs)\b.*/i, '')
-    .trim();
-  // Title-case: lowercase everything then capitalise each word
-  return trimmed
-    .toLowerCase()
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// USDA FoodData Central — generic whole foods + branded products
-async function searchUSDA(query: string): Promise<FoodSearchResult[]> {
-  try {
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${process.env.EXPO_PUBLIC_USDA_KEY ?? 'DEMO_KEY'}&dataType=Foundation,SR%20Legacy,Branded&pageSize=20&sortBy=score&sortOrder=desc`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    const json = await res.json();
-    return ((json.foods ?? []) as any[]).flatMap((f): FoodSearchResult[] => {
-      const get = (id: number): number =>
-        (f.foodNutrients ?? []).find((n: any) => n.nutrientId === id)?.value ?? 0;
-      const kcal = Math.round(get(1008));
-      const protein = Math.round(get(1003) * 10) / 10;
-      const carbs   = Math.round(get(1005) * 10) / 10;
-      const fat     = Math.round(get(1004) * 10) / 10;
-      if (!f.description || kcal <= 0) return [];
-      // Skip entries that have no macros at all (incomplete data)
-      if (protein === 0 && carbs === 0 && fat === 0) return [];
-      return [{
-        id: `usda_${f.fdcId}`,
-        name: cleanFoodName(f.description),
-        brand: f.brandOwner ?? f.brandName,
-        kcal100: kcal,
-        protein100: protein,
-        carbs100: carbs,
-        fat100: fat,
-        fiber100: Math.round(get(1079) * 10) / 10,
-        sugar100: Math.round(get(2000) * 10) / 10,
-        sodium100: Math.round(get(1093)),
-      }];
-    });
-  } catch { return []; }
-}
-
-// Open Food Facts — huge crowd-sourced branded/packaged food database
-async function searchOFF(query: string): Promise<FoodSearchResult[]> {
-  try {
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15&fields=id,product_name,brands,nutriments,serving_size`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    const json = await res.json();
-    return ((json.products ?? []) as OFFProduct[]).flatMap((p): FoodSearchResult[] => {
-      const n = p.nutriments ?? {};
-      const kcal = Math.round(n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0);
-      const protein = Math.round((n.proteins_100g ?? 0) * 10) / 10;
-      const carbs   = Math.round((n.carbohydrates_100g ?? 0) * 10) / 10;
-      const fat     = Math.round((n.fat_100g ?? 0) * 10) / 10;
-      const name = p.product_name?.trim();
-      if (!name || kcal <= 0) return [];
-      if (protein === 0 && carbs === 0 && fat === 0) return [];
-      return [{
-        id: `off_${p.id ?? Math.random()}`,
-        name,
-        brand: p.brands?.split(',')[0]?.trim(),
-        kcal100: kcal,
-        protein100: protein,
-        carbs100: carbs,
-        fat100: fat,
-        fiber100: Math.round((n.fiber_100g ?? 0) * 10) / 10,
-        sugar100: Math.round((n.sugars_100g ?? 0) * 10) / 10,
-        sodium100: Math.round((n.sodium_100g ?? 0) * 1000),
-      }];
-    });
-  } catch { return []; }
-}
-
-// Merges USDA + OFF results, deduplicating by normalised name
-async function searchFoods(query: string): Promise<FoodSearchResult[]> {
-  const [usda, off] = await Promise.all([searchUSDA(query), searchOFF(query)]);
-  const seen = new Set<string>();
-  const out: FoodSearchResult[] = [];
-  for (const item of [...usda, ...off]) {
-    const key = item.name.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!seen.has(key)) { seen.add(key); out.push(item); }
-  }
-  return out;
+/** Search the local food database and return FoodSearchResult shape */
+function searchFoods(query: string): FoodSearchResult[] {
+  return searchLocalFoods(query).map(localFoodToResult);
 }
 
 // ── Sleep Logger Modal ────────────────────────────────────────────────────────
@@ -844,6 +743,7 @@ function DagnaraLogo({ size = 22, color = colors.lavender }: { size?: number; co
 
 // ── Food row ──────────────────────────────────────────────────────────────────
 function FoodRow({ food, onDelete, onFavorite }: { food: FoodItem; onDelete: () => void; onFavorite: () => void }) {
+  const isQuickEntry = food.name === 'Quick entry';
   const grade = gradeFoodItem(food);
 
   function handleLongPress() {
@@ -871,10 +771,12 @@ function FoodRow({ food, onDelete, onFavorite }: { food: FoodItem; onDelete: () 
           </View>
         )}
       </View>
-      <Text style={[fr.kcal, { color: grade.color, backgroundColor: grade.color + '18', borderColor: grade.color + '44' }]}>+{food.kcal} kcal</Text>
-      <View style={[fr.gradeBadge, { backgroundColor: grade.color, borderColor: grade.color }]}>
-        <Text style={fr.gradeText}>{grade.grade}</Text>
-      </View>
+      <Text style={[fr.kcal, isQuickEntry ? { color: colors.ink2, backgroundColor: colors.line, borderColor: colors.line2 } : { color: grade.color, backgroundColor: grade.color + '18', borderColor: grade.color + '44' }]}>+{food.kcal} kcal</Text>
+      {!isQuickEntry && (
+        <View style={[fr.gradeBadge, { backgroundColor: grade.color, borderColor: grade.color }]}>
+          <Text style={fr.gradeText}>{grade.grade}</Text>
+        </View>
+      )}
       <TouchableOpacity
         style={fr.trash}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onDelete(); }}
@@ -1052,6 +954,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
 
 // ── Main Diary Screen ─────────────────────────────────────────────────────────
 export default function DiaryScreen() {
+  const insets = useSafeAreaInsets();
   const { email } = useAuthStore();
   const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, addWater, removeWater, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, logSleep, addStrengthSession, addCardioSession } = useDiaryStore();
   const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts } = useAppStore();
@@ -1079,6 +982,10 @@ export default function DiaryScreen() {
   // Quick Add (cross-platform alternative to Alert.prompt)
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddInput, setQuickAddInput] = useState('');
+
+  // Cached permission status — avoids async bridge round-trip on every tap
+  const cameraGrantedRef = useRef(false);
+  const galleryGrantedRef = useRef(false);
 
   // Food search
   const [searchVisible, setSearchVisible] = useState(false);
@@ -1197,6 +1104,12 @@ export default function DiaryScreen() {
   const showStreakRisk = isToday && foods.length === 0 && streak > 0 && hourNow >= 18;
 
   useEffect(() => { loadEntry(selectedDate); }, [selectedDate]);
+
+  // Pre-warm permission status so handlers skip the async bridge call on tap
+  useEffect(() => {
+    ImagePicker.getCameraPermissionsAsync().then(r => { cameraGrantedRef.current = r.granted; });
+    ImagePicker.getMediaLibraryPermissionsAsync().then(r => { galleryGrantedRef.current = r.granted; });
+  }, []);
 
   // Programs card: load quit/pill stats from AsyncStorage
   useEffect(() => {
@@ -1335,6 +1248,7 @@ export default function DiaryScreen() {
   function addFromSearch(product: FoodSearchResult) {
     setPendingProduct(product);
     setServingQty('100');
+    setSearchVisible(false);
     setServingModalVisible(true);
   }
 
@@ -1368,36 +1282,41 @@ export default function DiaryScreen() {
 
   async function handleBarcodeData(data: string) {
     setBarcodeLoading(true);
+    type Outcome = { type: 'found'; result: FoodSearchResult } | { type: 'alert'; title: string; msg: string };
+    let outcome: Outcome = { type: 'alert', title: 'Not found', msg: 'This barcode is not in our database. Try searching manually.' };
     try {
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${data}?fields=product_name,nutriments,serving_size,brands`,
-        { signal: controller.signal }
-      );
+      const fetchTimeout = setTimeout(() => controller.abort(), 12000);
+      const apiBase = process.env.EXPO_PUBLIC_API_URL ?? '';
+      const res = await fetch(`${apiBase}/api/barcode/${encodeURIComponent(data)}`, { signal: controller.signal });
       clearTimeout(fetchTimeout);
       const json = await res.json();
       if (json.status === 1 && json.product) {
         const result = offToResult(json.product as OFFProduct);
         if (!result) {
-          Alert.alert('No data', 'This product has no nutrition info. Try searching manually.');
-          setSearchVisible(true);
+          outcome = { type: 'alert', title: 'No data', msg: 'This product has no nutrition info. Try searching manually.' };
         } else {
-          setPendingProduct(result);
-          setServingQty('100');
-          setServingModalVisible(true);
+          outcome = { type: 'found', result };
         }
-      } else {
-        Alert.alert('Not found', 'This barcode is not in our database. Try searching manually.');
-        setSearchVisible(true);
       }
     } catch (err: unknown) {
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      Alert.alert('Error', isTimeout ? 'Request timed out. Check your connection.' : 'Could not fetch barcode data.');
-      setSearchVisible(true);
+      outcome = { type: 'alert', title: 'Error', msg: isTimeout ? 'Request timed out. Check your connection.' : 'Could not fetch barcode data.' };
     } finally {
       setBarcodeLoading(false);
+      setScanning(false);
       scanLockRef.current = false;
+    }
+    // Act after loading overlay is fully dismissed to avoid stacked-modal conflicts on Android
+    if (outcome.type === 'found') {
+      setPendingProduct(outcome.result);
+      setServingQty('100');
+      setServingModalVisible(true);
+    } else {
+      Alert.alert(outcome.title, outcome.msg, [
+        { text: 'Search manually', onPress: () => setSearchVisible(true) },
+        { text: 'OK', style: 'cancel' },
+      ]);
     }
   }
 
@@ -1449,13 +1368,13 @@ export default function DiaryScreen() {
   }
 
   async function processBase64Image(base64: string) {
+    setSearchVisible(false);
     setAnalyzing(true);
     try {
       const data = await analyzeFood(base64, 'image/jpeg');
       const raw: any[] = Array.isArray(data?.items) ? data.items : [];
       if (raw.length === 0) { Alert.alert('No food detected', 'Try a clearer photo.'); return; }
-      const h = new Date().getHours();
-      const meal: Meal = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : h < 20 ? 'dinner' : 'snack';
+      const meal: Meal = searchMeal;
       const aiItems: AiItem[] = raw.map(item => ({
         icon: item.icon ?? '🍽️', name: item.name ?? 'Unknown food',
         kcal: item.kcal ?? 0, carbs: item.carbs ?? 0, protein: item.protein ?? 0, fat: item.fat ?? 0,
@@ -1512,8 +1431,11 @@ export default function DiaryScreen() {
   }
 
   async function handleCamera() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow camera access.'); return; }
+    if (!cameraGrantedRef.current) {
+      const { granted } = await ImagePicker.requestCameraPermissionsAsync();
+      if (!granted) { Alert.alert('Permission needed', 'Allow camera access.'); return; }
+      cameraGrantedRef.current = true;
+    }
     const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 });
     if (result.canceled || !result.assets[0].base64) return;
     const b64 = result.assets[0].base64;
@@ -1522,9 +1444,12 @@ export default function DiaryScreen() {
   }
 
   async function handleGallery() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo access.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 0.5 });
+    if (!galleryGrantedRef.current) {
+      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!granted) { Alert.alert('Permission needed', 'Allow photo access.'); return; }
+      galleryGrantedRef.current = true;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.5 });
     if (result.canceled || !result.assets[0].base64) return;
     const b64 = result.assets[0].base64;
     if (b64.length > 10_000_000) { Alert.alert('Photo too large', 'Please use a lower-resolution photo.'); return; }
@@ -1591,8 +1516,7 @@ export default function DiaryScreen() {
   }
 
   async function quickLog(item: { icon: string; name: string; kcal: number; carbs: number; protein: number; fat: number }) {
-    const meal: Meal = new Date().getHours() < 11 ? 'breakfast' : new Date().getHours() < 15 ? 'lunch' : 'dinner';
-    const food: FoodItem = { id: `${Date.now()}`, icon: item.icon, name: item.name, kcal: item.kcal, carbs: item.carbs, protein: item.protein, fat: item.fat, unit: 'serving', meal };
+    const food: FoodItem = { id: `${Date.now()}`, icon: item.icon, name: item.name, kcal: item.kcal, carbs: item.carbs, protein: item.protein, fat: item.fat, unit: 'serving', meal: searchMeal };
     await addFood(selectedDate, food);
     await addXp(10);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1604,7 +1528,7 @@ export default function DiaryScreen() {
 
       {/* ── App Header ── */}
       <View style={st.appHeader}>
-        <Text style={st.appTitle}>Diary</Text>
+        <Text style={st.appTitle}>Diary ✓</Text>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
             <Ionicons name="share-outline" size={22} color={colors.ink2} />
@@ -1986,58 +1910,54 @@ export default function DiaryScreen() {
       <ExerciseModal visible={exerciseVisible} onClose={() => setExerciseVisible(false)} onAddCalories={handleAddCalories} onAddStrengthSession={handleAddStrengthSession} />
 
       {/* Barcode Scanner Modal */}
-      <Modal visible={scanning} animationType="slide" presentationStyle="fullScreen">
+      <Modal visible={scanning} animationType="none" presentationStyle="fullScreen">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-              <View style={{ width: 40 }} />
-              <Text style={{ color: colors.ink, fontSize: fontSize.md, fontWeight: '700' }}>Scan Barcode</Text>
-              <TouchableOpacity
-                onPress={() => { setScanning(false); scanLockRef.current = false; setSearchVisible(true); }}
-                style={{ width: 40, alignItems: 'flex-end', padding: spacing.xs }}
-              >
-                <Ionicons name="close" size={24} color={colors.ink} />
-              </TouchableOpacity>
-            </View>
-            <CameraView
-              style={{ flex: 1 }}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
-              onBarcodeScanned={({ data }) => {
-                if (scanLockRef.current) return;
-                scanLockRef.current = true;
-                setScanning(false);
-                handleBarcodeData(data);
-              }}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: insets.top + spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+            <View style={{ width: 40 }} />
+            <Text style={{ color: colors.ink, fontSize: fontSize.md, fontWeight: '700' }}>Scan Barcode</Text>
+            <TouchableOpacity
+              onPress={() => { setScanning(false); scanLockRef.current = false; setSearchVisible(true); }}
+              style={{ width: 40, alignItems: 'flex-end', padding: spacing.xs }}
             >
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: 260, height: 160, position: 'relative' }}>
-                  {[
-                    { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
-                    { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
-                    { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
-                    { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-                  ].map((style, i) => (
-                    <View key={i} style={[{ position: 'absolute', width: 24, height: 24, borderColor: colors.ink }, style]} />
-                  ))}
-                  <View style={{ position: 'absolute', top: '50%', left: spacing.sm, right: spacing.sm, height: 1, backgroundColor: colors.rose + '99' }} />
-                </View>
-              </View>
-            </CameraView>
-            <View style={{ padding: spacing.lg, alignItems: 'center' }}>
-              <Text style={{ color: colors.ink3, textAlign: 'center' }}>Point your camera at a barcode</Text>
-            </View>
-          </SafeAreaView>
-        </View>
-      </Modal>
-
-      {/* Barcode lookup loading overlay */}
-      <Modal visible={barcodeLoading} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: colors.layer3, borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center', gap: spacing.md }}>
-            <ActivityIndicator size="large" color={colors.lavender} />
-            <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '600' }}>Looking up product…</Text>
+              <Ionicons name="close" size={24} color={colors.ink} />
+            </TouchableOpacity>
           </View>
+          {barcodeLoading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md }}>
+              <ActivityIndicator size="large" color={colors.lavender} />
+              <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '600' }}>Looking up product…</Text>
+            </View>
+          ) : (
+            <>
+              <CameraView
+                style={{ flex: 1 }}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
+                onBarcodeScanned={({ data }) => {
+                  if (scanLockRef.current) return;
+                  scanLockRef.current = true;
+                  handleBarcodeData(data);
+                }}
+              >
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <View style={{ width: 260, height: 160, position: 'relative' }}>
+                    {[
+                      { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+                      { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+                      { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+                      { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+                    ].map((style, i) => (
+                      <View key={i} style={[{ position: 'absolute', width: 24, height: 24, borderColor: colors.ink }, style]} />
+                    ))}
+                    <View style={{ position: 'absolute', top: '50%', left: spacing.sm, right: spacing.sm, height: 1, backgroundColor: colors.rose + '99' }} />
+                  </View>
+                </View>
+              </CameraView>
+              <View style={{ paddingTop: spacing.lg, paddingBottom: insets.bottom + spacing.lg, alignItems: 'center' }}>
+                <Text style={{ color: colors.ink3, textAlign: 'center' }}>Point your camera at a barcode</Text>
+              </View>
+            </>
+          )}
         </View>
       </Modal>
 
@@ -2136,7 +2056,7 @@ export default function DiaryScreen() {
                 if (!t.trim()) { setSearchResults([]); setSearching(false); return; }
                 setSearchResults([]); // Clear stale immediately
                 if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-                searchDebounceRef.current = setTimeout(() => doSearch(t), 400);
+                searchDebounceRef.current = setTimeout(() => doSearch(t), 300);
               }}
               returnKeyType="search"
               onSubmitEditing={() => doSearch(searchQuery)}
@@ -2147,9 +2067,9 @@ export default function DiaryScreen() {
           {/* Action buttons — single unified row */}
           <View style={st.actionRow}>
             {[
-              { icon: '📷', label: 'Scan Photo',    onPress: () => { setSearchVisible(false); handleCamera(); } },
+              { icon: '📷', label: 'Scan Photo',    onPress: handleCamera },
               { icon: '📦', label: 'Scan Barcode',  onPress: handleBarcodePress },
-              { icon: '🖼️', label: 'Gallery',       onPress: () => { setSearchVisible(false); handleGallery(); } },
+              { icon: '🖼️', label: 'Gallery',       onPress: handleGallery },
               { icon: '⚡', label: 'Quick Add',     onPress: () => { setQuickAddInput(''); setQuickAddVisible(true); } },
             ].map(p => (
               <TouchableOpacity key={p.label} style={st.actionBtn} onPress={p.onPress} activeOpacity={0.75}>
@@ -2482,52 +2402,72 @@ export default function DiaryScreen() {
               </Text>
             </ScrollView>
           )}
+          {/* Quick Add overlay — rendered inside search modal to avoid stacked-modal issues on Android */}
+          {quickAddVisible && (() => {
+            const qaKcal = parseInt(quickAddInput) || 0;
+            const qaProtein = Math.round(qaKcal * 0.20 / 4);
+            const qaCarbs   = Math.round(qaKcal * 0.50 / 4);
+            const qaFat     = Math.round(qaKcal * 0.30 / 9);
+            return (
+              <KeyboardAvoidingView style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, zIndex: 99 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
+                <TouchableOpacity style={{ ...StyleSheet.absoluteFillObject, backgroundColor: colors.dim }} activeOpacity={1} onPress={() => setQuickAddVisible(false)} />
+                <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.lg, width: '100%', gap: spacing.md }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Quick Add</Text>
+                  <Text style={{ fontSize: fontSize.sm, color: colors.ink3 }}>Enter kcal amount</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' }}
+                    value={quickAddInput}
+                    onChangeText={setQuickAddInput}
+                    keyboardType="numeric"
+                    autoFocus
+                    placeholder="0"
+                    placeholderTextColor={colors.ink3}
+                    returnKeyType="done"
+                    onSubmitEditing={() => {
+                      if (qaKcal > 0) quickLog({ icon: '⚡', name: 'Quick entry', kcal: qaKcal, protein: qaProtein, carbs: qaCarbs, fat: qaFat });
+                      setQuickAddVisible(false);
+                      setSearchVisible(false);
+                    }}
+                  />
+                  {qaKcal > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-around', backgroundColor: colors.layer2, borderRadius: radius.md, paddingVertical: spacing.sm }}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.purple }}>{qaProtein}g</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Protein</Text>
+                      </View>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.sky }}>{qaCarbs}g</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Carbs</Text>
+                      </View>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.honey }}>{qaFat}g</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Fat</Text>
+                      </View>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <TouchableOpacity onPress={() => setQuickAddVisible(false)}
+                      style={{ flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md }}>
+                      <Text style={{ color: colors.ink2, fontWeight: '600', fontSize: fontSize.sm }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (qaKcal > 0) quickLog({ icon: '⚡', name: 'Quick entry', kcal: qaKcal, protein: qaProtein, carbs: qaCarbs, fat: qaFat });
+                        setQuickAddVisible(false);
+                        setSearchVisible(false);
+                      }}
+                      style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
+                      <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={{ paddingVertical: spacing.sm, alignItems: 'center' }}>
+                        <Text style={{ color: colors.ink, fontWeight: '700', fontSize: fontSize.sm }}>Add</Text>
+                      </ExpoLinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </KeyboardAvoidingView>
+            );
+          })()}
         </SafeAreaView>
-      </Modal>
-
-      {/* Quick Add modal — cross-platform replacement for Alert.prompt */}
-      <Modal visible={quickAddVisible} transparent animationType="fade" onRequestClose={() => setQuickAddVisible(false)}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
-          <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.lg, width: '100%', gap: spacing.md }}>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Quick Add</Text>
-            <Text style={{ fontSize: fontSize.sm, color: colors.ink3 }}>Enter kcal amount</Text>
-            <TextInput
-              style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' }}
-              value={quickAddInput}
-              onChangeText={setQuickAddInput}
-              keyboardType="numeric"
-              autoFocus
-              placeholder="0"
-              placeholderTextColor={colors.ink3}
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                const kcal = parseInt(quickAddInput) || 0;
-                if (kcal > 0) quickLog({ icon: '⚡', name: 'Quick entry', kcal, carbs: 0, protein: 0, fat: 0 });
-                setQuickAddVisible(false);
-              }}
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <TouchableOpacity onPress={() => setQuickAddVisible(false)}
-                style={{ flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md }}>
-                <Text style={{ color: colors.ink2, fontWeight: '600', fontSize: fontSize.sm }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  const kcal = parseInt(quickAddInput) || 0;
-                  if (kcal > 0) quickLog({ icon: '⚡', name: 'Quick entry', kcal, carbs: 0, protein: 0, fat: 0 });
-                  setQuickAddVisible(false);
-                }}
-                style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
-                <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ paddingVertical: spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ color: colors.ink, fontWeight: '700', fontSize: fontSize.sm }}>Add</Text>
-                </ExpoLinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

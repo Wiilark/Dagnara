@@ -231,7 +231,7 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
       temperature: 0,
       system: [{
         type: 'text',
-        text: 'You are a nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]\nEstimate realistic macros and portion weight for visible servings. weight_g is the estimated grams for the visible portion. per100 is per 100g. Return [] if no food.',
+        text: 'You are a precise nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]\nRules: (1) Estimate the ACTUAL visible portion weight carefully — a large plate of pasta is ~400g, a burger is ~250g, a salad is ~300g. (2) Use standard USDA/nutritionist values for per100 macros. (3) kcal must equal (carbs*4 + protein*4 + fat*9) * weight_g/100 — verify this before responding. (4) List each distinct food item separately. (5) Return [] if no food is visible.',
         cache_control: { type: 'ephemeral' }
       }],
       messages: [{
@@ -334,6 +334,40 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
   } catch (err) {
     console.error('[import-recipe]', err.message);
     res.status(500).json({ error: { message: 'Failed to fetch or parse recipe' } });
+  }
+});
+
+// ── Barcode proxy ─────────────────────────────────────────────────────────────
+const barcodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.ip),
+});
+
+app.get('/api/barcode/:code', barcodeLimiter, async (req, res) => {
+  const { code } = req.params;
+  if (!/^\d{4,14}$/.test(code)) {
+    return res.status(400).json({ error: 'Invalid barcode' });
+  }
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+    const off = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${code}?fields=product_name,nutriments,serving_size,brands`,
+      {
+        headers: { 'User-Agent': 'Dagnara/1.0 (nutrition tracking app)' },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(t);
+    const json = await off.json();
+    res.json(json);
+  } catch (err) {
+    console.error('[barcode]', err.message);
+    const msg = err.name === 'AbortError' ? 'Lookup timed out' : 'Could not reach food database';
+    res.status(502).json({ error: msg });
   }
 });
 
