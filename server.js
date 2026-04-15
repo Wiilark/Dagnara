@@ -263,7 +263,7 @@ const recipeLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip) as string,
+  keyGenerator: (req) => (req.body?.email ?? req.ip),
   message: { error: { message: 'Too many recipe imports — please wait a moment.' } }
 });
 
