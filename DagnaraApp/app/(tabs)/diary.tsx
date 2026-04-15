@@ -321,8 +321,8 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
         </View>
         {/* Search */}
         <View style={ex.searchRow}>
-          <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.4)" />
-          <TextInput style={ex.searchInput} placeholder="Search Exercise" placeholderTextColor="rgba(255,255,255,0.35)" value={search} onChangeText={setSearch} />
+          <Ionicons name="search-outline" size={16} color={colors.ink2} />
+          <TextInput style={ex.searchInput} placeholder="Search Exercise" placeholderTextColor={colors.ink3} value={search} onChangeText={setSearch} />
         </View>
         {/* Tabs */}
         <View style={ex.tabRow}>
@@ -359,11 +359,11 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
           <View style={{ flex: 1 }}>
             <TouchableOpacity style={ex.calField} onPress={() => {}}>
               <Text style={ex.calFieldLbl}>Calories</Text>
-              <TextInput style={ex.calFieldInput} placeholder="Required" placeholderTextColor="rgba(255,255,255,0.3)" value={manualKcal} onChangeText={setManualKcal} keyboardType="numeric" />
+              <TextInput style={ex.calFieldInput} placeholder="Required" placeholderTextColor={colors.ink3} value={manualKcal} onChangeText={setManualKcal} keyboardType="numeric" />
             </TouchableOpacity>
             <TouchableOpacity style={ex.calField} onPress={() => {}}>
               <Text style={ex.calFieldLbl}>Title</Text>
-              <TextInput style={ex.calFieldInput} placeholder="Optional" placeholderTextColor="rgba(255,255,255,0.3)" value={manualTitle} onChangeText={setManualTitle} />
+              <TextInput style={ex.calFieldInput} placeholder="Optional" placeholderTextColor={colors.ink3} value={manualTitle} onChangeText={setManualTitle} />
             </TouchableOpacity>
             <View style={{ flex: 1 }} />
             <View style={ex.doneWrap}>
@@ -576,23 +576,23 @@ function BreathingGuideModal({ exercise, onClose }: { exercise: BreathExercise; 
             </G>
           </Svg>
           <View style={{ position: 'absolute', alignItems: 'center' }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: exercise.color }}>{phase.label}</Text>
-            <Text style={{ fontSize: 52, fontWeight: '900', color: colors.ink }}>{countdown}</Text>
+            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: exercise.color }}>{phase.label}</Text>
+            <Text style={{ fontSize: fontSize['2xl'], fontWeight: '900', color: colors.ink }}>{countdown}</Text>
           </View>
         </View>
         {done ? (
           <View style={{ alignItems: 'center', gap: 16, marginTop: 16 }}>
             <Text style={{ fontSize: 48 }}>✅</Text>
             <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Session complete!</Text>
-            <TouchableOpacity style={{ backgroundColor: exercise.color, borderRadius: radius.md, paddingHorizontal: 36, paddingVertical: 14, marginTop: 8 }} onPress={onClose}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.sm }}>Done · +20 XP</Text>
+            <TouchableOpacity style={{ backgroundColor: exercise.color, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, marginTop: 8 }} onPress={onClose}>
+              <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm }}>Done · +20 XP</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
             <Text style={{ color: colors.ink3, fontSize: fontSize.sm, marginBottom: 32 }}>{mins}:{String(secs).padStart(2, '0')} remaining</Text>
             <TouchableOpacity onPress={() => setRunning(r => !r)}
-              style={{ backgroundColor: exercise.color + '22', borderWidth: 1, borderColor: exercise.color + '44', borderRadius: 50, width: 64, height: 64, alignItems: 'center', justifyContent: 'center' }}>
+              style={{ backgroundColor: exercise.color + '22', borderWidth: 1, borderColor: exercise.color + '44', borderRadius: radius.pill, width: 64, height: 64, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name={running ? 'pause' : 'play'} size={28} color={exercise.color} />
             </TouchableOpacity>
           </>
@@ -651,18 +651,18 @@ function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; 
 
 const sbst = StyleSheet.create({
   safe:       { flex: 1, backgroundColor: colors.bg },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' },
-  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: 20 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: radius.lg },
   title:      { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
-  sectionLbl: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: colors.ink3, textTransform: 'uppercase' },
+  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, color: colors.ink3, textTransform: 'uppercase' },
   emojiRow:   { flexDirection: 'row', gap: 4 },
   emojiBtn:   { flex: 1, alignItems: 'center', padding: 10, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: 'transparent' },
   emojiBtnSel:{ borderColor: colors.teal, backgroundColor: colors.teal + '11' },
   emoji:      { fontSize: 22 },
   emojiLbl:   { fontSize: 9, color: colors.ink3, marginTop: 4, textAlign: 'center' },
-  saveBtn:    { backgroundColor: colors.teal, borderRadius: radius.md, alignItems: 'center', paddingVertical: 13 },
-  saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: fontSize.sm },
-  breathCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  saveBtn:    { backgroundColor: colors.teal, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
+  saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
+  breathCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
   breathName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   breathDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
 });
@@ -711,8 +711,8 @@ function MoodModal({ visible, onClose, onSave }: { visible: boolean; onClose: ()
 
 const moodst = StyleSheet.create({
   safe:       { flex: 1, backgroundColor: colors.bg },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' },
-  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: 20 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: radius.lg },
   title:      { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   question:   { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink },
   emojiRow:   { flexDirection: 'row', gap: 4 },
@@ -721,8 +721,8 @@ const moodst = StyleSheet.create({
   emoji:      { fontSize: 22 },
   emojiLbl:   { fontSize: 9, color: colors.ink3, marginTop: 4, textAlign: 'center' },
   notesInput: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, color: colors.ink, padding: 14, fontSize: fontSize.sm, minHeight: 90, textAlignVertical: 'top' },
-  saveBtn:    { backgroundColor: colors.honey, borderRadius: radius.md, alignItems: 'center', paddingVertical: 13 },
-  saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: fontSize.sm },
+  saveBtn:    { backgroundColor: colors.honey, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
+  saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
 });
 
 // ── Dagnara Logo ──────────────────────────────────────────────────────────────
@@ -1977,11 +1977,11 @@ export default function DiaryScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
           <View style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <TouchableOpacity onPress={() => { setServingModalVisible(false); setSearchVisible(true); }}>
-              <Text style={{ color: colors.ink2, fontSize: 15 }}>Back</Text>
+              <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>Back</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.ink, fontSize: 17, fontWeight: '700' }}>Serving Size</Text>
+            <Text style={{ color: colors.ink, fontSize: fontSize.md, fontWeight: '700' }}>Serving Size</Text>
             <TouchableOpacity onPress={confirmServing}>
-              <Text style={{ color: colors.lavender, fontSize: 15, fontWeight: '700' }}>Add</Text>
+              <Text style={{ color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' }}>Add</Text>
             </TouchableOpacity>
           </View>
           {pendingProduct && (() => {
@@ -2315,7 +2315,7 @@ export default function DiaryScreen() {
 
           {foodTab === 'create' && (
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
-              <Text style={{ color: colors.ink2, fontSize: 13, marginBottom: 8 }}>Create a custom food entry</Text>
+              <Text style={{ color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.sm }}>Create a custom food entry</Text>
               {[
                 { key: 'name', label: 'Food name', keyboard: 'default' as const },
                 { key: 'kcal', label: 'Calories (kcal) *', keyboard: 'numeric' as const },
@@ -2326,9 +2326,9 @@ export default function DiaryScreen() {
                 { key: 'sodium', label: 'Sodium (mg)', keyboard: 'numeric' as const },
               ].map(({ key, label, keyboard }) => (
                 <View key={key}>
-                  <Text style={{ color: colors.ink3, fontSize: 12, marginBottom: 4 }}>{label}</Text>
+                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginBottom: 4 }}>{label}</Text>
                   <TextInput
-                    style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 12, padding: 12, color: colors.ink, fontSize: 15 }}
+                    style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm, padding: spacing.sm, color: colors.ink, fontSize: fontSize.base }}
                     value={customFood[key as keyof typeof customFood]}
                     onChangeText={v => setCustomFood(p => ({ ...p, [key]: v }))}
                     keyboardType={keyboard}
@@ -2338,7 +2338,7 @@ export default function DiaryScreen() {
                 </View>
               ))}
               <TouchableOpacity
-                style={{ backgroundColor: colors.purple, borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 8 }}
+                style={{ backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: 8 }}
                 onPress={async () => {
                   if (!customFood.name || !customFood.kcal) { Alert.alert('Required', 'Please enter a name and calories.'); return; }
                   const _kcal    = parseInt(customFood.kcal);
@@ -2373,7 +2373,7 @@ export default function DiaryScreen() {
                   setCustomFood({ name: '', kcal: '', protein: '', carbs: '', fat: '', fiber: '', sodium: '' });
                   setSearchVisible(false);
                 }}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Add to {MEAL_LABEL[searchMeal]}</Text>
+                <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.base }}>Add to {MEAL_LABEL[searchMeal]}</Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -2387,9 +2387,9 @@ export default function DiaryScreen() {
                 </Text>
               </View>
               <View style={{ gap: 8 }}>
-                <Text style={{ color: colors.ink3, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>RECIPE URL</Text>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1 }}>RECIPE URL</Text>
                 <TextInput
-                  style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 12, padding: 12, color: colors.ink, fontSize: 14 }}
+                  style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm, padding: spacing.sm, color: colors.ink, fontSize: fontSize.sm }}
                   placeholder="https://www.allrecipes.com/recipe/..."
                   placeholderTextColor={colors.ink3}
                   value={recipeUrl}
@@ -2400,13 +2400,13 @@ export default function DiaryScreen() {
                 />
               </View>
               <TouchableOpacity
-                style={{ backgroundColor: importingRecipe ? colors.layer2 : colors.purple, borderRadius: 14, padding: 14, alignItems: 'center', opacity: importingRecipe ? 0.7 : 1 }}
+                style={{ backgroundColor: importingRecipe ? colors.layer2 : colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', opacity: importingRecipe ? 0.7 : 1 }}
                 onPress={handleImportRecipeUrl}
                 disabled={importingRecipe}
               >
                 {importingRecipe
                   ? <ActivityIndicator color={colors.white} />
-                  : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Import recipe</Text>}
+                  : <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.base }}>Import recipe</Text>}
               </TouchableOpacity>
               <Text style={{ color: colors.ink3, fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
                 Requires a deployed Dagnara server with ANTHROPIC_API_KEY configured.
@@ -2673,53 +2673,53 @@ const sl = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
   backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 17, fontWeight: '700', color: colors.ink },
+  title: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   content: { padding: spacing.md, gap: spacing.md },
   durationDisplay: { alignItems: 'center', paddingVertical: spacing.lg },
-  durNum: { fontSize: 38, fontWeight: '800', color: colors.ink },
-  durLbl: { fontSize: 13, color: colors.ink3, marginTop: 4 },
-  sectionLbl: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3 },
-  timeRow: { flexDirection: 'row', gap: 12 },
+  durNum: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink },
+  durLbl: { fontSize: fontSize.sm, color: colors.ink3, marginTop: 4 },
+  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3 },
+  timeRow: { flexDirection: 'row', gap: spacing.sm },
   timeCard: { flex: 1, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
-  timeCardLbl: { fontSize: 12, color: colors.ink3, marginBottom: 8 },
-  timeVal: { fontSize: 22, fontWeight: '700', color: colors.ink, textAlign: 'center' },
+  timeCardLbl: { fontSize: fontSize.xs, color: colors.ink3, marginBottom: spacing.sm },
+  timeVal: { fontSize: fontSize.lg, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   qualityRow: { flexDirection: 'row', justifyContent: 'space-between' },
   qBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   qBtnSel: { backgroundColor: colors.purple + '33', borderWidth: 2, borderColor: colors.purple },
   qEmoji: { fontSize: 26 },
   insight: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
-  insightLbl: { fontSize: 11, fontWeight: '700', color: colors.purple2, marginBottom: 6 },
-  insightTxt: { fontSize: 13, color: colors.ink2, lineHeight: 20 },
+  insightLbl: { fontSize: fontSize.xs, fontWeight: '700', color: colors.purple2, marginBottom: 6 },
+  insightTxt: { fontSize: fontSize.sm, color: colors.ink2, lineHeight: 20 },
   saveBtn: { backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
-  saveTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  saveTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
 });
 
 // ── Exercise modal styles ─────────────────────────────────────────────────────
 const ex = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, paddingTop: spacing.sm },
-  closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  addTxt: { fontSize: 13, fontWeight: '600', color: colors.purple2 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginBottom: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 11 },
-  searchInput: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '300' },
-  tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', marginHorizontal: 14 },
+  closeBtn: { width: 40, height: 40, borderRadius: radius.lg, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
+  addTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.purple2 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.line2, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  searchInput: { flex: 1, color: colors.ink, fontSize: fontSize.sm, fontWeight: '300' },
+  tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.line2, marginHorizontal: spacing.md },
   tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabBtnActive: { borderBottomColor: colors.purple2 },
-  tabLbl: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
+  tabLbl: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink3 },
   tabLblActive: { color: colors.lavender },
-  sectionHdr: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
-  healthCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 14, marginBottom: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 16, padding: 16 },
-  healthIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  healthName: { fontSize: 15, fontWeight: '600', color: '#fff', marginBottom: 3 },
-  healthDesc: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '300' },
-  connectTxt: { fontSize: 12, fontWeight: '600', color: colors.purple2 },
-  exRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  exName: { fontSize: 15, fontWeight: '500', color: '#fff' },
-  exMeta: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
-  calField: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)' },
-  calFieldLbl: { fontSize: 18, fontWeight: '500', color: '#fff' },
-  calFieldInput: { fontSize: 18, color: '#fff', textAlign: 'right', width: '55%' },
+  sectionHdr: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3 },
+  healthCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.md, marginBottom: spacing.sm, backgroundColor: colors.layer1, borderWidth: 1.5, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
+  healthIcon: { width: 52, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  healthName: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink, marginBottom: 3 },
+  healthDesc: { fontSize: fontSize.xs, color: colors.ink2, fontWeight: '300' },
+  connectTxt: { fontSize: fontSize.xs, fontWeight: '600', color: colors.purple2 },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  exName: { fontSize: fontSize.base, fontWeight: '500', color: colors.ink },
+  exMeta: { fontSize: fontSize.xs, color: colors.ink2, marginTop: 2 },
+  calField: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  calFieldLbl: { fontSize: fontSize.md, fontWeight: '500', color: colors.ink },
+  calFieldInput: { fontSize: fontSize.md, color: colors.ink, textAlign: 'right', width: '55%' },
   doneWrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, paddingTop: spacing.sm },
   doneBtn: { backgroundColor: colors.line, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
   doneTxt: { fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.ink },
