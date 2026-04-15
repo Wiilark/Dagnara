@@ -108,12 +108,27 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 app.use(express.json({ limit: '10mb' })); // base64 images can be large
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
+// NOTE: email-keyed limiters use the body email as a convenience for shared IPs.
+// This is intentionally NOT treated as an auth check — it just reduces collateral
+// blocking on carrier NAT / office WiFi. Real auth is enforced by Supabase RLS.
 const analyzeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => (req.body?.email ?? req.ip),
   message: { error: { message: 'Too many requests — please wait before analysing another photo.' } }
+});
+
+// Separate limiter for text AI estimation — shares the same abuse profile as
+// photo analysis but must not share the bucket (they're independent features).
+const estimateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  message: { error: { message: 'Too many AI requests — please wait a moment.' } }
 });
 
 const configLimiter = rateLimit({
@@ -131,8 +146,51 @@ const stripeLimiter = rateLimit({
   message: { error: { message: 'Too many requests.' } }
 });
 
+// ── SSRF guard — block requests to private / loopback / link-local ranges ─────
+function isPrivateUrl(urlString) {
+  let parsed;
+  try { parsed = new URL(urlString); } catch { return true; }
+  const host = parsed.hostname;
+  // Reject loopback, private RFC-1918, link-local (AWS metadata), and IPv6 equivalents
+  const blocked = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,           // AWS/GCP instance metadata
+    /^::1$/,
+    /^fc00:/i,
+    /^fe80:/i,
+    /^0\.0\.0\.0$/,
+    /^localhost$/i,
+  ];
+  return blocked.some(re => re.test(host));
+}
+
 // ── Allowed image MIME types ───────────────────────────────────────────────────
 const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+// ── Anthropic call helper — enforces a 20s timeout on every API call ──────────
+async function callAnthropic(body) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // ── Config endpoint ───────────────────────────────────────────────────────────
 // Returns only the Supabase anon key (public by design) so it's not hardcoded
@@ -167,31 +225,22 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5',
-        max_tokens: 400,
-        temperature: 0,
-        system: [{
-          type: 'text',
-          text: 'You are a nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nEstimate realistic macros for visible portions. Return [] if no food.',
-          cache_control: { type: 'ephemeral' }
-        }],
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
-            { type: 'text', text: 'List all food items in this image.' }
-          ]
-        }]
-      })
+    const response = await callAnthropic({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 500,
+      temperature: 0,
+      system: [{
+        type: 'text',
+        text: 'You are a nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]\nEstimate realistic macros and portion weight for visible servings. weight_g is the estimated grams for the visible portion. per100 is per 100g. Return [] if no food.',
+        cache_control: { type: 'ephemeral' }
+      }],
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
+          { type: 'text', text: 'List all food items in this image.' }
+        ]
+      }]
     });
 
     const data = await response.json();
@@ -202,7 +251,8 @@ app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
     res.json({ items });
   } catch (err) {
     console.error('[analyze-food]', err.message);
-    res.status(500).json({ error: { message: 'Failed to contact Anthropic API' } });
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    res.status(500).json({ error: { message: msg } });
   }
 });
 
@@ -213,6 +263,7 @@ const recipeLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => (req.body?.email ?? req.ip) as string,
   message: { error: { message: 'Too many recipe imports — please wait a moment.' } }
 });
 
@@ -225,6 +276,9 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: { message: 'Invalid URL' } }); }
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     return res.status(400).json({ error: { message: 'Only http/https URLs are supported' } });
+  }
+  if (isPrivateUrl(url)) {
+    return res.status(400).json({ error: { message: 'URL not allowed' } });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -256,28 +310,19 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
         .slice(0, 3000);
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 600,
-        temperature: 0,
-        system: [{
-          type: 'text',
-          text: 'You are a nutrition extraction assistant. Return ONLY valid JSON — no prose, no markdown. Format:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\nEstimate realistic macros per serving if not provided.',
-          cache_control: { type: 'ephemeral' }
-        }],
-        messages: [{
-          role: 'user',
-          content: `Extract this recipe:\n\n${recipeText}`
-        }]
-      })
+    const response = await callAnthropic({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 600,
+      temperature: 0,
+      system: [{
+        type: 'text',
+        text: 'You are a nutrition extraction assistant. Return ONLY valid JSON — no prose, no markdown. Format:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\nEstimate realistic macros per serving if not provided.',
+        cache_control: { type: 'ephemeral' }
+      }],
+      messages: [{
+        role: 'user',
+        content: `Extract this recipe:\n\n${recipeText}`
+      }]
     });
 
     const data = await response.json();
@@ -289,6 +334,154 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
   } catch (err) {
     console.error('[import-recipe]', err.message);
     res.status(500).json({ error: { message: 'Failed to fetch or parse recipe' } });
+  }
+});
+
+// ── AI text nutrition estimation ─────────────────────────────────────────────
+app.post('/api/estimate-nutrition', estimateLimiter, async (req, res) => {
+  const { description } = req.body ?? {};
+  if (!description || typeof description !== 'string' || description.trim().length < 2) {
+    return res.status(400).json({ error: { message: 'description is required' } });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: { message: 'AI estimation not configured on this server' } });
+  }
+
+  try {
+    const response = await callAnthropic({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      temperature: 0,
+      system: [{
+        type: 'text',
+        text: 'You are a nutrition estimation assistant. Return ONLY valid JSON arrays — no prose, no markdown. Given a food description in natural language, return estimated nutrition. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nReturn [] if you cannot estimate. Never explain, just return JSON.',
+        cache_control: { type: 'ephemeral' }
+      }],
+      messages: [{ role: 'user', content: `Estimate nutrition for: ${description.trim().slice(0, 500)}` }]
+    });
+
+    const data = await response.json();
+    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
+    const text = data?.content?.[0]?.text ?? '';
+    let items = [];
+    try { const p = JSON.parse(text); items = Array.isArray(p) ? p : []; } catch { items = []; }
+    res.json({ items });
+  } catch (err) {
+    console.error('[estimate-nutrition]', err.message);
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+// ── AI meal planner ───────────────────────────────────────────────────────────
+const mealPlanLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  message: { error: { message: 'Meal plan limit reached — please wait 5 minutes.' } }
+});
+
+app.post('/api/meal-plan', mealPlanLimiter, async (req, res) => {
+  const { calorieGoal, weightGoal, dietPreference, allergies, days = 7, recentFoods = [] } = req.body ?? {};
+  if (!calorieGoal || typeof calorieGoal !== 'number') {
+    return res.status(400).json({ error: { message: 'calorieGoal is required' } });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: { message: 'Meal planning not configured on this server' } });
+  }
+
+  const context = [
+    `Calorie goal: ${calorieGoal} kcal/day`,
+    weightGoal ? `Weight goal: ${weightGoal}` : null,
+    dietPreference ? `Diet preference: ${dietPreference}` : null,
+    (Array.isArray(allergies) && allergies.length > 0) ? `Allergies/avoid: ${allergies.join(', ')}` : null,
+    (Array.isArray(recentFoods) && recentFoods.length > 0) ? `Foods user has recently logged: ${recentFoods.slice(0, 20).join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+
+  try {
+    const response = await callAnthropic({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      temperature: 0.7,
+      system: [{
+        type: 'text',
+        text: 'You are a meal planning assistant. Return ONLY valid JSON — no prose, no markdown. Create a meal plan with this structure:\n{"days":[{"day":"Monday","meals":{"breakfast":{"name":"meal name","kcal":number,"icon":"emoji","description":"brief description"},"lunch":{same},"dinner":{same},"snack":{same}},"totalKcal":number}],"tips":["tip1","tip2","tip3"]}\nMake realistic, varied, nutritious meals. Match the calorie goal closely.',
+        cache_control: { type: 'ephemeral' }
+      }],
+      messages: [{ role: 'user', content: `Create a ${days}-day meal plan:\n${context}` }]
+    });
+
+    const data = await response.json();
+    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
+    const text = data?.content?.[0]?.text ?? '';
+    let plan = { days: [], tips: [] };
+    try {
+      // Strip markdown code fences if present
+      const clean = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+      const p = JSON.parse(clean);
+      if (p && typeof p === 'object' && !Array.isArray(p)) plan = p;
+    } catch {}
+    res.json(plan);
+  } catch (err) {
+    console.error('[meal-plan]', err.message);
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to generate meal plan';
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+// ── AI Nutrition Coach ────────────────────────────────────────────────────────
+const coachLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  message: { error: { message: 'Too many messages — please wait a moment.' } }
+});
+
+app.post('/api/coach', coachLimiter, async (req, res) => {
+  const { messages, context } = req.body ?? {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: { message: 'messages is required' } });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: { message: 'AI coach not configured on this server' } });
+  }
+
+  const validMessages = messages
+    .filter((msg) => msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string')
+    .slice(-20)
+    .map((msg) => ({ role: msg.role, content: String(msg.content).slice(0, 2000) }));
+
+  if (validMessages.length === 0 || validMessages[validMessages.length - 1].role !== 'user') {
+    return res.status(400).json({ error: { message: 'Last message must be from user' } });
+  }
+
+  const systemPrompt = [
+    'You are a friendly, knowledgeable personal nutrition coach for the Dagnara health app.',
+    'Give concise, practical, science-backed advice. Keep responses under 3 short paragraphs unless a detailed breakdown is explicitly requested.',
+    'Focus on nutrition, macros, meal ideas, hydration, and healthy habits. Be encouraging and specific.',
+    typeof context === 'string' && context ? `\nUser profile:\n${context.slice(0, 500)}` : '',
+  ].filter(Boolean).join('\n');
+
+  try {
+    const response = await callAnthropic({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+      messages: validMessages,
+    });
+
+    const data = await response.json();
+    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
+    const reply = data?.content?.[0]?.text ?? 'Sorry, I could not generate a response.';
+    res.json({ reply });
+  } catch (err) {
+    console.error('[coach]', err.message);
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    res.status(500).json({ error: { message: msg } });
   }
 });
 
