@@ -957,7 +957,7 @@ export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { email } = useAuthStore();
   const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, addWater, removeWater, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, logSleep, addStrengthSession, addCardioSession } = useDiaryStore();
-  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts } = useAppStore();
+  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
   const xpInfo = getXpLevel(xp);
 
@@ -1244,6 +1244,13 @@ export default function DiaryScreen() {
   }
 
   function openFoodSearch(meal: Meal) { setSearchMeal(meal); setSearchQuery(''); searchQueryRef.current = ''; setSearchResults([]); setFoodTab('search'); setSearchVisible(true); }
+
+  useEffect(() => {
+    if (pendingAddMeal) {
+      setPendingAddMeal(null);
+      openFoodSearch(pendingAddMeal as Meal);
+    }
+  }, [pendingAddMeal]);
 
   function addFromSearch(product: FoodSearchResult) {
     setPendingProduct(product);
