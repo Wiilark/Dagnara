@@ -20,7 +20,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { analyzeFood, importRecipe, estimateNutrition } from '../../src/lib/api';
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
-import { searchLocalFoods, type LocalFood } from '../../src/lib/foodDatabase';
+import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
@@ -139,6 +139,19 @@ function offKcal(n: Record<string, number>): number {
 function searchFoods(query: string): FoodSearchResult[] {
   return searchLocalFoods(query).map(localFoodToResult);
 }
+
+const FOOD_MAP = new Map([...FOOD_DATABASE, ...RECIPE_DATABASE].map(f => [f.id, f]));
+
+const BROWSE_CATEGORIES = [
+  { emoji: '🥣', label: 'Breakfast Foods',     foodIds: ['g004','g003','e001','e004','e005','g005','g006','d003','d004','g012','g013','g014','b003','b001'] },
+  { emoji: '🥗', label: 'Salads & Vegetables', foodIds: ['v001','v002','v003','v004','v005','v006','v009','v010','v011','v013','v014','v015','v016','v017','v018','v019','v020','v021','v022','v025','v026'] },
+  { emoji: '🍗', label: 'Proteins',            foodIds: ['m001','m002','m003','m004','m005','m006','m008','s001','s002','s003','s004','s005','s006','s007','e001','e004','e005','l005','l006','b010'] },
+  { emoji: '🍎', label: 'Fruits',              foodIds: ['f001','f002','f003','f004','f005','f006','f007','f008','f009','f010','f011','f012','f013','f015','f016','f017','f018','f019','f020','f022'] },
+  { emoji: '🥛', label: 'Dairy',              foodIds: ['d001','d002','d003','d004','d005','d006','d007','d008','d010','d011','d012','d013'] },
+  { emoji: '🍝', label: 'Grains & Pasta',      foodIds: ['g001','g002','g004','g005','g006','g007','g008','g009','g010','g011','g015','g017','g018'] },
+  { emoji: '🫘', label: 'Legumes & Nuts',      foodIds: ['l001','l002','l003','l004','l005','l006','l007','l008','n001','n002','n003','n004','n005','n006','n009','n010','n011','n012'] },
+  { emoji: '🥤', label: 'Beverages',           foodIds: ['b001','b002','b003','b004','b005','b006','b007','b008','b009','b010'] },
+] as const;
 
 // ── Sleep Logger Modal ────────────────────────────────────────────────────────
 const SLEEP_QUALITY = ['😫', '😕', '😐', '😊', '🌟'];
@@ -957,7 +970,7 @@ export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { email } = useAuthStore();
   const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, addWater, removeWater, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, logSleep, addStrengthSession, addCardioSession } = useDiaryStore();
-  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal } = useAppStore();
+  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
   const xpInfo = getXpLevel(xp);
 
@@ -996,6 +1009,7 @@ export default function DiaryScreen() {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchQueryRef = useRef('');
   const [foodTab, setFoodTab] = useState<'search'|'recent'|'favorites'|'browse'|'create'|'restaurant'|'url'>('search');
+  const [browseCat, setBrowseCat] = useState<string | null>(null);
 
   // Recipe URL import
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -1363,6 +1377,21 @@ export default function DiaryScreen() {
         };
         await addFood(selectedDate, food);
       }
+      // Save aggregate recipe to library (per-serving nutrition, stored as per-100g for serving modal)
+      const servings: number = data?.servings ?? 1;
+      const recipe: LocalFood = {
+        id: `r_${Date.now()}`,
+        name: (data?.name as string | undefined) ?? 'Imported Recipe',
+        icon: '📖',
+        kcal: Math.round(items.reduce((s: number, i: any) => s + (i.kcal ?? 0), 0) / servings),
+        protein: Math.round(items.reduce((s: number, i: any) => s + (i.protein ?? 0), 0) / servings * 10) / 10,
+        carbs: Math.round(items.reduce((s: number, i: any) => s + (i.carbs ?? 0), 0) / servings * 10) / 10,
+        fat: Math.round(items.reduce((s: number, i: any) => s + (i.fat ?? 0), 0) / servings * 10) / 10,
+        fiber: 0,
+        sugar: 0,
+        sodium: 0,
+      };
+      await saveRecipe(recipe);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setRecipeUrl('');
       setSearchVisible(false);
@@ -1539,7 +1568,10 @@ export default function DiaryScreen() {
 
       {/* ── App Header ── */}
       <View style={st.appHeader}>
-        <Text style={st.appTitle}>Diary ✓</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Text style={st.appTitle}>Diary</Text>
+          <Ionicons name="checkmark-circle" size={18} color={colors.green} />
+        </View>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
             <Ionicons name="share-outline" size={22} color={colors.ink2} />
@@ -2198,7 +2230,7 @@ export default function DiaryScreen() {
               }
               renderItem={({ item: f }) => (
                 <TouchableOpacity style={st.foodResult} onPress={async () => {
-                  await addFood(selectedDate, { ...f, id: `${Date.now()}` });
+                  await addFood(selectedDate, { ...f, id: `${Date.now()}`, meal: searchMeal });
                   await addXp(10);
                   setSearchVisible(false);
                 }}>
@@ -2253,24 +2285,65 @@ export default function DiaryScreen() {
 
           {foodTab === 'browse' && (
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
-              {[
-                { emoji: '🥣', label: 'Breakfast Foods', items: ['Oatmeal', 'Eggs', 'Toast', 'Yogurt'] },
-                { emoji: '🥗', label: 'Salads & Vegetables', items: ['Caesar Salad', 'Spinach', 'Broccoli'] },
-                { emoji: '🍗', label: 'Proteins', items: ['Chicken Breast', 'Salmon', 'Tuna', 'Beef'] },
-                { emoji: '🍎', label: 'Fruits', items: ['Apple', 'Banana', 'Orange', 'Berries'] },
-                { emoji: '🥛', label: 'Dairy', items: ['Milk', 'Cheese', 'Greek Yogurt'] },
-                { emoji: '🍝', label: 'Grains & Pasta', items: ['Rice', 'Pasta', 'Quinoa', 'Bread'] },
-              ].map(cat => (
-                <TouchableOpacity key={cat.label} style={st.browseCard}
-                  onPress={() => { const q = cat.label.split(' ')[0]; setSearchQuery(q); searchQueryRef.current = q; doSearch(q); setFoodTab('search'); }}>
-                  <Text style={st.browseEmoji}>{cat.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.browseName}>{cat.label}</Text>
-                    <Text style={st.browseSub}>{cat.items.slice(0,3).join(', ')}</Text>
+              {BROWSE_CATEGORIES.map(cat => {
+                const isOpen = browseCat === cat.label;
+                const foods = cat.foodIds.map(id => FOOD_MAP.get(id)).filter(Boolean) as LocalFood[];
+                return (
+                  <View key={cat.label} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+                    <TouchableOpacity style={st.browseCard}
+                      onPress={() => { setBrowseCat(isOpen ? null : cat.label); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                      <Text style={st.browseEmoji}>{cat.emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.browseName}>{cat.label}</Text>
+                        <Text style={st.browseSub}>{foods.slice(0, 3).map(f => f.name).join(', ')}</Text>
+                      </View>
+                      <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.ink3} />
+                    </TouchableOpacity>
+                    {isOpen && foods.map(food => (
+                      <TouchableOpacity key={food.id} style={st.browseItem}
+                        onPress={() => { addFromSearch(localFoodToResult(food)); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                        <Text style={st.browseItemIcon}>{food.icon}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={st.browseItemName}>{food.name}</Text>
+                          <Text style={st.browseItemMeta}>per 100g · P{food.protein}g  C{food.carbs}g  F{food.fat}g</Text>
+                        </View>
+                        <Text style={st.browseItemKcal}>{food.kcal}</Text>
+                        <Text style={st.browseItemKcalLbl}>kcal</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-                </TouchableOpacity>
-              ))}
+                );
+              })}
+              {/* Recipes category — built-in + user-imported */}
+              {(() => {
+                const isOpen = browseCat === 'Recipes';
+                const foods = [...RECIPE_DATABASE, ...savedRecipes];
+                return (
+                  <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+                    <TouchableOpacity style={st.browseCard}
+                      onPress={() => { setBrowseCat(isOpen ? null : 'Recipes'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                      <Text style={st.browseEmoji}>📖</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.browseName}>Recipes</Text>
+                        <Text style={st.browseSub}>{foods.slice(0, 3).map(f => f.name).join(', ')}</Text>
+                      </View>
+                      <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.ink3} />
+                    </TouchableOpacity>
+                    {isOpen && foods.map(food => (
+                      <TouchableOpacity key={food.id} style={st.browseItem}
+                        onPress={() => { addFromSearch(localFoodToResult(food)); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                        <Text style={st.browseItemIcon}>{food.icon}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={st.browseItemName}>{food.name}</Text>
+                          <Text style={st.browseItemMeta}>per serving · P{food.protein}g  C{food.carbs}g  F{food.fat}g</Text>
+                        </View>
+                        <Text style={st.browseItemKcal}>{food.kcal}</Text>
+                        <Text style={st.browseItemKcalLbl}>kcal</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })()}
             </ScrollView>
           )}
 
@@ -2519,10 +2592,16 @@ const st = StyleSheet.create({
   foodTabTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink3 },
   foodTabTxtActive: { color: colors.purple, fontWeight: '700' },
   // Browse cards
-  browseCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 14, padding: 14 },
-  browseEmoji: { fontSize: 28 },
-  browseName: { fontSize: 14, fontWeight: '600', color: colors.ink, marginBottom: 2 },
-  browseSub: { fontSize: 11, color: colors.ink3 },
+  browseCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm, padding: spacing.sm },
+  browseEmoji: { fontSize: fontSize.xl },
+  browseName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink, marginBottom: 2 },
+  browseSub: { fontSize: fontSize.xs, color: colors.ink3 },
+  browseItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.layer1, borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  browseItemIcon: { fontSize: fontSize.lg, width: spacing.lg, textAlign: 'center' },
+  browseItemName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink },
+  browseItemMeta: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
+  browseItemKcal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
+  browseItemKcalLbl: { fontSize: fontSize.xs, color: colors.ink3 },
   iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
 

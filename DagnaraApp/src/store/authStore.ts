@@ -15,6 +15,7 @@ interface AuthState {
   email: string | null;
   profile: Profile;
   isLoading: boolean;
+  isPremium: boolean;
   setEmail: (email: string | null) => void;
   setProfile: (profile: Profile) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -22,12 +23,14 @@ interface AuthState {
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   loadSession: () => Promise<void>;
+  checkSubscription: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   email: null,
   profile: {},
   isLoading: true,
+  isPremium: false,
 
   setEmail: (email) => set({ email }),
   setProfile: async (profile) => {
@@ -64,7 +67,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .maybeSingle();
         // Existing users are considered onboarded
         await AsyncStorage.setItem(`dagnara_onboarded_${session.user.email}`, 'true');
-        set({ email: session.user.email, profile: data?.profile_data ?? {}, isLoading: false });
+        const profileData = data?.profile_data ?? {};
+        set({
+          email: session.user.email,
+          profile: profileData,
+          isPremium: (profileData.subscriptionStatus as string | undefined) === 'active',
+          isLoading: false,
+        });
       } else {
         set({ isLoading: false });
       }
@@ -84,7 +93,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .eq('email', email)
       .maybeSingle();
     await AsyncStorage.setItem(`dagnara_onboarded_${email}`, 'true');
-    set({ email, profile: data?.profile_data ?? {} });
+    const profileData = data?.profile_data ?? {};
+    set({
+      email,
+      profile: profileData,
+      isPremium: (profileData.subscriptionStatus as string | undefined) === 'active',
+    });
   },
 
   register: async (email, password, profile) => {
@@ -107,11 +121,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Reset all user-specific store state so next user starts clean
     require('./appStore').useAppStore.getState().reset();
     require('./diaryStore').useDiaryStore.getState().reset();
-    set({ email: null, profile: {} });
+    set({ email: null, profile: {}, isPremium: false });
   },
 
   sendPasswordReset: async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
+  },
+
+  checkSubscription: async () => {
+    const email = get().email;
+    if (!email) return;
+    try {
+      const { data } = await supabase
+        .from('dagnara_profiles')
+        .select('profile_data')
+        .eq('email', email)
+        .maybeSingle();
+      if (data?.profile_data) {
+        const status = data.profile_data.subscriptionStatus as string | undefined;
+        set({
+          isPremium: status === 'active',
+          profile: { ...get().profile, subscriptionStatus: status ?? 'none' },
+        });
+      }
+    } catch {
+      // Network error — keep current state
+    }
   },
 }));

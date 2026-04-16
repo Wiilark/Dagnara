@@ -1,35 +1,71 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash(start:*)",
-      "Bash(node:*)",
-      "Bash(python3:*)",
-      "Bash(claude update:*)",
-      "Bash(gh auth:*)",
-      "Bash(gh repo:*)",
-      "Bash(gh api:*)",
-      "Bash(echo \"exit: $?\")",
-      "Bash(ls:*)",
-      "Bash(grep -n \"^// ──\\\\|^window\\\\.\\\\|^function \\\\|^}$\\\\|^}\\\\\\)\" \"C:\\\\Users\\\\Wilark\\\\Desktop\\\\DAGNARA\\\\dagnara.html\")",
-      "Bash(grep:*)",
-      "Bash(echo \"exit:$?\")",
       "Skill(update-config)",
-      "Bash(jq:*)",
-      "Bash(npm install:*)",
-      "Bash(npm start:*)",
-      "Bash(curl:*)",
-      "Bash(npm run:*)",
-      "Bash(npm --version)",
-      "Bash(npx:*)",
-      "Read(//c/Users/Wilark/Desktop/DAGNARA/DagnaraApp/$USERPROFILE/.config/ngrok/**)",
-      "Read(//c/Users/Wilark/Desktop/DAGNARA/DagnaraApp/$USERPROFILE/AppData/Local/ngrok/**)",
-      "Bash(\"C:\\\\Users\\\\Wilark\\\\Desktop\\\\DAGNARA\\\\DagnaraApp\\\\node_modules\\\\@expo\\\\ngrok-bin-win32-x64\\\\ngrok.exe\" authtoken:*)",
-      "Bash(pkill -f localtunnel)",
-      "Bash(pkill -f \"lt --port\")",
-      "Bash(jobs:*)"
+      "WebFetch(domain:medium.com)"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/auto_compact.py\"",
+            "timeout": 360
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/command_restrictor.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate_git_commit.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/theme_enforcer.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_mock_code.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret_scanner.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -37,7 +73,14 @@
           {
             "type": "command",
             "command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *\"dagnara.html\" ]]; then cd \"C:/Users/Wilark/Desktop/DAGNARA\" && git add dagnara.html && git commit -m \"Auto-sync: $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin master; fi 2>/dev/null || true",
+            "shell": "bash",
             "statusMessage": "Syncing to GitHub..."
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/typescript_check.py\"",
+            "timeout": 50,
+            "statusMessage": "Checking TypeScript..."
           }
         ]
       }

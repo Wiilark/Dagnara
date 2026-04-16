@@ -18,7 +18,9 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Dagnara uses your camera to identify food items and estimate their nutritional content.",
-        "NSPhotoLibraryUsageDescription": "Dagnara accesses your photo library so you can select food photos for nutritional analysis."
+        "NSPhotoLibraryUsageDescription": "Dagnara accesses your photo library so you can select food photos for nutritional analysis.",
+        "NSHealthShareUsageDescription": "Dagnara reads your steps, active calories, and sleep from Apple Health to show your daily activity.",
+        "NSHealthUpdateUsageDescription": "Dagnara writes your logged workouts and calories burned to Apple Health."
       }
     },
     "android": {
@@ -30,11 +32,18 @@
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_SLEEP_SESSION",
+        "android.permission.health.WRITE_EXERCISE_SESSION"
       ]
     },
     "plugins": [
       "expo-router",
+      "react-native-health",
+      ["react-native-health-connect", {
+        "permissions": ["ReadSteps", "ReadActiveCaloriesBurned", "ReadSleepSession", "WriteExerciseSession"]
+      }],
       "expo-camera",
       [
         "expo-image-picker",
@@ -42,7 +51,14 @@
           "photosPermission": "Dagnara accesses your photo library so you can select food photos for nutritional analysis."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0c0818"
+        }
+      ]
     ],
     "scheme": "dagnara",
     "extra": {

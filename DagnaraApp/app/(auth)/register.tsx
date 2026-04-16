@@ -9,12 +9,13 @@ import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
 const FIELDS = [
-  { key: 'name',     label: 'NAME',         placeholder: 'Your name',      auto: 'name'           as const, required: true },
-  { key: 'email',    label: 'EMAIL',         placeholder: 'you@email.com',  auto: 'email'          as const, keyboard: 'email-address' as const, required: true },
-  { key: 'password', label: 'PASSWORD',      placeholder: '••••••••',       auto: 'password'       as const, secure: true, required: true },
-  { key: 'age',      label: 'AGE',           placeholder: 'e.g. 28',        keyboard: 'numeric'    as const },
-  { key: 'weight',   label: 'WEIGHT (kg)',   placeholder: 'e.g. 72',        keyboard: 'numeric'    as const },
-  { key: 'height',   label: 'HEIGHT (cm)',   placeholder: 'e.g. 175',       keyboard: 'numeric'    as const },
+  { key: 'name',            label: 'NAME',              placeholder: 'Your name',      auto: 'name'           as const, required: true },
+  { key: 'email',           label: 'EMAIL',             placeholder: 'you@email.com',  auto: 'email'          as const, keyboard: 'email-address' as const, required: true },
+  { key: 'password',        label: 'PASSWORD',          placeholder: '••••••••',       auto: 'password'       as const, secure: true, required: true, hint: 'Minimum 6 characters' },
+  { key: 'confirmPassword', label: 'CONFIRM PASSWORD',  placeholder: '••••••••',       auto: 'password'       as const, secure: true, required: true },
+  { key: 'age',             label: 'AGE',               placeholder: 'e.g. 28',        keyboard: 'numeric'    as const },
+  { key: 'weight',          label: 'WEIGHT (kg)',        placeholder: 'e.g. 72',        keyboard: 'numeric'    as const },
+  { key: 'height',          label: 'HEIGHT (cm)',        placeholder: 'e.g. 175',       keyboard: 'numeric'    as const },
 ];
 
 export default function RegisterScreen() {
@@ -29,6 +30,26 @@ export default function RegisterScreen() {
     if (!values.email || !values.password || !values.name) {
       Alert.alert('Required fields missing', 'Please fill in name, email and password.');
       return;
+    }
+    if (values.password.length < 6) {
+      Alert.alert('Password too short', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (values.password !== values.confirmPassword) {
+      Alert.alert('Passwords do not match', 'Please make sure both password fields are identical.');
+      return;
+    }
+    if (values.age) {
+      const a = parseInt(values.age);
+      if (isNaN(a) || a < 16 || a > 100) { Alert.alert('Invalid age', 'Age must be between 16 and 100.'); return; }
+    }
+    if (values.weight) {
+      const w = parseFloat(values.weight);
+      if (isNaN(w) || w < 30 || w > 300) { Alert.alert('Invalid weight', 'Weight must be between 30 and 300 kg.'); return; }
+    }
+    if (values.height) {
+      const h = parseFloat(values.height);
+      if (isNaN(h) || h < 100 || h > 250) { Alert.alert('Invalid height', 'Height must be between 100 and 250 cm.'); return; }
     }
     setLoading(true);
     try {
@@ -66,7 +87,7 @@ export default function RegisterScreen() {
 
         {/* Form card */}
         <View style={s.card}>
-          {FIELDS.map(({ key, label, placeholder, auto, keyboard, secure, required }) => (
+          {FIELDS.map(({ key, label, placeholder, auto, keyboard, secure, required, hint }) => (
             <View key={key} style={s.fieldWrap}>
               <Text style={s.fieldLabel}>{label}{required && <Text style={{ color: colors.rose }}> *</Text>}</Text>
               <TextInput
@@ -80,11 +101,12 @@ export default function RegisterScreen() {
                 keyboardType={keyboard ?? 'default'}
                 secureTextEntry={secure}
               />
+              {hint && <Text style={s.fieldHint}>{hint}</Text>}
             </View>
           ))}
 
           <TouchableOpacity onPress={handleRegister} disabled={loading} activeOpacity={0.8} style={s.btnWrap}>
-            <LinearGradient colors={[colors.purple, '#9c27b0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
+            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
               {loading
                 ? <ActivityIndicator color={colors.white} />
                 : <Text style={s.btnTxt}>Create account</Text>}
@@ -126,8 +148,9 @@ const s = StyleSheet.create({
     elevation: 8,
   },
 
-  fieldWrap: { gap: 6 },
+  fieldWrap: { gap: spacing.xs },
   fieldLabel: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 },
+  fieldHint: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
   input: {
     backgroundColor: colors.layer2,
     borderWidth: 1, borderColor: colors.line2,

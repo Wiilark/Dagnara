@@ -8,6 +8,8 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../src/store/authStore';
 import { useAppStore, calcTDEE } from '../src/store/appStore';
+import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput, type UnitSystem } from '../src/lib/units';
+import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, scheduleDailySummaryReminder } from '../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../src/theme';
 
 const { width } = Dimensions.get('window');
@@ -35,7 +37,7 @@ const ACTIVITIES: { key: Activity; label: string; desc: string }[] = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const { email, profile, setProfile } = useAuthStore();
-  const { setGoals } = useAppStore();
+  const { setGoals, unitSystem, setUnitSystem } = useAppStore();
 
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState<Goal>('maintain');
@@ -46,21 +48,42 @@ export default function OnboardingScreen() {
   const [height, setHeight] = useState(profile.height ?? '');
   const [saving, setSaving] = useState(false);
 
+  // Parse weight/height from display unit to metric for TDEE calc
+  const wKg = parseWeight(weight, unitSystem) ?? (parseFloat(weight) || 0);
+  const hCm = parseHeight(height, unitSystem) ?? (parseFloat(height) || 0);
+
   const calorieGoal = (() => {
-    const a = parseInt(age), w = parseInt(weight), h = parseInt(height);
-    if (!a || !w || !h) return 2000;
-    return calcTDEE(a, w, h, sex, activity, goal);
+    const a = parseInt(age);
+    if (!a || !wKg || !hCm) return 2000;
+    return calcTDEE(a, wKg, hCm, sex, activity, goal);
   })();
 
   async function finish() {
     setSaving(true);
     try {
       await setGoals(activity, goal, calorieGoal);
-      // Update profile with body stats if changed
+      // Update profile with body stats — always stored in metric (kg, cm)
       if (age || weight || height) {
-        await setProfile({ ...profile, age, weight, height });
+        await setProfile({
+          ...profile, age,
+          weight: wKg > 0 ? String(Math.round(wKg * 10) / 10) : profile.weight,
+          height: hCm > 0 ? String(Math.round(hCm)) : profile.height,
+          sex,
+        });
       }
       await AsyncStorage.setItem(`dagnara_onboarded_${email ?? 'anon'}`, 'true');
+      // Enable all notifications by default — user can toggle in Profile > Notifications
+      const p = `dagnara_${email ?? 'anon'}`;
+      await AsyncStorage.multiSet([
+        [`${p}_notif_meals`,   'true'],
+        [`${p}_notif_streak`,  'true'],
+        [`${p}_notif_checkin`, 'true'],
+        [`${p}_notif_summary`, 'true'],
+      ]);
+      await scheduleMealReminders(true);
+      await scheduleStreakReminder(true);
+      await scheduleWaterReminder(true);
+      await scheduleDailySummaryReminder(true);
       router.replace('/(tabs)/diary');
     } finally {
       setSaving(false);
@@ -70,9 +93,32 @@ export default function OnboardingScreen() {
   function next() { if (step < STEPS - 1) setStep(s => s + 1); else finish(); }
   function back() { if (step > 0) setStep(s => s - 1); }
 
+  const ageNum    = age ? parseInt(age) : NaN;
+  const ageErr    = age && !isNaN(ageNum)
+    ? (ageNum < 16 ? 'Minimum age is 16' : ageNum > 100 ? 'Maximum age is 100' : null)
+    : null;
+  const weightErr = weight
+    ? (wKg < 30
+        ? `Too low – min ${unitSystem === 'Metric' ? '30 kg' : unitSystem === 'UK' ? '4 st 10 lb' : '66 lb'}`
+        : wKg > 300
+          ? `Too high – max ${unitSystem === 'Metric' ? '300 kg' : unitSystem === 'UK' ? '47 st 3 lb' : '661 lb'}`
+          : null)
+    : null;
+  const heightErr = height
+    ? (hCm < 100
+        ? `Too low – min ${unitSystem === 'Metric' ? '100 cm' : "3'4\""}`
+        : hCm > 250
+          ? `Too high – max ${unitSystem === 'Metric' ? '250 cm' : "8'2\""}`
+          : null)
+    : null;
+
   const canAdvance = () => {
     if (step === 3) {
-      return !!age && !!weight && !!height;
+      if (!age || !weight || !height) return false;
+      if (isNaN(ageNum) || ageNum < 16 || ageNum > 100) return false;
+      if (!wKg || wKg < 30 || wKg > 300) return false;
+      if (!hCm || hCm < 100 || hCm > 250) return false;
+      return true;
     }
     return true;
   };
@@ -181,6 +227,26 @@ export default function OnboardingScreen() {
             <Text style={s.heading}>Your body stats</Text>
             <Text style={s.body}>Used in the Harris-Benedict formula to calculate your BMR.</Text>
 
+            {/* Unit system toggle */}
+            <View style={s.unitToggleRow}>
+              {(['Metric', 'Imperial (US)'] as const).map(u => (
+                <TouchableOpacity
+                  key={u}
+                  style={[s.unitToggleBtn, unitSystem === u && s.unitToggleBtnActive]}
+                  onPress={() => {
+                    if (weight) { const kg = parseWeight(weight, unitSystem); setWeight(kg != null ? kgToInput(kg, u) : ''); }
+                    if (height) { const cm = parseHeight(height, unitSystem); setHeight(cm != null ? cmToInput(cm, u) : ''); }
+                    void setUnitSystem(u);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[s.unitToggleTxt, unitSystem === u && s.unitToggleTxtActive]}>
+                    {u === 'Metric' ? '🌍 Metric' : '🇺🇸 Imperial'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <Text style={s.fieldLabel}>BIOLOGICAL SEX</Text>
             <View style={s.sexRow}>
               {(['male', 'female'] as Sex[]).map(v => (
@@ -198,23 +264,24 @@ export default function OnboardingScreen() {
             </View>
 
             {[
-              { key: 'age', label: 'AGE', value: age, set: setAge, placeholder: 'e.g. 28', unit: 'years' },
-              { key: 'weight', label: 'WEIGHT', value: weight, set: setWeight, placeholder: 'e.g. 72', unit: 'kg' },
-              { key: 'height', label: 'HEIGHT', value: height, set: setHeight, placeholder: 'e.g. 175', unit: 'cm' },
+              { key: 'age',    label: 'AGE',    value: age,    set: setAge,    placeholder: 'e.g. 28', unit: 'years', keyboard: 'numeric' as const,    error: ageErr },
+              { key: 'weight', label: 'WEIGHT', value: weight, set: setWeight, placeholder: weightPlaceholder(unitSystem), unit: weightUnit(unitSystem), keyboard: 'decimal-pad' as const, error: weightErr },
+              { key: 'height', label: 'HEIGHT', value: height, set: setHeight, placeholder: heightPlaceholder(unitSystem), unit: heightUnit(unitSystem), keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as any, error: heightErr },
             ].map(f => (
               <View key={f.key} style={s.inputWrap}>
                 <Text style={s.fieldLabel}>{f.label}</Text>
                 <View style={s.inputRow}>
                   <TextInput
-                    style={[s.input, { flex: 1 }]}
+                    style={[s.input, { flex: 1 }, !!f.error && { borderColor: colors.rose }]}
                     placeholder={f.placeholder}
                     placeholderTextColor={colors.ink3}
                     value={f.value}
                     onChangeText={f.set}
-                    keyboardType="numeric"
+                    keyboardType={f.keyboard}
                   />
                   <Text style={s.unit}>{f.unit}</Text>
                 </View>
+                {f.error ? <Text style={s.inputError}>{f.error}</Text> : null}
               </View>
             ))}
           </View>
@@ -256,8 +323,8 @@ export default function OnboardingScreen() {
                 ['⚡ Activity', ACTIVITIES.find(a => a.key === activity)?.label ?? activity],
                 ['👤 Sex',      sex === 'male' ? 'Male' : 'Female'],
                 ['📅 Age',      age ? `${age} years` : '—'],
-                ['⚖️ Weight',   weight ? `${weight} kg` : '—'],
-                ['📏 Height',   height ? `${height} cm` : '—'],
+                ['⚖️ Weight',   wKg > 0 ? formatWeight(wKg, unitSystem) : '—'],
+                ['📏 Height',   hCm > 0 ? formatHeight(hCm, unitSystem) : '—'],
               ].map(([label, value]) => (
                 <View key={label} style={s.summaryRow}>
                   <Text style={s.summaryLabel}>{label}</Text>
@@ -287,7 +354,7 @@ export default function OnboardingScreen() {
           style={[s.nextBtnWrap, (!canAdvance() || saving) && { opacity: 0.5 }]}
         >
           <LinearGradient
-            colors={[colors.purple, '#9c27b0']}
+            colors={[colors.purple, colors.purpleGlow]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.nextBtn}
           >
@@ -335,13 +402,23 @@ const s = StyleSheet.create({
     backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2,
     borderRadius: radius.md, padding: spacing.md,
   },
-  optionSelected: { borderColor: colors.purple, backgroundColor: 'rgba(124,77,255,0.08)' },
+  optionSelected: { borderColor: colors.purple, backgroundColor: colors.purpleTint },
   optionIcon: { fontSize: 24 },
   optionLabel: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink },
   optionLabelSelected: { color: colors.lavender },
   optionDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line2 },
   radioSelected: { borderColor: colors.purple, backgroundColor: colors.purple },
+
+  unitToggleRow: { flexDirection: 'row', gap: spacing.sm },
+  unitToggleBtn: {
+    flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center',
+    borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md,
+    backgroundColor: colors.layer1,
+  },
+  unitToggleBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleTint },
+  unitToggleTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink2 },
+  unitToggleTxtActive: { color: colors.lavender },
 
   fieldLabel: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 },
   sexRow: { flexDirection: 'row', gap: spacing.sm },
@@ -350,7 +427,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md,
     backgroundColor: colors.layer1,
   },
-  sexBtnSelected: { borderColor: colors.purple, backgroundColor: 'rgba(124,77,255,0.1)' },
+  sexBtnSelected: { borderColor: colors.purple, backgroundColor: colors.purpleTint },
   sexBtnTxt: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink2 },
   sexBtnTxtSelected: { color: colors.lavender },
 
@@ -362,11 +439,12 @@ const s = StyleSheet.create({
     color: colors.ink, fontSize: fontSize.base,
   },
   unit: { fontSize: fontSize.sm, color: colors.ink3, width: 40 },
+  inputError: { fontSize: fontSize.xs, color: colors.rose, marginTop: 2 },
 
   summaryCard: {
     borderRadius: radius.lg, padding: spacing.xl,
     alignItems: 'center', gap: spacing.sm,
-    borderWidth: 1, borderColor: 'rgba(124,77,255,0.2)',
+    borderWidth: 1, borderColor: colors.line2,
   },
   calNum: { fontSize: 56, fontWeight: '900', color: colors.lavender, lineHeight: 64 },
   calLabel: { fontSize: fontSize.sm, color: colors.ink2, fontWeight: '600', marginBottom: spacing.sm },
@@ -381,7 +459,7 @@ const s = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.md, paddingVertical: 12,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     borderBottomWidth: 1, borderBottomColor: colors.line2,
   },
   summaryLabel: { fontSize: fontSize.sm, color: colors.ink2 },
@@ -390,14 +468,14 @@ const s = StyleSheet.create({
   nav: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.xl, paddingBottom: 36, paddingTop: spacing.md,
+    paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, paddingTop: spacing.md,
     backgroundColor: colors.bg,
     borderTopWidth: 1, borderTopColor: colors.line2,
     gap: spacing.md,
   },
-  backBtn: { flex: 1, paddingVertical: spacing.sm + 6, alignItems: 'center' },
+  backBtn: { flex: 1, paddingVertical: spacing.md, alignItems: 'center' },
   backTxt: { fontSize: fontSize.base, color: colors.ink2, fontWeight: '600' },
   nextBtnWrap: { flex: 2, borderRadius: radius.md, overflow: 'hidden' },
-  nextBtn: { paddingVertical: spacing.sm + 6, alignItems: 'center', borderRadius: radius.md },
+  nextBtn: { paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md },
   nextTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700', letterSpacing: 0.3 },
 });

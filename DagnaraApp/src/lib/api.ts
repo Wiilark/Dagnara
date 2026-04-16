@@ -42,3 +42,72 @@ export async function analyzeFood(imageData: string, mediaType: string): Promise
   if (!res.ok) throw new Error('SERVER_ERROR');
   return res.json();
 }
+
+export async function estimateNutrition(description: string): Promise<any> {
+  if (!API_BASE) throw new Error('SETUP_REQUIRED');
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/estimate-nutrition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    });
+  } catch {
+    throw new Error('NETWORK_ERROR');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? 'SERVER_ERROR');
+  }
+  return res.json();
+}
+
+export async function generateMealPlan(params: {
+  calorieGoal: number;
+  weightGoal?: string;
+  dietPreference?: string;
+  allergies?: string[];
+  days?: number;
+  recentFoods?: string[];
+  email?: string;
+}): Promise<any> {
+  if (!API_BASE) throw new Error('SETUP_REQUIRED');
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/meal-plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new Error('NETWORK_ERROR');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? 'SERVER_ERROR');
+  }
+  return res.json();
+}
+
+export async function coachMessage(
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  context?: string,
+  email?: string
+): Promise<{ reply: string }> {
+  if (!API_BASE) throw new Error('SETUP_REQUIRED');
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/coach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, context, email }),
+    });
+  } catch {
+    throw new Error('NETWORK_ERROR');
+  }
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody?.error?.message ?? 'SERVER_ERROR');
+  }
+  return res.json();
+}

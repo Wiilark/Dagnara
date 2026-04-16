@@ -97,6 +97,60 @@ export async function scheduleWeightReminder(enabled: boolean) {
   });
 }
 
+// Cancel today's meal reminder and push it to tomorrow.
+// Call this when the user logs their first food for a given meal.
+export async function skipMealReminderToday(meal: 'breakfast' | 'lunch' | 'dinner') {
+  const tag = `meal_${meal}`;
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const exists = scheduled.some(n => (n.content.data as any)?.tag === tag);
+  if (!exists) return;
+
+  const config: Record<string, [string, string, number, number]> = {
+    breakfast: ['🥞 Log breakfast', "Don't forget to log your breakfast!", 8, 0],
+    lunch:     ['🥗 Log lunch',     'Time to log your lunch.',              12, 30],
+    dinner:    ['🍽 Log dinner',    'Have you logged dinner yet?',           19, 0],
+  };
+  const [title, body, hour, minute] = config[meal];
+  const now = new Date();
+  const reminderToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
+
+  // Only worth acting if reminder hasn't fired yet today
+  if (now >= reminderToday) return;
+
+  // Cancel recurring daily and fire a one-time tomorrow, then re-add daily.
+  // This way the reminder skips today but resumes from tomorrow.
+  await cancelByTag(tag);
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, minute);
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, data: { tag } },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: tomorrow,
+    },
+  });
+  // Re-add the daily so it keeps firing after tomorrow
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, data: { tag } },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+    },
+  });
+}
+
+export async function scheduleDailySummaryReminder(enabled: boolean) {
+  if (!enabled) { await cancelByTag('daily_summary'); return; }
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+  await scheduleDailyAt(
+    'daily_summary',
+    '📊 Daily summary ready',
+    'Tap to review today\'s nutrition and close out your diary.',
+    21, 0,
+  );
+}
+
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }

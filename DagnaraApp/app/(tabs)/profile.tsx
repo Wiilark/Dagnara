@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Modal, Switch,
+  Alert, TextInput, Modal, Switch, Image, Platform, KeyboardAvoidingView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -12,13 +14,17 @@ import { useAppStore, getXpLevel, calcTDEE } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
+import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
+import { useDiaryStore } from '../../src/store/diaryStore';
 
 const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Mediterranean'];
 const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
-  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal } = useAppStore();
+  const { updateCaloriesBurned, logSleep, selectedDate } = useDiaryStore();
+  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts } = useAppStore();
   const xpInfo = getXpLevel(xp);
 
   const [editing, setEditing] = useState(false);
@@ -27,17 +33,24 @@ export default function ProfileScreen() {
   const [macrosModal, setMacrosModal] = useState(false);
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
+  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'notifications' | 'subscription' | 'health'>('');
+  const [language, setLanguage] = useState('English');
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
+  const [acFirstName, setAcFirstName] = useState('');
+  const [acLastName,  setAcLastName]  = useState('');
+  const [acEmail,     setAcEmail]     = useState('');
+  const [acPassword,  setAcPassword]  = useState('');
   const [dietaryModal, setDietaryModal] = useState(false);
   const [tdeeModal, setTdeeModal] = useState(false);
   const [selectedFoodPref, setSelectedFoodPref] = useState('none');
   const [selectedDiet, setSelectedDiet] = useState('Balanced');
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([]);
 
-  // Unit preferences
-  const [unitWeight, setUnitWeight] = useState<'kg' | 'lbs'>('kg');
-  const [unitHeight, setUnitHeight] = useState<'cm' | 'm'>('cm');
-  const [unitWater,  setUnitWater]  = useState<'ml' | 'fl oz'>('ml');
-  const [unitEnergy, setUnitEnergy] = useState<'kcal' | 'kJ'>('kcal');
+
+  // Custom macro goals
+  const [localCarbs,   setLocalCarbs]   = useState(String(macroPcts.carbs));
+  const [localProtein, setLocalProtein] = useState(String(macroPcts.protein));
+  const [localFat,     setLocalFat]     = useState(String(macroPcts.fat));
 
   // Notification preferences
   const [notifCheckIn, setNotifCheckIn] = useState(false);
@@ -45,29 +58,60 @@ export default function ProfileScreen() {
   const [notifStreak,  setNotifStreak]  = useState(false);
   const calorieGoal = storeCalGoal || 2000;
   const [waterGoal, setWaterGoal] = useState('8');
-  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [waterGoalModal, setWaterGoalModal] = useState(false);
+  const [waterGoalInput, setWaterGoalInput] = useState('');
+  const [sex, setSex] = useState<'male' | 'female'>((profile.sex as 'male' | 'female') ?? 'male');
   const [localActivity, setLocalActivity] = useState<typeof activityLevel>(activityLevel);
   const [localGoal, setLocalGoal] = useState<typeof weightGoal>(weightGoal);
   const [measurements, setMeasurements] = useState<Record<string, string>>({
     weight: '', height: '', waist: '', chest: '', hips: '', arms: '',
   });
+  const [measureInputs, setMeasureInputs] = useState<Record<string, string>>({
+    weight: '', height: '', waist: '', chest: '', hips: '', arms: '',
+  });
+  const [draftWeightInput, setDraftWeightInput] = useState('');
+  const [draftHeightInput, setDraftHeightInput] = useState('');
+
+  // Health sync state
+  const [healthConnected, setHealthConnected] = useState(false);
+  const [healthSyncSteps, setHealthSyncSteps] = useState(false);
+  const [healthSyncCalories, setHealthSyncCalories] = useState(false);
+  const [healthSyncSleep, setHealthSyncSleep] = useState(false);
+  const [healthWriteBack, setHealthWriteBack] = useState(false);
+  const [healthLastSync, setHealthLastSync] = useState<string | null>(null);
+  const [healthSyncing, setHealthSyncing] = useState(false);
 
   // Load persisted measurements + prefs on mount (scoped to this user)
   const p = email ?? 'anon';
   useEffect(() => {
     AsyncStorage.multiGet([
-      `${p}_body_measurements`, `${p}_unit_weight`, `${p}_unit_height`, `${p}_unit_water`, `${p}_unit_energy`,
+      `${p}_body_measurements`,
       `${p}_notif_checkin`, `${p}_notif_meals`, `${p}_notif_streak`,
+      `${p}_language`, `${p}_unit_system`, `${p}_water_goal`, `${p}_plan`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
       if (m[`${p}_body_measurements`]) setMeasurements(JSON.parse(m[`${p}_body_measurements`]!));
-      if (m[`${p}_unit_weight`])  setUnitWeight(m[`${p}_unit_weight`] as any);
-      if (m[`${p}_unit_height`])  setUnitHeight(m[`${p}_unit_height`] as any);
-      if (m[`${p}_unit_water`])   setUnitWater(m[`${p}_unit_water`] as any);
-      if (m[`${p}_unit_energy`])  setUnitEnergy(m[`${p}_unit_energy`] as any);
       if (m[`${p}_notif_checkin`]) setNotifCheckIn(m[`${p}_notif_checkin`] === 'true');
       if (m[`${p}_notif_meals`])   setNotifMeals(m[`${p}_notif_meals`] === 'true');
       if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
+      if (m[`${p}_language`])      setLanguage(m[`${p}_language`]!);
+      if (m[`${p}_plan`])          setSelectedPlan(m[`${p}_plan`] as 'free' | 'premium');
+      if (m[`${p}_water_goal`])    setWaterGoal(m[`${p}_water_goal`]!);
+      // Migrate old unit_system key to store (one-time, fire-and-forget)
+      if (m[`${p}_unit_system`])   void setUnitSystem(m[`${p}_unit_system`] as UnitSystem);
+    });
+    // Load health sync prefs
+    AsyncStorage.multiGet([
+      `${p}_health_connected`, `${p}_health_steps`, `${p}_health_calories`,
+      `${p}_health_sleep`, `${p}_health_writeback`, `${p}_health_last_sync`,
+    ]).then(pairs => {
+      const m: Record<string, string | null> = Object.fromEntries(pairs);
+      if (m[`${p}_health_connected`]) setHealthConnected(m[`${p}_health_connected`] === 'true');
+      if (m[`${p}_health_steps`])     setHealthSyncSteps(m[`${p}_health_steps`] === 'true');
+      if (m[`${p}_health_calories`])  setHealthSyncCalories(m[`${p}_health_calories`] === 'true');
+      if (m[`${p}_health_sleep`])     setHealthSyncSleep(m[`${p}_health_sleep`] === 'true');
+      if (m[`${p}_health_writeback`]) setHealthWriteBack(m[`${p}_health_writeback`] === 'true');
+      if (m[`${p}_health_last_sync`]) setHealthLastSync(m[`${p}_health_last_sync`]);
     });
   }, []);
 
@@ -79,59 +123,187 @@ export default function ProfileScreen() {
     }
   }, [tdeeModal]);
 
+  // Sync macro inputs when modal opens
+  useEffect(() => {
+    if (macrosModal) {
+      setLocalCarbs(String(macroPcts.carbs));
+      setLocalProtein(String(macroPcts.protein));
+      setLocalFat(String(macroPcts.fat));
+    }
+  }, [macrosModal]);
+
+  // Populate display-unit weight/height inputs when Personal Details modal opens
+  useEffect(() => {
+    if (!editing) return;
+    setDraftWeightInput(draft.weight ? kgToInput(parseFloat(draft.weight), unitSystem) : '');
+    setDraftHeightInput(draft.height ? cmToInput(parseFloat(draft.height), unitSystem) : '');
+  }, [editing]);
+
+  // Populate display-unit inputs when measurements modal opens
+  useEffect(() => {
+    if (!measureModal) return;
+    setMeasureInputs({
+      weight: measurements.weight ? kgToInput(parseFloat(measurements.weight), unitSystem) : '',
+      height: measurements.height ? cmToInput(parseFloat(measurements.height), unitSystem) : '',
+      waist:  measurements.waist  ? cmLenToInput(parseFloat(measurements.waist),  unitSystem) : '',
+      chest:  measurements.chest  ? cmLenToInput(parseFloat(measurements.chest),  unitSystem) : '',
+      hips:   measurements.hips   ? cmLenToInput(parseFloat(measurements.hips),   unitSystem) : '',
+      arms:   measurements.arms   ? cmLenToInput(parseFloat(measurements.arms),   unitSystem) : '',
+    });
+  }, [measureModal]);
+
+  async function handleHealthConnect() {
+    const granted = await requestHealthPermissions();
+    if (!granted) {
+      Alert.alert('Permission denied', `Could not access ${healthPlatformName()}. Check your device settings.`);
+      return;
+    }
+    setHealthConnected(true);
+    await AsyncStorage.setItem(`${p}_health_connected`, 'true');
+  }
+
+  async function handleHealthSync() {
+    if (!healthConnected) { await handleHealthConnect(); return; }
+    setHealthSyncing(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const data = await readHealthData(today);
+      if (healthSyncCalories && data.activeCalories > 0) {
+        await updateCaloriesBurned(today, data.activeCalories);
+      }
+      if (healthSyncSleep && data.sleepMinutes > 0) {
+        const hrs = Math.floor(data.sleepMinutes / 60);
+        const mins = data.sleepMinutes % 60;
+        await logSleep(today, {
+          bedtime: '22:00',
+          waketime: `0${hrs}:${String(mins).padStart(2, '0')}`,
+          quality: 2,
+          duration: `${hrs}h ${mins}m`,
+        });
+      }
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setHealthLastSync(now);
+      await AsyncStorage.setItem(`${p}_health_last_sync`, now);
+      Alert.alert('Synced', `Health data updated.\nSteps: ${data.steps.toLocaleString()}${healthSyncCalories ? `\nCalories burned: ${data.activeCalories} kcal` : ''}${healthSyncSleep ? `\nSleep: ${Math.floor(data.sleepMinutes / 60)}h ${data.sleepMinutes % 60}m` : ''}`);
+    } catch {
+      Alert.alert('Sync failed', 'Could not read health data. Try again.');
+    } finally {
+      setHealthSyncing(false);
+    }
+  }
+
   async function handleSave() {
-    await setProfile(draft);
+    const wKg = parseWeight(draftWeightInput, unitSystem);
+    const hCm = parseHeight(draftHeightInput, unitSystem);
+    const ageNum = parseInt(draft.age ?? '');
+    if (draft.age && !isNaN(ageNum) && (ageNum < 16 || ageNum > 100)) {
+      Alert.alert('Invalid age', 'Age must be between 16 and 100 years.');
+      return;
+    }
+    if (wKg != null && (wKg < 30 || wKg > 300)) {
+      const bounds = unitSystem === 'Metric' ? '30–300 kg' : unitSystem === 'UK' ? '4 st 10 lb – 47 st 3 lb' : '66–661 lb';
+      Alert.alert('Invalid weight', `Weight must be between ${bounds}.`);
+      return;
+    }
+    if (hCm != null && (hCm < 100 || hCm > 250)) {
+      const bounds = unitSystem === 'Metric' ? '100–250 cm' : "3'4\"–8'2\"";
+      Alert.alert('Invalid height', `Height must be between ${bounds}.`);
+      return;
+    }
+    await setProfile({
+      ...draft,
+      ...(wKg != null ? { weight: String(Math.round(wKg * 10) / 10) } : {}),
+      ...(hCm != null ? { height: String(Math.round(hCm)) } : {}),
+    });
     setEditing(false);
   }
 
   async function handleSaveMeasurements() {
-    await AsyncStorage.setItem(`${p}_body_measurements`, JSON.stringify(measurements));
-    // Sync weight & height back into the profile
+    // Parse display-unit inputs back to metric for storage
+    const wKg    = parseWeight(measureInputs.weight, unitSystem);
+    const hCm    = parseHeight(measureInputs.height, unitSystem);
+    const waistCm = parseLength(measureInputs.waist, unitSystem);
+    const chestCm = parseLength(measureInputs.chest, unitSystem);
+    const hipsCm  = parseLength(measureInputs.hips,  unitSystem);
+    const armsCm  = parseLength(measureInputs.arms,  unitSystem);
+    if (wKg != null && (wKg < 30 || wKg > 300)) {
+      const bounds = unitSystem === 'Metric' ? '30–300 kg' : unitSystem === 'UK' ? '4 st 10 lb – 47 st 3 lb' : '66–661 lb';
+      Alert.alert('Invalid weight', `Weight must be between ${bounds}.`);
+      return;
+    }
+    if (hCm != null && (hCm < 100 || hCm > 250)) {
+      const bounds = unitSystem === 'Metric' ? '100–250 cm' : "3'4\"–8'2\"";
+      Alert.alert('Invalid height', `Height must be between ${bounds}.`);
+      return;
+    }
+    if ((waistCm != null && (waistCm < 40 || waistCm > 200)) ||
+        (chestCm != null && (chestCm < 40 || chestCm > 200)) ||
+        (hipsCm  != null && (hipsCm  < 40 || hipsCm  > 200))) {
+      Alert.alert('Invalid measurement', 'Waist, chest, and hips must be between 40–200 cm (16–79 in).');
+      return;
+    }
+    if (armsCm != null && (armsCm < 10 || armsCm > 100)) {
+      Alert.alert('Invalid measurement', 'Arm circumference must be between 10–100 cm (4–39 in).');
+      return;
+    }
+    const newMeasurements = {
+      weight: wKg    != null ? String(Math.round(wKg    * 10) / 10) : measurements.weight,
+      height: hCm    != null ? String(Math.round(hCm))              : measurements.height,
+      waist:  waistCm != null ? String(Math.round(waistCm))         : measurements.waist,
+      chest:  chestCm != null ? String(Math.round(chestCm))         : measurements.chest,
+      hips:   hipsCm  != null ? String(Math.round(hipsCm))          : measurements.hips,
+      arms:   armsCm  != null ? String(Math.round(armsCm))          : measurements.arms,
+    };
+    setMeasurements(newMeasurements);
+    await AsyncStorage.setItem(`${p}_body_measurements`, JSON.stringify(newMeasurements));
+    // Sync weight & height (metric) back into the profile
     const updated = {
       ...profile,
-      ...(measurements.weight ? { weight: measurements.weight } : {}),
-      ...(measurements.height ? { height: measurements.height } : {}),
+      ...(wKg != null ? { weight: String(Math.round(wKg * 10) / 10) } : {}),
+      ...(hCm != null ? { height: String(Math.round(hCm)) } : {}),
     };
     await setProfile(updated);
     setMeasureModal(false);
   }
 
   function handleLogout() {
-    Alert.alert('Sign out', 'Are you sure?', [
+    Alert.alert('Log out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: logout },
+      { text: 'Log out', style: 'destructive', onPress: logout },
     ]);
   }
 
-  function handleDeleteData() {
-    Alert.alert(
-      'Delete all data',
-      'This will permanently delete all your health data. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete everything', style: 'destructive', onPress: async () => {
-            try {
-              // Wipe all local storage
-              const keys = await AsyncStorage.getAllKeys();
-              await AsyncStorage.multiRemove(keys as string[]);
-              // Wipe Supabase data for this user
-              if (email) {
-                await Promise.allSettled([
-                  supabase.from('dagnara_diary').delete().eq('email', email),
-                  supabase.from('dagnara_app_state').delete().eq('email', email),
-                  supabase.from('dagnara_profiles').delete().eq('email', email),
-                ]);
-              }
-            } catch {}
-            logout();
-          },
-        },
-      ]
-    );
+
+  async function handlePickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Allow photo library access to set a profile photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0].base64) return;
+    const dataUri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+    await setProfile({ ...profile, photoUri: dataUri });
   }
 
   const initial = (profile.name ?? email ?? '?')[0].toUpperCase();
+
+  async function handleSaveAccount() {
+    const newName = [acFirstName.trim(), acLastName.trim()].filter(Boolean).join(' ');
+    await setProfile({ ...profile, name: newName || profile.name });
+    await AsyncStorage.setItem(`${p}_language`, language);
+    if (acPassword.trim().length >= 6) {
+      const { error } = await supabase.auth.updateUser({ password: acPassword.trim() });
+      if (error) { Alert.alert('Password Error', error.message); return; }
+    }
+    setSettingsPage('');
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -139,31 +311,30 @@ export default function ProfileScreen() {
 
         {/* ── Header ── */}
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.ink2} />
-          </TouchableOpacity>
-          <Text style={styles.heading}>Profile</Text>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsModal(true)}>
-              <Ionicons name="settings-outline" size={18} color={colors.ink2} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={20} color={colors.ink2} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.editBtn} onPress={() => { setDraft(profile); setEditing(true); }}>
-              <Ionicons name="pencil-outline" size={16} color={colors.lavender} />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
+            <Text style={styles.heading}>Profile</Text>
           </View>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsModal(true)}>
+            <Ionicons name="settings-outline" size={18} color={colors.ink2} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Avatar card ── */}
         <View style={styles.avatarCard}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
+          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
+            {profile.photoUri
+              ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
+              : <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+            }
+            <View style={styles.avatarAdd}>
+              <Ionicons name="camera" size={13} color={colors.white} />
             </View>
-            <TouchableOpacity style={styles.avatarAdd} onPress={() => Alert.alert('Photo upload', 'Avatar upload coming soon.')}>
-              <Ionicons name="add" size={14} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{profile.name ?? 'Your Name'}</Text>
           <Text style={styles.emailText}>{email}</Text>
           {/* XP level */}
@@ -192,17 +363,41 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* ── Achievements ── */}
+        <Text style={styles.sectionHdr}>ACHIEVEMENTS</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.sm, gap: spacing.sm }}>
+          {([
+            { id: 'streak3',   icon: '🔥', label: '3-day\nstreak',   unlocked: streak >= 3 },
+            { id: 'streak7',   icon: '🔥', label: '7-day\nstreak',   unlocked: streak >= 7 },
+            { id: 'streak30',  icon: '🏅', label: '30-day\nstreak',  unlocked: streak >= 30 },
+            { id: 'streak100', icon: '👑', label: '100-day\nstreak', unlocked: streak >= 100 },
+            { id: 'level5',  icon: '⭐', label: 'Level 5\nachiever', unlocked: xpInfo.level >= 5 },
+            { id: 'level10', icon: '🎯', label: 'Level 10\nfocused',  unlocked: xpInfo.level >= 10 },
+            { id: 'level15', icon: '🌟', label: 'Level 15\nall-star', unlocked: xpInfo.level >= 15 },
+            { id: 'level20', icon: '🏆', label: 'Level 20\nchampion', unlocked: xpInfo.level >= 20 },
+            { id: 'xp100',  icon: '💎', label: '100 XP\nearned',   unlocked: xp >= 100 },
+            { id: 'xp500',  icon: '🚀', label: '500 XP\nearned',   unlocked: xp >= 500 },
+            { id: 'xp2000', icon: '🌌', label: '2k XP\nearned',    unlocked: xp >= 2000 },
+          ] as { id: string; icon: string; label: string; unlocked: boolean }[]).map(a => (
+            <View key={a.id} style={[styles.achieveBadge, !a.unlocked && { opacity: 0.3 }]}>
+              <Text style={{ fontSize: fontSize.xl }}>{a.icon}</Text>
+              <Text style={styles.achieveLbl}>{a.label}</Text>
+              {a.unlocked && <View style={styles.achieveDot} />}
+            </View>
+          ))}
+        </ScrollView>
+
         {/* ── Customization ── */}
         <Text style={styles.sectionHdr}>CUSTOMIZATION</Text>
         <View style={styles.menuCard}>
           {[
             { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
-            { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? profile.weight + ' kg' : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
+            { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'bar-chart-outline', label: 'Adjust Macronutrients', color: colors.sky, value: '', onPress: () => setMacrosModal(true) },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${calorieGoal} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${waterGoal} glasses/day`, onPress: () => Alert.prompt?.('Water goal', 'Glasses per day', (v) => v && setWaterGoal(v), 'plain-text', waterGoal, 'numeric') },
-            { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? `${measurements.weight} kg` : 'Not set', onPress: () => setMeasureModal(true) },
+            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${waterGoal} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
+            { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
               <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
@@ -215,69 +410,19 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* ── Health Sync ── */}
-        <Text style={styles.sectionHdr}>HEALTH SYNC</Text>
-        <View style={styles.menuCard}>
-          {[
-            { icon: '❤️', label: 'Apple Health', desc: 'Import steps, sleep, workouts', color: '#ff2d55' },
-            { icon: '💚', label: 'Google Fit / Health Connect', desc: 'Sync steps, calories, activity', color: '#4285f4' },
-          ].map(({ icon, label, desc, color }) => (
-            <TouchableOpacity key={label} style={styles.healthRow} onPress={() => Alert.alert('Coming soon', `${label} integration coming soon.`)}>
-              <View style={[styles.healthIcon, { backgroundColor: color + '22' }]}>
-                <Text style={{ fontSize: 22 }}>{icon}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>{label}</Text>
-                <Text style={styles.healthDesc}>{desc}</Text>
-              </View>
-              <Text style={styles.connectTxt}>Connect</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Account ── */}
-        <Text style={styles.sectionHdr}>ACCOUNT</Text>
-        <View style={styles.menuCard}>
-          {[
-            { icon: 'shield-outline', label: 'Privacy & Security', color: colors.lavender },
-            { icon: 'help-circle-outline', label: 'Help & Support', color: colors.sky },
-          ].map(({ icon, label, color }) => (
-            <TouchableOpacity key={label} style={styles.menuRow} onPress={() => Alert.alert(label, 'Coming soon.')}>
-              <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
-                <Ionicons name={icon as any} size={16} color={color} />
-              </View>
-              <Text style={styles.menuLabel}>{label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.rose + '22' }]}>
-              <Ionicons name="log-out-outline" size={16} color={colors.rose} />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.rose }]}>Sign out</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuRow} onPress={handleDeleteData}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.rose + '11' }]}>
-              <Ionicons name="trash-outline" size={16} color={colors.rose + 'aa'} />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.rose + 'aa' }]}>Delete all my data</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-          </TouchableOpacity>
-        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* ── Measurements Modal ── */}
       <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setMeasureModal(false)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Body Measurements</Text>
             <TouchableOpacity onPress={handleSaveMeasurements}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
             {/* BMI Card */}
             {(() => {
               const w = parseFloat(measurements.weight || String(profile.weight ?? ''));
@@ -287,18 +432,18 @@ export default function ProfileScreen() {
                 bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal weight' :
                 bmi < 30 ? 'Overweight' : 'Obese';
               const bmiColor = bmi === null ? colors.ink3 :
-                bmi < 18.5 ? '#38bdf8' : bmi < 25 ? '#4ade80' :
-                bmi < 30 ? '#f59e0b' : '#ef4444';
+                bmi < 18.5 ? colors.sky : bmi < 25 ? colors.green :
+                bmi < 30 ? colors.honey : colors.rose;
               return (
                 <View style={styles.bmiCard}>
                   <Text style={styles.bmiSectionLbl}>Body Mass Index</Text>
                   <Text style={[styles.bmiNum, { color: bmiColor }]}>{bmi ? bmi.toFixed(1) : '--'}</Text>
                   <Text style={styles.bmiLbl}>{bmiLabel}</Text>
                   <View style={styles.bmiScale}>
-                    <View style={[styles.bmiSeg, { backgroundColor: '#38bdf8' }]} />
-                    <View style={[styles.bmiSeg, { backgroundColor: '#4ade80', flex: 1.2 }]} />
-                    <View style={[styles.bmiSeg, { backgroundColor: '#f59e0b' }]} />
-                    <View style={[styles.bmiSeg, { backgroundColor: '#ef4444' }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.sky }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.green, flex: 1.2 }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.honey }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.rose }]} />
                   </View>
                   <View style={styles.bmiScaleLbls}>
                     {['Under', 'Normal', 'Over', 'Obese'].map(l => <Text key={l} style={styles.bmiScaleLbl}>{l}</Text>)}
@@ -308,22 +453,22 @@ export default function ProfileScreen() {
             })()}
             {/* Measurement inputs */}
             <Text style={styles.inputLabel}>Current Measurements</Text>
-            {[
-              { key: 'weight', label: 'Weight', unit: 'kg' },
-              { key: 'height', label: 'Height', unit: 'cm' },
-              { key: 'waist',  label: 'Waist',  unit: 'cm' },
-              { key: 'chest',  label: 'Chest',  unit: 'cm' },
-              { key: 'hips',   label: 'Hips',   unit: 'cm' },
-              { key: 'arms',   label: 'Arms',   unit: 'cm' },
-            ].map(({ key, label, unit }) => (
+            {([
+              { key: 'weight', label: 'Weight', unit: weightUnit(unitSystem),  keyboard: 'decimal-pad' as const },
+              { key: 'height', label: 'Height', unit: heightUnit(unitSystem),  keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as any },
+              { key: 'waist',  label: 'Waist',  unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
+              { key: 'chest',  label: 'Chest',  unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
+              { key: 'hips',   label: 'Hips',   unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
+              { key: 'arms',   label: 'Arms',   unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
+            ] as const).map(({ key, label, unit, keyboard }) => (
               <View key={key} style={styles.measureRow}>
                 <Text style={styles.measureLbl}>{label}</Text>
                 <View style={styles.measureInput}>
                   <TextInput
                     style={styles.measureField}
-                    value={measurements[key]}
-                    onChangeText={v => setMeasurements(m => ({ ...m, [key]: v }))}
-                    keyboardType="decimal-pad"
+                    value={measureInputs[key]}
+                    onChangeText={v => setMeasureInputs(m => ({ ...m, [key]: v }))}
+                    keyboardType={keyboard}
                     placeholder="—"
                     placeholderTextColor={colors.ink3}
                   />
@@ -337,7 +482,7 @@ export default function ProfileScreen() {
 
       {/* ── Diet Plan Modal ── */}
       <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setDietModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Diet Plan</Text>
@@ -356,31 +501,64 @@ export default function ProfileScreen() {
 
       {/* ── Macros Modal ── */}
       <Modal visible={macrosModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
-            <Text style={styles.modalTitle}>Macronutrients</Text>
-            <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>Macro Goals</Text>
+            <TouchableOpacity onPress={() => {
+              const c = parseInt(localCarbs) || 0;
+              const p = parseInt(localProtein) || 0;
+              const f = parseInt(localFat) || 0;
+              if (c + p + f !== 100) { Alert.alert('Invalid split', 'Carbs + Protein + Fat must equal 100%.'); return; }
+              void setMacroPcts({ carbs: c, protein: p, fat: f });
+              setMacrosModal(false);
+            }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            <Text style={[styles.inputLabel, { marginBottom: 16 }]}>Set your daily macro targets. Percentages must add up to 100%.</Text>
-            {[
-              { key: 'protein', label: 'Protein', color: colors.rose, pct: '30', g: '150' },
-              { key: 'carbs',   label: 'Carbohydrates', color: colors.honey, pct: '45', g: '225' },
-              { key: 'fat',     label: 'Fat', color: colors.sky, pct: '25', g: '55' },
-            ].map(({ key, label, color, pct, g }) => (
-              <View key={key} style={mst.macroRow}>
-                <View style={[mst.macroDot, { backgroundColor: color }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={mst.macroLabel}>{label}</Text>
-                  <View style={mst.macroBar}><View style={[mst.macroFill, { width: `${pct}%` as any, backgroundColor: color + 'aa' }]} /></View>
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+            <Text style={[styles.inputLabel, { marginBottom: spacing.md }]}>Enter the % of calories from each macro. Must total 100%.</Text>
+
+            {([
+              { key: 'carbs',   label: 'Carbohydrates', color: colors.sky,  val: localCarbs,   set: setLocalCarbs },
+              { key: 'protein', label: 'Protein',        color: colors.rose, val: localProtein, set: setLocalProtein },
+              { key: 'fat',     label: 'Fat',            color: colors.honey, val: localFat,    set: setLocalFat },
+            ] as const).map(({ key, label, color, val, set }) => {
+              const pct = parseInt(val) || 0;
+              const grams = Math.round(calorieGoal * pct / 100 / (key === 'fat' ? 9 : 4));
+              return (
+                <View key={key} style={mst.macroRow}>
+                  <View style={[mst.macroDot, { backgroundColor: color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={mst.macroLabel}>{label}</Text>
+                    <View style={mst.macroBar}><View style={[mst.macroFill, { width: `${Math.min(100, pct)}%` as any, backgroundColor: color + 'aa' }]} /></View>
+                  </View>
+                  <View style={mst.macroVals}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <TextInput
+                        style={[mst.macroPct, { color, borderBottomWidth: 1, borderBottomColor: color + '55', minWidth: 32, textAlign: 'right' }]}
+                        value={val}
+                        onChangeText={set}
+                        keyboardType="number-pad"
+                        maxLength={3}
+                      />
+                      <Text style={[mst.macroPct, { color }]}>%</Text>
+                    </View>
+                    <Text style={mst.macroG}>{grams}g</Text>
+                  </View>
                 </View>
-                <View style={mst.macroVals}>
-                  <Text style={[mst.macroPct, { color }]}>{pct}%</Text>
-                  <Text style={mst.macroG}>{g}g</Text>
+              );
+            })}
+
+            {(() => {
+              const total = (parseInt(localCarbs) || 0) + (parseInt(localProtein) || 0) + (parseInt(localFat) || 0);
+              const ok = total === 100;
+              return (
+                <View style={[mst.calCard, { borderColor: ok ? colors.line2 : colors.rose + '55' }]}>
+                  <Text style={mst.calLbl}>Total</Text>
+                  <Text style={[mst.calVal, { color: ok ? colors.green : colors.rose }]}>{total}%</Text>
                 </View>
-              </View>
-            ))}
+              );
+            })()}
+
             <View style={mst.calCard}>
               <Text style={mst.calLbl}>Daily Calorie Goal</Text>
               <Text style={mst.calVal}>{calorieGoal} kcal</Text>
@@ -390,125 +568,402 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Settings Modal ── */}
-      <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+      <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setSettingsModal(false)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
-            <Text style={styles.modalTitle}>Settings</Text>
-            <View style={{ width: 40 }} />
+            {settingsPage !== ''
+              ? <TouchableOpacity onPress={() => setSettingsPage('')}><Text style={styles.cancelText}>← Back</Text></TouchableOpacity>
+              : <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
+            }
+            <Text style={styles.modalTitle}>
+              {settingsPage === 'account' ? 'Account Settings' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Manage Subscriptions' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+            </Text>
+            {settingsPage === 'account'
+              ? <TouchableOpacity onPress={handleSaveAccount}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+              : <View style={{ width: 40 }} />
+            }
           </View>
-          <ScrollView contentContainerStyle={[styles.modalScroll, { gap: 0 }]} showsVerticalScrollIndicator={false}>
-            {/* Account */}
-            <Text style={sst.sectionLbl}>ACCOUNT</Text>
+          <ScrollView contentContainerStyle={[styles.modalScroll, { gap: 0 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+            {settingsPage === 'account' ? (
+              /* ── Account Settings page ── */
+              <>
+            <Text style={sst.sectionLbl}>PERSONAL</Text>
             <View style={sst.card}>
-              <TouchableOpacity style={sst.row} onPress={() => setSettingsModal(false)}>
-                <View style={[sst.icon, { backgroundColor: colors.purple + '1a' }]}><Text>👤</Text></View>
-                <Text style={sst.label}>Profile</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Premium', '🌟 Premium upgrade coming soon!')}>
-                <View style={[sst.icon, { backgroundColor: colors.honey + '1a' }]}><Text>⭐</Text></View>
-                <Text style={sst.label}>Upgrade to Premium</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Units */}
-            <Text style={sst.sectionLbl}>UNITS & PREFERENCES</Text>
-            <View style={sst.card}>
-              {[
-                { icon: '⚖️', label: 'Weight unit', current: unitWeight, options: ['kg', 'lbs'] as const, bg: colors.sky + '1a',
-                  onToggle: () => { const v = unitWeight === 'kg' ? 'lbs' : 'kg'; setUnitWeight(v); AsyncStorage.setItem(`${p}_unit_weight`, v); } },
-                { icon: '📏', label: 'Height unit', current: unitHeight, options: ['cm', 'm'] as const, bg: colors.green + '1a',
-                  onToggle: () => { const v = unitHeight === 'cm' ? 'm' : 'cm'; setUnitHeight(v); AsyncStorage.setItem(`${p}_unit_height`, v); } },
-                { icon: '💧', label: 'Water unit', current: unitWater, options: ['ml', 'fl oz'] as const, bg: colors.sky + '1a',
-                  onToggle: () => { const v = unitWater === 'ml' ? 'fl oz' : 'ml'; setUnitWater(v); AsyncStorage.setItem(`${p}_unit_water`, v); } },
-                { icon: '🔥', label: 'Energy unit', current: unitEnergy, options: ['kcal', 'kJ'] as const, bg: colors.honey + '1a',
-                  onToggle: () => { const v = unitEnergy === 'kcal' ? 'kJ' : 'kcal'; setUnitEnergy(v); AsyncStorage.setItem(`${p}_unit_energy`, v); } },
-              ].map(({ icon, label, current, options, bg, onToggle }, i, arr) => (
-                <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]} onPress={onToggle}>
-                  <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
-                  <Text style={sst.label}>{label}</Text>
-                  <View style={sst.unitToggle}>
-                    {options.map(opt => (
-                      <Text key={opt} style={[sst.unitOpt, current === opt && sst.unitOptActive]}>{opt}</Text>
-                    ))}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Notifications */}
-            <Text style={sst.sectionLbl}>NOTIFICATIONS</Text>
-            <View style={sst.card}>
-              {[
-                { icon: '🔔', label: 'Daily check-in reminder', bg: colors.purple + '1a', value: notifCheckIn,
-                  onToggle: (v: boolean) => { setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
-                { icon: '🥗', label: 'Meal reminders', bg: colors.green + '1a', value: notifMeals,
-                  onToggle: (v: boolean) => { setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
-                { icon: '🔥', label: 'Streak protection', bg: colors.honey + '1a', value: notifStreak,
-                  onToggle: (v: boolean) => { setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
-              ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
-                <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                  <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
-                  <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
-                  <Switch value={value} onValueChange={onToggle}
-                    trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
-                    thumbColor={value ? colors.purple : colors.ink3}
-                    style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
+              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
+                <View style={[sst.icon, { backgroundColor: colors.purple2 + '22' }]}>
+                  <Ionicons name="mail-outline" size={16} color={colors.purple2} />
                 </View>
-              ))}
+                <Text style={act.fieldLbl}>Email</Text>
+                <TextInput style={act.fieldInput} value={acEmail} onChangeText={setAcEmail}
+                  keyboardType="email-address" autoCapitalize="none" placeholderTextColor={colors.ink3} placeholder="email@example.com" />
+              </View>
+              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
+                <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
+                  <Ionicons name="person-outline" size={16} color={colors.lavender} />
+                </View>
+                <Text style={act.fieldLbl}>First Name</Text>
+                <TextInput style={act.fieldInput} value={acFirstName} onChangeText={setAcFirstName}
+                  placeholderTextColor={colors.ink3} placeholder="First name" />
+              </View>
+              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
+                <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
+                  <Ionicons name="person-outline" size={16} color={colors.lavender} />
+                </View>
+                <Text style={act.fieldLbl}>Last Name</Text>
+                <TextInput style={act.fieldInput} value={acLastName} onChangeText={setAcLastName}
+                  placeholderTextColor={colors.ink3} placeholder="Last name" />
+              </View>
+              <View style={[sst.row, { borderBottomWidth: 0 }]}>
+                <View style={[sst.icon, { backgroundColor: colors.ink3 + '22' }]}>
+                  <Ionicons name="lock-closed-outline" size={16} color={colors.ink3} />
+                </View>
+                <Text style={act.fieldLbl}>Password</Text>
+                <TextInput style={act.fieldInput} value={acPassword} onChangeText={setAcPassword}
+                  secureTextEntry placeholder="New password" placeholderTextColor={colors.ink3} />
+              </View>
             </View>
-
-            {/* Goals */}
-            <Text style={sst.sectionLbl}>GOALS</Text>
+            <Text style={sst.sectionLbl}>PREFERENCES</Text>
             <View style={sst.card}>
               {[
-                { icon: '🏃', label: 'Daily steps', val: '8,000', bg: colors.honey + '1a' },
-                { icon: '💧', label: 'Water intake', val: `${waterGoal} glasses`, bg: colors.sky + '1a' },
-                { icon: '😴', label: 'Sleep goal', val: '8h', bg: colors.purple + '1a' },
-                { icon: '🍎', label: 'Calorie goal', val: `${calorieGoal} kcal`, bg: colors.green + '1a' },
-              ].map(({ icon, label, val, bg }, i, arr) => (
+                { icon: 'scale-outline', label: 'Unit System', value: unitSystem, color: colors.sky, onPress: () => setSettingsPage('unitSystem') },
+                { icon: 'language-outline', label: 'Language', value: language, color: colors.green, onPress: () => setSettingsPage('language') },
+              ].map(({ icon, label, value, color, onPress }, i, arr) => (
                 <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                  onPress={() => Alert.alert(label, 'Tap to edit this goal.')}>
-                  <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
+                  onPress={onPress}>
+                  <View style={[sst.icon, { backgroundColor: color + '22' }]}>
+                    <Ionicons name={icon as any} size={16} color={color} />
+                  </View>
                   <Text style={sst.label}>{label}</Text>
-                  <Text style={sst.val}>{val}</Text>
+                  <Text style={sst.val}>{value}</Text>
                   <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
                 </TouchableOpacity>
               ))}
             </View>
-
-            {/* Support */}
-            <Text style={sst.sectionLbl}>SUPPORT</Text>
+            <Text style={sst.sectionLbl}>PRIVACY</Text>
             <View style={sst.card}>
-              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Help & Support', 'Coming soon.')}>
-                <View style={[sst.icon, { backgroundColor: colors.sky + '1a' }]}><Text>💬</Text></View>
-                <Text style={sst.label}>Help & Support</Text>
+              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Data Consents', 'Coming soon.')}>
+                <View style={[sst.icon, { backgroundColor: colors.teal + '22' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={colors.teal} />
+                </View>
+                <Text style={sst.label}>Data Consents</Text>
                 <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
               </TouchableOpacity>
-              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Privacy Policy', 'Coming soon.')}>
-                <View style={[sst.icon, { backgroundColor: colors.green + '1a' }]}><Text>🔒</Text></View>
-                <Text style={sst.label}>Privacy Policy</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-              <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                <View style={[sst.icon, { backgroundColor: colors.layer3 }]}><Text>ℹ️</Text></View>
-                <Text style={sst.label}>App version</Text>
-                <Text style={sst.val}>1.0.0</Text>
-              </View>
             </View>
-            <View style={{ height: 20 }} />
+            <View style={[sst.card, { marginTop: spacing.lg }]}>
+              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Unsubscribe', 'You will no longer receive marketing emails.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Unsubscribe', style: 'destructive', onPress: () => {} }])}>
+                <View style={[sst.icon, { backgroundColor: colors.rose + '11' }]}>
+                  <Ionicons name="mail-unread-outline" size={16} color={colors.rose} />
+                </View>
+                <Text style={[sst.label, { color: colors.rose }]}>Unsubscribe from marketing</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: logout }])}>
+                <View style={[sst.icon, { backgroundColor: colors.rose + '11' }]}>
+                  <Ionicons name="trash-outline" size={16} color={colors.rose} />
+                </View>
+                <Text style={[sst.label, { color: colors.rose }]}>Delete Account</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: spacing.xl }} />
+              </>
+            ) : settingsPage === 'unitSystem' ? (
+              /* ── Unit System page ── */
+              <View style={sst.card}>
+                {[
+                  { name: 'Metric',        subtitle: 'kg · cm · ml · °C  —  used by most of the world' },
+                  { name: 'Imperial (US)', subtitle: 'lb · ft/in · fl oz · °F  —  used in the United States' },
+                  { name: 'UK',            subtitle: 'st/lb · ft/in · ml · °C  —  used in the United Kingdom' },
+                  { name: 'US Customary',  subtitle: 'lb · in · cup · °F  —  US cooking & informal measures' },
+                ].map(({ name, subtitle }, i, arr) => (
+                  <TouchableOpacity key={name} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() => { void setUnitSystem(name as UnitSystem); setSettingsPage('account'); }}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={sst.label}>{name}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>{subtitle}</Text>
+                    </View>
+                    {unitSystem === name && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : settingsPage === 'language' ? (
+              /* ── Language page ── */
+              <View style={sst.card}>
+                {['English'].map((lang, i, arr) => (
+                  <TouchableOpacity key={lang} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() => { setLanguage(lang); AsyncStorage.setItem(`${p}_language`, lang); setSettingsPage('account'); }}>
+                    <Text style={[sst.label, { flex: 1 }]}>{lang}</Text>
+                    {language === lang && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : settingsPage === 'subscription' ? (
+              /* ── Subscription page ── */
+              <View style={{ gap: spacing.md, paddingVertical: spacing.xs }}>
+                {/* Free plan */}
+                <TouchableOpacity
+                  onPress={() => { setSelectedPlan('free'); void AsyncStorage.setItem(`${p}_plan`, 'free'); }}
+                  style={[subst.planCard, selectedPlan === 'free' && subst.planCardSel]}>
+                  <View style={subst.planHeader}>
+                    <View style={[subst.planBadge, { backgroundColor: colors.ink3 + '22' }]}>
+                      <Ionicons name="person-outline" size={18} color={colors.ink2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={subst.planName}>Free</Text>
+                      <Text style={subst.planPrice}>$0 / month</Text>
+                    </View>
+                    <View style={[subst.planRadio, selectedPlan === 'free' && subst.planRadioSel]}>
+                      {selectedPlan === 'free' && <View style={subst.planRadioDot} />}
+                    </View>
+                  </View>
+                  <View style={subst.divider} />
+                  {[
+                    'Log meals manually (unlimited)',
+                    'Calories, protein, carbs & fat tracking',
+                    'Daily diary & streak tracking',
+                    'Body measurements & BMI',
+                    '10 built-in recipes',
+                  ].map(f => (
+                    <View key={f} style={subst.featureRow}>
+                      <Ionicons name="checkmark-circle-outline" size={16} color={colors.ink3} />
+                      <Text style={subst.featureTxt}>{f}</Text>
+                    </View>
+                  ))}
+                </TouchableOpacity>
+
+                {/* Premium plan */}
+                <TouchableOpacity
+                  onPress={() => { setSelectedPlan('premium'); void AsyncStorage.setItem(`${p}_plan`, 'premium'); }}
+                  style={[subst.planCard, subst.planCardPremium, selectedPlan === 'premium' && subst.planCardSel]}>
+                  <LinearGradient colors={['rgba(124,77,255,0.18)', 'transparent']}
+                    style={{ ...StyleSheet.absoluteFillObject as any, borderRadius: radius.lg }}
+                    start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.5 }}
+                    pointerEvents="none" />
+                  <View style={subst.planHeader}>
+                    <LinearGradient colors={[colors.purple, colors.purpleGlow]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={[subst.planBadge, { borderRadius: radius.sm }]}>
+                      <Ionicons name="star" size={16} color={colors.white} />
+                    </LinearGradient>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[subst.planName, { color: colors.lavender }]}>Premium</Text>
+                      <Text style={[subst.planPrice, { color: colors.purple2 }]}>$4.99 / month</Text>
+                    </View>
+                    <View style={[subst.planRadio, subst.planRadioPremium, selectedPlan === 'premium' && subst.planRadioSel]}>
+                      {selectedPlan === 'premium' && <View style={[subst.planRadioDot, { backgroundColor: colors.purple }]} />}
+                    </View>
+                  </View>
+                  <View style={[subst.divider, { borderColor: colors.line2 }]} />
+                  {[
+                    'Everything in Free',
+                    'AI food scan — log by photo',
+                    'AI recipe import from any URL',
+                    '50+ full recipe library',
+                    'Advanced micros: fiber, sugar, sodium, vitamins',
+                    'Workout & nutrition programs',
+                    'Full body progress analytics',
+                    'Priority support',
+                  ].map((f, i) => (
+                    <View key={f} style={subst.featureRow}>
+                      <Ionicons
+                        name={i === 0 ? 'copy-outline' : 'checkmark-circle'}
+                        size={16}
+                        color={i === 0 ? colors.ink3 : colors.purple2}
+                      />
+                      <Text style={[subst.featureTxt, i !== 0 && { color: colors.ink }]}>{f}</Text>
+                    </View>
+                  ))}
+                </TouchableOpacity>
+              </View>
+            ) : settingsPage === 'notifications' ? (
+              /* ── Notification Settings page ── */
+              <View style={sst.card}>
+                {[
+                  { icon: '🔔', label: 'Daily check-in reminder', bg: colors.purple + '1a', value: notifCheckIn,
+                    onToggle: (v: boolean) => { setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
+                  { icon: '🥗', label: 'Meal reminders', bg: colors.green + '1a', value: notifMeals,
+                    onToggle: (v: boolean) => { setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
+                  { icon: '🔥', label: 'Streak protection', bg: colors.honey + '1a', value: notifStreak,
+                    onToggle: (v: boolean) => { setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
+                ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
+                  <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                    <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
+                    <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
+                    <Switch value={value} onValueChange={onToggle}
+                      trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
+                      thumbColor={value ? colors.purple : colors.ink3}
+                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
+                  </View>
+                ))}
+              </View>
+            ) : settingsPage === 'health' ? (
+              /* ── Health Connect settings ── */
+              <ScrollView contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.xl }}>
+                {!isHealthAvailable() && (
+                  <Text style={[sst.sectionLbl, { color: colors.rose, paddingHorizontal: spacing.md }]}>
+                    Health sync is not available on this platform.
+                  </Text>
+                )}
+                <Text style={sst.sectionLbl}>CONNECTION</Text>
+                <View style={sst.card}>
+                  <View style={[sst.row, { borderBottomWidth: 0 }]}>
+                    <View style={[sst.icon, { backgroundColor: Platform.OS === 'ios' ? colors.rose + '22' : colors.green + '22' }]}>
+                      <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={16} color={Platform.OS === 'ios' ? colors.rose : colors.green} />
+                    </View>
+                    <Text style={[sst.label, { flex: 1 }]}>{healthPlatformName()}</Text>
+                    {healthConnected
+                      ? <Text style={{ fontSize: fontSize.xs, color: colors.green, fontWeight: '700' }}>Connected</Text>
+                      : <TouchableOpacity onPress={handleHealthConnect} style={{ backgroundColor: colors.purple, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
+                          <Text style={{ fontSize: fontSize.xs, color: colors.white, fontWeight: '700' }}>Connect</Text>
+                        </TouchableOpacity>
+                    }
+                  </View>
+                </View>
+
+                <Text style={sst.sectionLbl}>SYNC DATA</Text>
+                <View style={sst.card}>
+                  {[
+                    { key: 'steps',    icon: '👟', label: 'Steps',           value: healthSyncSteps,    onToggle: (v: boolean) => { setHealthSyncSteps(v);    AsyncStorage.setItem(`${p}_health_steps`, String(v)); } },
+                    { key: 'calories', icon: '🔥', label: 'Active Calories', value: healthSyncCalories, onToggle: (v: boolean) => { setHealthSyncCalories(v); AsyncStorage.setItem(`${p}_health_calories`, String(v)); } },
+                    { key: 'sleep',    icon: '🌙', label: 'Sleep',           value: healthSyncSleep,    onToggle: (v: boolean) => { setHealthSyncSleep(v);    AsyncStorage.setItem(`${p}_health_sleep`, String(v)); } },
+                  ].map(({ key, icon, label, value, onToggle }, i, arr) => (
+                    <View key={key} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                      <View style={[sst.icon, { backgroundColor: colors.layer3 }]}><Text>{icon}</Text></View>
+                      <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
+                      <Switch value={value} onValueChange={onToggle}
+                        disabled={!healthConnected}
+                        trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
+                        thumbColor={value ? colors.purple : colors.ink3}
+                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
+                    </View>
+                  ))}
+                </View>
+
+                <Text style={sst.sectionLbl}>WRITE BACK</Text>
+                <View style={sst.card}>
+                  <View style={[sst.row, { borderBottomWidth: 0 }]}>
+                    <View style={[sst.icon, { backgroundColor: colors.honey + '1a' }]}><Text>💪</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={sst.label}>Write Workouts</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Log exercises back to {healthPlatformName()}</Text>
+                    </View>
+                    <Switch value={healthWriteBack} onValueChange={(v) => { setHealthWriteBack(v); AsyncStorage.setItem(`${p}_health_writeback`, String(v)); }}
+                      disabled={!healthConnected}
+                      trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
+                      thumbColor={healthWriteBack ? colors.purple : colors.ink3}
+                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
+                  </View>
+                </View>
+
+                <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
+                  {healthLastSync && (
+                    <Text style={{ fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center' }}>Last synced: {healthLastSync}</Text>
+                  )}
+                  <TouchableOpacity onPress={handleHealthSync} disabled={healthSyncing} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+                    <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={{ paddingVertical: spacing.sm + 2, alignItems: 'center' }}>
+                      <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm, letterSpacing: 0.5 }}>
+                        {healthSyncing ? 'Syncing…' : 'Sync Now'}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : (
+              /* ── Settings list page ── */
+              <>
+            {/* Account */}
+            <Text style={sst.sectionLbl}>ACCOUNT</Text>
+            <View style={sst.card}>
+              <TouchableOpacity style={sst.row} onPress={() => {
+                setAcFirstName(profile.name?.split(' ')[0] ?? '');
+                setAcLastName(profile.name?.split(' ').slice(1).join(' ') ?? '');
+                setAcEmail(email ?? '');
+                setAcPassword('');
+                setSettingsPage('account');
+              }}>
+                <View style={[sst.icon, { backgroundColor: colors.purple + '1a' }]}>
+                  <Ionicons name="person-circle-outline" size={16} color={colors.purple2} />
+                </View>
+                <Text style={sst.label}>Account Settings</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('subscription')}>
+                <View style={[sst.icon, { backgroundColor: colors.honey + '1a' }]}>
+                  <Ionicons name="card-outline" size={16} color={colors.honey} />
+                </View>
+                <Text style={sst.label}>Manage Subscriptions</Text>
+                <Text style={[sst.val, { color: selectedPlan === 'premium' ? colors.honey : colors.ink3, textTransform: 'capitalize' }]}>{selectedPlan}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+              </TouchableOpacity>
+            </View>
+
+
+            {/* Notifications */}
+            <Text style={sst.sectionLbl}>NOTIFICATIONS</Text>
+            <View style={sst.card}>
+              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('notifications')}>
+                <View style={[sst.icon, { backgroundColor: colors.purple + '1a' }]}>
+                  <Ionicons name="notifications-outline" size={16} color={colors.purple2} />
+                </View>
+                <Text style={sst.label}>Notification Settings</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Import Health Data */}
+            <Text style={sst.sectionLbl}>IMPORT HEALTH DATA</Text>
+            <View style={sst.card}>
+              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('health')}>
+                <View style={[sst.icon, { backgroundColor: Platform.OS === 'ios' ? colors.rose + '22' : colors.green + '22' }]}>
+                  <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={16} color={Platform.OS === 'ios' ? colors.rose : colors.green} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={sst.label}>{healthPlatformName()}</Text>
+                  {healthConnected && <Text style={{ fontSize: fontSize.xs, color: colors.green }}>Connected{healthLastSync ? ` · ${healthLastSync}` : ''}</Text>}
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Help */}
+            <Text style={sst.sectionLbl}>HELP</Text>
+            <View style={sst.card}>
+              {[
+                { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, bg: colors.sky + '1a' },
+                { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, bg: colors.layer3 },
+                { icon: 'code-slash-outline', label: 'Open-source Licenses', color: colors.purple2, bg: colors.purple + '1a' },
+                { icon: 'library-outline', label: 'Sources of recommendations', color: colors.green, bg: colors.green + '1a' },
+              ].map(({ icon, label, color, bg }, i, arr) => (
+                <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                  onPress={() => Alert.alert(label, 'Coming soon.')}>
+                  <View style={[sst.icon, { backgroundColor: bg }]}>
+                    <Ionicons name={icon as any} size={16} color={color} />
+                  </View>
+                  <Text style={sst.label}>{label}</Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={{ alignSelf: 'center', marginTop: spacing.xl, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm + 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.rose + '55', backgroundColor: colors.rose + '11' }}
+              onPress={() => { setSettingsModal(false); handleLogout(); }}>
+              <Text style={{ color: colors.rose, fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 1.1 }}>LOG OUT</Text>
+            </TouchableOpacity>
+            <Text style={{ textAlign: 'center', color: colors.ink3, fontSize: fontSize.xs, marginTop: spacing.sm }}>1.0.0</Text>
+            <View style={{ height: spacing.xl }} />
+              </>
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Dietary Preferences Modal ── */}
       <Modal visible={dietaryModal} animationType="slide" presentationStyle="fullScreen">
-        <SafeAreaView style={dp.safe}>
+        <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
           <View style={dp.header}>
             <TouchableOpacity onPress={() => setDietaryModal(false)} style={dp.backBtn}>
-              <Ionicons name="chevron-back" size={18} color="#f0ecff" />
+              <Ionicons name="chevron-back" size={18} color={colors.ink} />
             </TouchableOpacity>
             <Text style={dp.title}>Food Preferences</Text>
             <View style={{ width: 36 }} />
@@ -531,7 +986,7 @@ export default function ProfileScreen() {
                   onPress={() => setSelectedFoodPref(key)}>
                   <Text style={dp.prefLabel}>{label}</Text>
                   <View style={[dp.radio, selectedFoodPref === key && dp.radioSel]}>
-                    {selectedFoodPref === key && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✓</Text>}
+                    {selectedFoodPref === key && <Text style={{ color: colors.white, fontSize: fontSize.xs, fontWeight: '700' }}>✓</Text>}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -577,7 +1032,7 @@ export default function ProfileScreen() {
 
       {/* ── TDEE Modal ── */}
       <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setTdeeModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Calorie & Goals</Text>
@@ -587,6 +1042,7 @@ export default function ProfileScreen() {
               const height = parseFloat(profile.height ?? '170') || 170;
               const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
               setGoals(localActivity, localGoal, cal);
+              setProfile({ ...profile, sex });
               setTdeeModal(false);
             }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
@@ -666,18 +1122,16 @@ export default function ProfileScreen() {
 
       {/* ── Edit Profile Modal ── */}
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Personal Details</Text>
             <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
             {[
               { label: 'Name', key: 'name' },
               { label: 'Age', key: 'age', keyboard: 'numeric' as const },
-              { label: 'Weight (kg)', key: 'weight', keyboard: 'numeric' as const },
-              { label: 'Height (cm)', key: 'height', keyboard: 'numeric' as const },
               { label: 'Goal', key: 'goal' },
             ].map(({ label, key, keyboard }) => (
               <View key={key}>
@@ -692,8 +1146,77 @@ export default function ProfileScreen() {
                 />
               </View>
             ))}
+            <View>
+              <Text style={styles.inputLabel}>Weight ({weightUnit(unitSystem)})</Text>
+              <TextInput
+                style={styles.input}
+                value={draftWeightInput}
+                onChangeText={setDraftWeightInput}
+                placeholderTextColor={colors.ink3}
+                keyboardType="decimal-pad"
+                autoCapitalize="none"
+              />
+            </View>
+            <View>
+              <Text style={styles.inputLabel}>Height ({heightUnit(unitSystem)})</Text>
+              <TextInput
+                style={styles.input}
+                value={draftHeightInput}
+                onChangeText={setDraftHeightInput}
+                placeholderTextColor={colors.ink3}
+                keyboardType={unitSystem === 'Metric' ? 'decimal-pad' : 'default'}
+                autoCapitalize="none"
+              />
+            </View>
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* Water Goal modal — cross-platform replacement for Alert.prompt */}
+      <Modal visible={waterGoalModal} transparent animationType="fade" onRequestClose={() => setWaterGoalModal(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
+          <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.lg, width: '100%', gap: spacing.md }}>
+            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Water Goal</Text>
+            <Text style={{ fontSize: fontSize.sm, color: colors.ink3 }}>Glasses per day (1–20)</Text>
+            <TextInput
+              style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' }}
+              value={waterGoalInput}
+              onChangeText={setWaterGoalInput}
+              keyboardType="numeric"
+              autoFocus
+              placeholder="8"
+              placeholderTextColor={colors.ink3}
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                const n = parseInt(waterGoalInput);
+                if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
+                else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
+                setWaterGoalModal(false);
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <TouchableOpacity onPress={() => setWaterGoalModal(false)}
+                style={{ flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md }}>
+                <Text style={{ color: colors.ink2, fontWeight: '600', fontSize: fontSize.sm }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const n = parseInt(waterGoalInput);
+                  if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
+                  else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
+                  setWaterGoalModal(false);
+                }}
+                style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ paddingVertical: spacing.sm, alignItems: 'center' }}>
+                  <Text style={{ color: colors.ink, fontWeight: '700', fontSize: fontSize.sm }}>Save</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -706,20 +1229,19 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
-  editBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.purple + '22', borderRadius: radius.xl, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  editBtnText: { color: colors.lavender, fontSize: fontSize.sm },
 
   avatarCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
   avatarWrap: { position: 'relative' },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: 32, fontWeight: '800' },
-  avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.layer1 },
+  avatarImg: { width: 80, height: 80, borderRadius: radius.pill },
+  avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.layer1 },
   name: { color: colors.ink, fontSize: fontSize.lg, fontWeight: '700' },
   emailText: { color: colors.ink3, fontSize: fontSize.sm },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', marginTop: 4 },
   xpBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  xpBadgeTxt: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  xpBadgeTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
   xpMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   xpName: { fontSize: 12, fontWeight: '600', color: colors.ink },
   xpPts: { fontSize: 11, color: colors.ink3 },
@@ -733,16 +1255,15 @@ const styles = StyleSheet.create({
 
   sectionHdr: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, marginBottom: -6 },
 
+  achieveBadge: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  achieveLbl: { fontSize: fontSize.xs, color: colors.ink2, textAlign: 'center' },
+  achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
   menuCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   menuIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
 
-  healthRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  healthIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  healthDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
-  connectTxt: { fontSize: 12, fontWeight: '600', color: colors.purple2 },
 
   dietOption: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
@@ -797,28 +1318,49 @@ const sst = StyleSheet.create({
   icon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   label: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.ink },
   val: { fontSize: 12, color: colors.ink3, fontWeight: '500', marginRight: 4 },
-  unitToggle: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.line2 },
-  unitOpt: { paddingHorizontal: 10, paddingVertical: 5, fontSize: 11, fontWeight: '600', color: colors.ink3 },
-  unitOptActive: { backgroundColor: colors.purple + '44', color: colors.lavender },
+});
+
+// ── Subscription modal styles ─────────────────────────────────────────────────
+const subst = StyleSheet.create({
+  planCard: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, overflow: 'hidden' },
+  planCardSel: { borderColor: colors.purple, borderWidth: 1.5 },
+  planCardPremium: { borderColor: colors.line2 },
+  planHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  planBadge: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  planName: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  planPrice: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
+  planRadio: { width: 20, height: 20, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  planRadioSel: { borderColor: colors.purple },
+  planRadioPremium: { borderColor: colors.line3 },
+  planRadioDot: { width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.ink3 },
+  divider: { borderTopWidth: 1, borderColor: colors.line, marginVertical: spacing.xs },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 2 },
+  featureTxt: { fontSize: fontSize.sm, color: colors.ink2, flex: 1 },
+});
+
+// ── Account Settings modal styles ────────────────────────────────────────────
+const act = StyleSheet.create({
+  fieldLbl: { fontSize: fontSize.sm, color: colors.ink2, width: 90 },
+  fieldInput: { flex: 1, fontSize: fontSize.sm, color: colors.ink, textAlign: 'right' },
 });
 
 // ── Dietary preferences modal styles ──────────────────────────────────────────
 const dp = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0c0818' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(124,77,255,0.12)' },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: '700', color: '#f0ecff' },
-  scroll: { padding: 16, paddingBottom: 120 },
-  sectionLbl: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1 * 10, textTransform: 'uppercase', color: 'rgba(196,181,255,0.45)', marginBottom: 12, marginTop: 8 },
-  listCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, overflow: 'hidden', marginBottom: 24 },
-  prefRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  prefLabel: { fontSize: 15, color: '#f0ecff' },
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(196,181,255,0.3)', alignItems: 'center', justifyContent: 'center' },
-  radioSel: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  toggle: { width: 50, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', position: 'relative', overflow: 'hidden' },
-  toggleOn: { backgroundColor: '#22c55e' },
-  toggleThumb: { position: 'absolute', top: 3, left: 3, width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(12,8,24,0.95)', paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: 'rgba(124,77,255,0.1)' },
-  saveBtn: { alignItems: 'center', paddingVertical: 14 },
-  saveBtnTxt: { fontSize: 13, fontWeight: '700', letterSpacing: 1.4, color: '#f0ecff' },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
+  backBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  scroll: { padding: spacing.md, paddingBottom: spacing.xl * 3 },
+  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm, marginTop: spacing.xs },
+  listCard: { backgroundColor: colors.layer1, borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.lg },
+  prefRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  prefLabel: { fontSize: fontSize.base, color: colors.ink },
+  radio: { width: 24, height: 24, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
+  radioSel: { backgroundColor: colors.green, borderColor: colors.green },
+  toggle: { width: 50, height: 28, borderRadius: radius.pill, backgroundColor: colors.layer2, position: 'relative', overflow: 'hidden' },
+  toggleOn: { backgroundColor: colors.green },
+  toggleThumb: { position: 'absolute', top: 3, left: 3, width: 22, height: 22, borderRadius: radius.pill, backgroundColor: colors.white },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
+  saveBtn: { alignItems: 'center', paddingVertical: spacing.sm },
+  saveBtnTxt: { fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 1.4, color: colors.ink },
 });

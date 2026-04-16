@@ -14,8 +14,8 @@ export const colors = {
 
   // Text
   ink:  '#f0ecff',
-  ink2: 'rgba(220,210,255,0.65)',
-  ink3: 'rgba(180,165,255,0.38)',
+  ink2: 'rgba(228,218,255,0.96)',
+  ink3: 'rgba(208,193,255,0.82)',
 
   // Brand
   purple:   '#7c4dff',
@@ -32,13 +32,28 @@ export const colors = {
   rose:   '#f43f5e',
   sky:    '#38bdf8',
   teal:   '#14b8a6',
+
+  // Purple tints (use these instead of inline rgba)
+  purpleGlow: '#9c27b0',               // CTA gradient endpoint
+  purpleTint: 'rgba(124,77,255,0.08)', // subtle fill for selected/active cards
+
+  // Overlay / backdrop
+  dim: 'rgba(0,0,0,0.6)',              // modal backdrop / scrim
+
+  // Nutri-Score grades (A–E)
+  nutriA: '#038141', // dark green
+  nutriB: '#85BB2F', // green
+  nutriC: '#FECB02', // yellow
+  nutriD: '#EE8100', // orange
+  nutriE: '#E63312', // red
 };
 
 export const radius = {
-  sm: 10,
-  md: 16,
-  lg: 22,
-  xl: 30,
+  sm:   10,
+  md:   16,
+  lg:   22,
+  xl:   30,
+  pill: 999, // fully-rounded pills / badges
 };
 
 export const spacing = {

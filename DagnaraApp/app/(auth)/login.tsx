@@ -118,7 +118,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleLogin} disabled={loading} activeOpacity={0.8} style={s.btnWrap}>
-            <LinearGradient colors={[colors.purple, '#9c27b0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
+            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
               {loading
                 ? <ActivityIndicator color={colors.white} />
                 : <Text style={s.btnTxt}>Sign in</Text>}
@@ -150,9 +150,9 @@ const s = StyleSheet.create({
   // Pills
   pills: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   pill: {
-    backgroundColor: 'rgba(124,77,255,0.12)',
-    borderWidth: 1, borderColor: 'rgba(124,77,255,0.25)',
-    borderRadius: 20, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    backgroundColor: colors.line,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
   },
   pillTxt: { fontSize: fontSize.xs, color: colors.lavender, fontWeight: '600' },
 
@@ -172,7 +172,7 @@ const s = StyleSheet.create({
   cardTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink, marginBottom: spacing.xs },
 
   // Fields
-  fieldWrap: { gap: 6 },
+  fieldWrap: { gap: spacing.xs },
   fieldLabel: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 },
   input: {
     backgroundColor: colors.layer2,

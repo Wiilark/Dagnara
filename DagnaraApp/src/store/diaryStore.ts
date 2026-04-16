@@ -21,6 +21,33 @@ export interface FoodItem {
   meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
 }
 
+export interface StrengthSet {
+  reps: number;
+  weight: number;  // always stored in kg internally
+  unit: 'kg' | 'lbs';
+}
+
+export interface StrengthExercise {
+  name: string;
+  sets: StrengthSet[];
+}
+
+export interface StrengthSession {
+  id: string;
+  exercises: StrengthExercise[];
+  totalKcal: number;
+  loggedAt: string;
+}
+
+export interface CardioSession {
+  id: string;
+  name: string;
+  emoji: string;
+  minutes: number;
+  kcal: number;
+  loggedAt: string;
+}
+
 export interface SleepLog {
   bedtime: string;
   waketime: string;
@@ -34,6 +61,12 @@ export interface DiaryEntry {
   water: number;
   calories_burned: number;
   sleep?: SleepLog;
+  veggies?: number;
+  fruits?: number;
+  skippedMeals?: Record<string, boolean>;
+  strengthSessions?: StrengthSession[];
+  cardioSessions?: CardioSession[];
+  _savedAt?: string;
 }
 
 interface DiaryState {
@@ -46,8 +79,16 @@ interface DiaryState {
   removeFood: (date: string, id: string) => Promise<void>;
   addWater: (date: string) => Promise<void>;
   removeWater: (date: string) => Promise<void>;
+  setWater: (date: string, n: number) => Promise<void>;
+  setVeggies: (date: string, n: number) => Promise<void>;
+  setFruits: (date: string, n: number) => Promise<void>;
+  setSkippedMeals: (date: string, meals: Record<string, boolean>) => Promise<void>;
   updateCaloriesBurned: (date: string, kcal: number) => Promise<void>;
   logSleep: (date: string, sleep: SleepLog) => Promise<void>;
+  addStrengthSession: (date: string, session: StrengthSession) => Promise<void>;
+  removeStrengthSession: (date: string, id: string) => Promise<void>;
+  addCardioSession: (date: string, session: CardioSession) => Promise<void>;
+  removeCardioSession: (date: string, id: string) => Promise<void>;
   syncEntry: (date: string, email: string) => Promise<void>;
   restoreFromCloud: (email: string) => Promise<void>;
   reset: () => void;
@@ -58,20 +99,25 @@ function emptyEntry(date: string): DiaryEntry {
   return { date, foods: [], water: 0, calories_burned: 0 };
 }
 
-// Save locally and push to Supabase if email available
+// Save locally and push to Supabase if email available (retries once on failure)
 async function saveEntry(date: string, entry: DiaryEntry, email: string | null) {
+  const stamped = { ...entry, _savedAt: new Date().toISOString() };
   const key = email ? `diary_${email}_${date}` : `diary_anon_${date}`;
-  await AsyncStorage.setItem(key, JSON.stringify(entry));
+  await AsyncStorage.setItem(key, JSON.stringify(stamped));
   if (email) {
-    try {
-      await supabase.from('dagnara_diary').upsert(
-        { email, date, entry_data: entry, updated_at: new Date().toISOString() },
-        { onConflict: 'email,date' }
-      );
-    } catch {
-      // Network failure — local save already done
-    }
+    const push = () => supabase.from('dagnara_diary').upsert(
+      { email, date, entry_data: stamped, updated_at: stamped._savedAt },
+      { onConflict: 'email,date' }
+    );
+    void (async () => { try { await push(); } catch { try { await new Promise(r => setTimeout(r, 4000)); await push(); } catch {} } })();
   }
+}
+
+// Keep only the most recent 60 dates in memory to prevent unbounded growth
+function pruneEntries(entries: Record<string, DiaryEntry>): Record<string, DiaryEntry> {
+  const keys = Object.keys(entries).sort();
+  if (keys.length <= 60) return entries;
+  return Object.fromEntries(keys.slice(-60).map(k => [k, entries[k]]));
 }
 
 // Get the current user's email from authStore (no circular dep — zustand stores are singletons)
@@ -98,7 +144,8 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const key = email ? `diary_${email}_${date}` : `diary_anon_${date}`;
     const raw = await AsyncStorage.getItem(key);
     const local: DiaryEntry = raw ? JSON.parse(raw) : emptyEntry(date);
-    set((s) => ({ entries: { ...s.entries, [date]: local } }));
+    // Show local immediately for instant UI, cloud may overwrite below
+    set((s) => ({ entries: pruneEntries({ ...s.entries, [date]: local }) }));
 
     // 2. Check Supabase for a newer version
     if (email) {
@@ -112,15 +159,17 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
 
         if (data?.entry_data) {
           const cloud: DiaryEntry = data.entry_data;
-          // Use cloud if it has more food entries (more complete)
-          const best = cloud.foods.length >= local.foods.length ? cloud : local;
-          set((s) => ({ entries: { ...s.entries, [date]: best } }));
+          // Prefer whichever was saved more recently (_savedAt timestamp)
+          const best = (cloud._savedAt ?? '') >= (local._savedAt ?? '') ? cloud : local;
+          set((s) => ({ entries: pruneEntries({ ...s.entries, [date]: best }) }));
           await AsyncStorage.setItem(key, JSON.stringify(best));
+          return;
         }
       } catch {
         // Network error — local data already shown
       }
     }
+    set((s) => ({ entries: pruneEntries({ ...s.entries, [date]: local }) }));
   },
 
   addFood: async (date, item) => {
@@ -156,6 +205,38 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     await saveEntry(date, updated, getEmail());
   },
 
+  setWater: async (date, n) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, water: Math.max(0, n) };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  setVeggies: async (date, n) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, veggies: Math.max(0, n) };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  setFruits: async (date, n) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, fruits: Math.max(0, n) };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  setSkippedMeals: async (date, meals) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, skippedMeals: meals };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
   updateCaloriesBurned: async (date, kcal) => {
     const entries = get().entries;
     const entry = entries[date] ?? emptyEntry(date);
@@ -168,6 +249,43 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entries = get().entries;
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, sleep };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  addStrengthSession: async (date, session) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, strengthSessions: [...(entry.strengthSessions ?? []), session] };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  removeStrengthSession: async (date, id) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, strengthSessions: (entry.strengthSessions ?? []).filter(s => s.id !== id) };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  addCardioSession: async (date, session) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, cardioSessions: [...(entry.cardioSessions ?? []), session] };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  removeCardioSession: async (date, id) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const removed = (entry.cardioSessions ?? []).find(s => s.id === id);
+    const updated = {
+      ...entry,
+      cardioSessions: (entry.cardioSessions ?? []).filter(s => s.id !== id),
+      calories_burned: Math.max(0, entry.calories_burned - (removed?.kcal ?? 0)),
+    };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
     await saveEntry(date, updated, getEmail());
   },
@@ -189,7 +307,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     try {
       const since = (() => {
         const d = new Date();
-        d.setDate(d.getDate() - 30);
+        d.setDate(d.getDate() - 90);
         return d.toISOString().split('T')[0];
       })();
 
@@ -215,13 +333,13 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
       for (const row of data) {
         const cloud: DiaryEntry = row.entry_data;
         const local = localMap[row.date] ?? emptyEntry(row.date);
-        const best = cloud.foods.length >= local.foods.length ? cloud : local;
+        const best = (cloud._savedAt ?? '') >= (local._savedAt ?? '') ? cloud : local;
         restored[row.date] = best;
         toSet.push([`diary_${email}_${row.date}`, JSON.stringify(best)]);
       }
 
       await AsyncStorage.multiSet(toSet);
-      set((s) => ({ entries: { ...s.entries, ...restored } }));
+      set((s) => ({ entries: pruneEntries({ ...s.entries, ...restored }) }));
     } catch {
       // Network error — local data still available
     }
