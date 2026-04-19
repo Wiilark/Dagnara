@@ -183,7 +183,7 @@ function MealPlanModal({ visible, onClose, calorieGoal, weightGoal, recentFoods,
   const day = plan?.days[selectedDay];
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.line }}>
@@ -605,7 +605,7 @@ export default function RecipesScreen() {
       />
 
       {/* Food detail modal */}
-      <Modal visible={!!selectedFood} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={!!selectedFood} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedFood(null)}>
         {selectedFood && (
           <SafeAreaView style={styles.modal}>
             <View style={styles.modalHeader}>
@@ -683,7 +683,7 @@ export default function RecipesScreen() {
       </Modal>
 
       {/* Recipe detail modal */}
-      <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
         {selected && (
           <SafeAreaView style={styles.modal}>
             <View style={styles.modalHeader}>
@@ -774,14 +774,14 @@ const styles = StyleSheet.create({
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
 
   // Budget banner
-  budgetBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(74,222,128,0.08)', borderWidth: 1, borderColor: 'rgba(74,222,128,0.2)', borderRadius: radius.lg, padding: spacing.md },
+  budgetBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.green + '14', borderWidth: 1, borderColor: colors.green + '33', borderRadius: radius.lg, padding: spacing.md },
   budgetLeft: { gap: 3 },
-  budgetLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(74,222,128,0.7)' },
-  budgetVal: { fontSize: 13, color: colors.ink2 },
-  budgetNum: { fontSize: 20, fontWeight: '800', color: colors.green },
+  budgetLabel: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.green + 'b3' },
+  budgetVal: { fontSize: fontSize.sm, color: colors.ink2 },
+  budgetNum: { fontSize: fontSize.lg, fontWeight: '800', color: colors.green },
   budgetRing: { alignItems: 'center' },
-  budgetPct: { fontSize: 20, fontWeight: '800', color: colors.green },
-  budgetPctLbl: { fontSize: 10, color: colors.ink3 },
+  budgetPct: { fontSize: fontSize.lg, fontWeight: '800', color: colors.green },
+  budgetPctLbl: { fontSize: fontSize.xs, color: colors.ink3 },
 
   // Search
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, paddingHorizontal: spacing.sm },
@@ -823,9 +823,9 @@ const styles = StyleSheet.create({
   modal: { flex: 1, backgroundColor: colors.bg },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
-  modalMeal: { fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.ink3 },
+  modalMeal: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.ink3 },
   addBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, backgroundColor: colors.purple, borderRadius: radius.md },
-  addBtnTxt: { color: '#fff', fontWeight: '700', fontSize: fontSize.sm },
+  addBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   modalScroll: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 50 },
   modalIcon: { fontSize: 64, textAlign: 'center', marginBottom: spacing.sm },
   modalTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },

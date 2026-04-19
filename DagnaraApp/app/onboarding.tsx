@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, Dimensions, ActivityIndicator,
+  TextInput, Dimensions, ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -46,11 +46,13 @@ export default function OnboardingScreen() {
   const [age, setAge] = useState(profile.age ?? '');
   const [weight, setWeight] = useState(profile.weight ?? '');
   const [height, setHeight] = useState(profile.height ?? '');
+  const [targetWeight, setTargetWeight] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Parse weight/height from display unit to metric for TDEE calc
   const wKg = parseWeight(weight, unitSystem) ?? (parseFloat(weight) || 0);
   const hCm = parseHeight(height, unitSystem) ?? (parseFloat(height) || 0);
+  const tgtKg = parseWeight(targetWeight, unitSystem) ?? (parseFloat(targetWeight) || 0);
 
   const calorieGoal = (() => {
     const a = parseInt(age);
@@ -60,15 +62,22 @@ export default function OnboardingScreen() {
 
   async function finish() {
     setSaving(true);
+    let navigated = false;
+    const doNavigate = () => { if (!navigated) { navigated = true; router.replace('/(tabs)/diary'); } };
+
+    // Hard 15-second timeout — navigate regardless if something stalls
+    const timer = setTimeout(doNavigate, 15_000);
+
     try {
       await setGoals(activity, goal, calorieGoal);
       // Update profile with body stats — always stored in metric (kg, cm)
-      if (age || weight || height) {
+      if (age || weight || height || targetWeight) {
         await setProfile({
           ...profile, age,
           weight: wKg > 0 ? String(Math.round(wKg * 10) / 10) : profile.weight,
           height: hCm > 0 ? String(Math.round(hCm)) : profile.height,
           sex,
+          ...(tgtKg > 0 ? { targetWeight: String(Math.round(tgtKg * 10) / 10) } : {}),
         });
       }
       await AsyncStorage.setItem(`dagnara_onboarded_${email ?? 'anon'}`, 'true');
@@ -80,12 +89,18 @@ export default function OnboardingScreen() {
         [`${p}_notif_checkin`, 'true'],
         [`${p}_notif_summary`, 'true'],
       ]);
-      await scheduleMealReminders(true);
-      await scheduleStreakReminder(true);
-      await scheduleWaterReminder(true);
-      await scheduleDailySummaryReminder(true);
-      router.replace('/(tabs)/diary');
+      // Notifications — best-effort; never block navigation if OS denies permission
+      try {
+        await scheduleMealReminders(true);
+        await scheduleStreakReminder(true);
+        await scheduleWaterReminder(true);
+        await scheduleDailySummaryReminder(true);
+      } catch {}
+      doNavigate();
+    } catch (e: any) {
+      Alert.alert('Setup error', e?.message ?? 'Something went wrong. Please try again.');
     } finally {
+      clearTimeout(timer);
       setSaving(false);
     }
   }
@@ -229,19 +244,20 @@ export default function OnboardingScreen() {
 
             {/* Unit system toggle */}
             <View style={s.unitToggleRow}>
-              {(['Metric', 'Imperial (US)'] as const).map(u => (
+              {(['Metric', 'Imperial (US)', 'UK', 'US Customary'] as const).map(u => (
                 <TouchableOpacity
                   key={u}
                   style={[s.unitToggleBtn, unitSystem === u && s.unitToggleBtnActive]}
                   onPress={() => {
                     if (weight) { const kg = parseWeight(weight, unitSystem); setWeight(kg != null ? kgToInput(kg, u) : ''); }
                     if (height) { const cm = parseHeight(height, unitSystem); setHeight(cm != null ? cmToInput(cm, u) : ''); }
+                    if (targetWeight) { const kg = parseWeight(targetWeight, unitSystem); setTargetWeight(kg != null ? kgToInput(kg, u) : ''); }
                     void setUnitSystem(u);
                   }}
                   activeOpacity={0.75}
                 >
                   <Text style={[s.unitToggleTxt, unitSystem === u && s.unitToggleTxtActive]}>
-                    {u === 'Metric' ? '🌍 Metric' : '🇺🇸 Imperial'}
+                    {u === 'Metric' ? '🌍 Metric' : u === 'Imperial (US)' ? '🇺🇸 Imperial' : u === 'UK' ? '🇬🇧 UK' : '🫙 US Custom'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -262,6 +278,7 @@ export default function OnboardingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={s.sexHint}>Used in the BMR formula — affects calorie goal by ~150 kcal/day</Text>
 
             {[
               { key: 'age',    label: 'AGE',    value: age,    set: setAge,    placeholder: 'e.g. 28', unit: 'years', keyboard: 'numeric' as const,    error: ageErr },
@@ -284,6 +301,24 @@ export default function OnboardingScreen() {
                 {f.error ? <Text style={s.inputError}>{f.error}</Text> : null}
               </View>
             ))}
+
+            {goal !== 'maintain' && (
+              <View style={s.inputWrap}>
+                <Text style={s.fieldLabel}>TARGET WEIGHT</Text>
+                <View style={s.inputRow}>
+                  <TextInput
+                    style={[s.input, { flex: 1 }]}
+                    placeholder={weightPlaceholder(unitSystem)}
+                    placeholderTextColor={colors.ink3}
+                    value={targetWeight}
+                    onChangeText={setTargetWeight}
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={s.unit}>{weightUnit(unitSystem)}</Text>
+                </View>
+                <Text style={s.sexHint}>Optional — your goal weight</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -318,14 +353,15 @@ export default function OnboardingScreen() {
             </LinearGradient>
 
             <View style={s.summaryList}>
-              {[
-                ['🎯 Goal',     GOALS.find(g => g.key === goal)?.label ?? goal],
-                ['⚡ Activity', ACTIVITIES.find(a => a.key === activity)?.label ?? activity],
-                ['👤 Sex',      sex === 'male' ? 'Male' : 'Female'],
-                ['📅 Age',      age ? `${age} years` : '—'],
-                ['⚖️ Weight',   wKg > 0 ? formatWeight(wKg, unitSystem) : '—'],
-                ['📏 Height',   hCm > 0 ? formatHeight(hCm, unitSystem) : '—'],
-              ].map(([label, value]) => (
+              {([
+                ['🎯 Goal',          GOALS.find(g => g.key === goal)?.label ?? goal],
+                ['⚡ Activity',      ACTIVITIES.find(a => a.key === activity)?.label ?? activity],
+                ['👤 Sex',           sex === 'male' ? 'Male' : 'Female'],
+                ['📅 Age',           age ? `${age} years` : '—'],
+                ['⚖️ Weight',        wKg > 0 ? formatWeight(wKg, unitSystem) : '—'],
+                ['📏 Height',        hCm > 0 ? formatHeight(hCm, unitSystem) : '—'],
+                ...(tgtKg > 0 ? [['🏁 Target weight', formatWeight(tgtKg, unitSystem)]] : []),
+              ] as [string, string][]).map(([label, value]) => (
                 <View key={label} style={s.summaryRow}>
                   <Text style={s.summaryLabel}>{label}</Text>
                   <Text style={s.summaryValue}>{value}</Text>
@@ -410,9 +446,9 @@ const s = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line2 },
   radioSelected: { borderColor: colors.purple, backgroundColor: colors.purple },
 
-  unitToggleRow: { flexDirection: 'row', gap: spacing.sm },
+  unitToggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   unitToggleBtn: {
-    flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center',
+    width: '48%', paddingVertical: spacing.sm + 2, alignItems: 'center',
     borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md,
     backgroundColor: colors.layer1,
   },
@@ -430,6 +466,7 @@ const s = StyleSheet.create({
   sexBtnSelected: { borderColor: colors.purple, backgroundColor: colors.purpleTint },
   sexBtnTxt: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink2 },
   sexBtnTxtSelected: { color: colors.lavender },
+  sexHint: { fontSize: fontSize.xs, color: colors.ink3, marginTop: -2, lineHeight: 16 },
 
   inputWrap: { gap: 6 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

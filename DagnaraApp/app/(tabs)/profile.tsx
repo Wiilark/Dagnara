@@ -415,7 +415,7 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* ── Measurements Modal ── */}
-      <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMeasureModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setMeasureModal(false)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
@@ -481,7 +481,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Diet Plan Modal ── */}
-      <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setDietModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
@@ -500,7 +500,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Macros Modal ── */}
-      <Modal visible={macrosModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={macrosModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMacrosModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
@@ -568,7 +568,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Settings Modal ── */}
-      <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')}>
+      <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')} onRequestClose={() => { setSettingsPage(''); setSettingsModal(false); }}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             {settingsPage !== ''
@@ -593,9 +593,12 @@ export default function ProfileScreen() {
                 <View style={[sst.icon, { backgroundColor: colors.purple2 + '22' }]}>
                   <Ionicons name="mail-outline" size={16} color={colors.purple2} />
                 </View>
-                <Text style={act.fieldLbl}>Email</Text>
-                <TextInput style={act.fieldInput} value={acEmail} onChangeText={setAcEmail}
-                  keyboardType="email-address" autoCapitalize="none" placeholderTextColor={colors.ink3} placeholder="email@example.com" />
+                <View style={{ flex: 1 }}>
+                  <TextInput style={[act.fieldInput, { color: colors.ink3 }]} value={acEmail}
+                    editable={false} keyboardType="email-address" autoCapitalize="none"
+                    placeholderTextColor={colors.ink3} placeholder="email@example.com" />
+                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>To change your email, contact support.</Text>
+                </View>
               </View>
               <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
                 <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
@@ -959,7 +962,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Dietary Preferences Modal ── */}
-      <Modal visible={dietaryModal} animationType="slide" presentationStyle="fullScreen">
+      <Modal visible={dietaryModal} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setDietaryModal(false)}>
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
           <View style={dp.header}>
             <TouchableOpacity onPress={() => setDietaryModal(false)} style={dp.backBtn}>
@@ -1031,7 +1034,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── TDEE Modal ── */}
-      <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTdeeModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setTdeeModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
@@ -1121,7 +1124,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Edit Profile Modal ── */}
-      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>

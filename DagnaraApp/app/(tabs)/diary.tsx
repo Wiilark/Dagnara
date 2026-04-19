@@ -177,7 +177,7 @@ function SleepModal({ visible, onClose, onSave }: {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={sl.safe} edges={['bottom']}>
         <View style={sl.header}>
           <TouchableOpacity onPress={onClose} style={sl.backBtn}>
@@ -323,7 +323,7 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
   const filtered = EXERCISES.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={ex.safe} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={ex.header}>
@@ -574,7 +574,7 @@ function BreathingGuideModal({ exercise, onClose }: { exercise: BreathExercise; 
   const secs = totalLeft % 60;
 
   return (
-    <Modal visible animationType="fade" presentationStyle="fullScreen">
+    <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
           <TouchableOpacity style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
@@ -624,7 +624,7 @@ function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; 
   const [activeExercise, setActiveExercise] = useState<BreathExercise | null>(null);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       {activeExercise && <BreathingGuideModal exercise={activeExercise} onClose={() => setActiveExercise(null)} />}
       <SafeAreaView style={sbst.safe} edges={['bottom']}>
         <View style={sbst.header}>
@@ -689,7 +689,7 @@ function MoodModal({ visible, onClose, onSave }: { visible: boolean; onClose: ()
   const [notes, setNotes] = useState('');
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={moodst.safe} edges={['bottom']}>
         <View style={moodst.header}>
           <TouchableOpacity onPress={onClose} style={moodst.backBtn}><Ionicons name="chevron-back" size={18} color={colors.ink2} /></TouchableOpacity>
@@ -893,7 +893,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
   const totalKcal = list.reduce((s, it) => s + it.kcal, 0);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
         <View style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.line }}>
           <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
@@ -1973,7 +1973,7 @@ export default function DiaryScreen() {
       <ExerciseModal visible={exerciseVisible} onClose={() => setExerciseVisible(false)} onAddCalories={handleAddCalories} onAddStrengthSession={handleAddStrengthSession} />
 
       {/* Barcode Scanner Modal */}
-      <Modal visible={scanning} animationType="none" presentationStyle="fullScreen">
+      <Modal visible={scanning} animationType="none" presentationStyle="fullScreen" onRequestClose={() => setScanning(false)}>
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: insets.top + spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
             <View style={{ width: 40 }} />
@@ -2025,7 +2025,7 @@ export default function DiaryScreen() {
       </Modal>
 
       {/* Serving Size Modal */}
-      <Modal visible={servingModalVisible} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={servingModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setServingModalVisible(false); setSearchVisible(true); }}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
           <View style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <TouchableOpacity onPress={() => { setServingModalVisible(false); setSearchVisible(true); }}>
