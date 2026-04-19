@@ -205,7 +205,7 @@ function StatisticsModal({ visible, onClose, entries }: {
 }) {
   const [period, setPeriod] = useState<StatPeriod>('Week');
 
-  const days = period === 'Week' ? 7 : period === '1 Month' ? 30 : period === '3 Months' ? 90 : 180;
+  const days = period === 'Week' ? 7 : period === '1 Month' ? 30 : period === '3 Months' ? 90 : 90;
   const bars: { label: string; kcal: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
@@ -1112,7 +1112,14 @@ export default function ProgressScreen() {
         <LoggingCalendar entries={entries} />
 
         {/* Weight chart */}
-        {weightHistory.length >= 2 && (
+        {weightHistory.length < 2 ? (
+          <View style={st.card}>
+            <Text style={st.cardLabel}>WEIGHT TREND</Text>
+            <Text style={{ fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingVertical: spacing.md }}>
+              Log your weight at least twice to see your trend.
+            </Text>
+          </View>
+        ) : (
           <View style={st.card}>
             <WeightChart weightHistory={weightHistory} unitSystem={unitSystem} />
           </View>

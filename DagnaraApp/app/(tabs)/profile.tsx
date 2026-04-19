@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel, calcTDEE } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
-import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder } from '../../src/lib/notifications';
+import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, requestNotificationPermission } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
         const mins = data.sleepMinutes % 60;
         await logSleep(today, {
           bedtime: '22:00',
-          waketime: `0${hrs}:${String(mins).padStart(2, '0')}`,
+          waketime: `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`,
           quality: 2,
           duration: `${hrs}h ${mins}m`,
         });
@@ -780,11 +780,11 @@ export default function ProfileScreen() {
               <View style={sst.card}>
                 {[
                   { icon: '🔔', label: 'Daily check-in reminder', bg: colors.purple + '1a', value: notifCheckIn,
-                    onToggle: (v: boolean) => { setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
+                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
                   { icon: '🥗', label: 'Meal reminders', bg: colors.green + '1a', value: notifMeals,
-                    onToggle: (v: boolean) => { setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
+                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
                   { icon: '🔥', label: 'Streak protection', bg: colors.honey + '1a', value: notifStreak,
-                    onToggle: (v: boolean) => { setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
+                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
                 ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
                   <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
                     <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>

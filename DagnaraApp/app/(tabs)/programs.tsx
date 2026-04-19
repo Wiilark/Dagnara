@@ -241,7 +241,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   if (showSetup) {
     return (
-      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
           <SafeAreaView style={m.sheet} edges={['bottom']}>
             <View style={m.sheetHeader}>
               <Text style={m.sheetTitle}>🚭 Quit Smoking Setup</Text>
@@ -277,7 +277,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>🚭 Quit Smoking</Text>
@@ -414,7 +414,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   if (showSetup) {
     return (
-      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
           <SafeAreaView style={m.sheet} edges={['bottom']}>
             <View style={m.sheetHeader}>
               <Text style={m.sheetTitle}>🍺 Quit Drinking Setup</Text>
@@ -448,7 +448,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>🍺 Quit Drinking</Text>

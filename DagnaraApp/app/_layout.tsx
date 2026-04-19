@@ -65,7 +65,7 @@ function RootLayout() {
     if (email) {
       AsyncStorage.getItem(`dagnara_onboarded_${email}`).then(v => setOnboarded(v === 'true'));
     } else {
-      setOnboarded(null);
+      setOnboarded(false);
     }
   }, [email, segments]);
 

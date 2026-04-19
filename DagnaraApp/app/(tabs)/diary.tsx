@@ -167,9 +167,10 @@ function SleepModal({ visible, onClose, onSave }: {
   const [waketime, setWaketime] = useState('06:00');
   const [quality, setQuality] = useState(2);
 
-  function calcDuration() {
+  function calcDuration(): string {
     const [bh, bm] = bedtime.split(':').map(Number);
     const [wh, wm] = waketime.split(':').map(Number);
+    if ([bh, bm, wh, wm].some(n => isNaN(n))) return '—';
     let mins = (wh * 60 + wm) - (bh * 60 + bm);
     if (mins < 0) mins += 24 * 60;
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
@@ -192,7 +193,7 @@ function SleepModal({ visible, onClose, onSave }: {
           </View>
           <Text style={sl.sectionLbl}>BEDTIME & WAKE TIME</Text>
           <View style={sl.timeRow}>
-            <View style={[sl.timeCard, { borderColor: 'rgba(124,77,255,0.5)', backgroundColor: 'rgba(124,77,255,0.08)' }]}>
+            <View style={[sl.timeCard, { borderColor: colors.purple + '80', backgroundColor: colors.purpleTint }]}>
               <Text style={sl.timeCardLbl}>🌙 Bedtime</Text>
               <TextInput style={sl.timeVal} value={bedtime} onChangeText={setBedtime} keyboardType="numbers-and-punctuation" />
             </View>
@@ -214,7 +215,9 @@ function SleepModal({ visible, onClose, onSave }: {
             <Text style={sl.insightTxt}>On days following 8h+ sleep, your step count is 34% higher. Your mood also improves on average.</Text>
           </View>
           <TouchableOpacity style={sl.saveBtn} onPress={() => {
-            onSave({ bedtime, waketime, quality, duration: calcDuration() });
+            const duration = calcDuration();
+            if (duration === '—') { Alert.alert('Invalid time', 'Please enter times in HH:MM format (e.g. 22:30).'); return; }
+            onSave({ bedtime, waketime, quality, duration });
             onClose();
           }}>
             <Text style={sl.saveTxt}>Save Sleep Log</Text>
@@ -1749,6 +1752,23 @@ export default function DiaryScreen() {
           {analyzing && <ActivityIndicator color={colors.lavender} style={{ marginLeft: 4 }} />}
         </View>
 
+        {/* Empty state */}
+        {foods.length === 0 && (
+          <View style={st.emptyState}>
+            <Text style={st.emptyStateIcon}>🍽️</Text>
+            {isToday ? (
+              <>
+                <Text style={st.emptyStateTxt}>Log your first meal</Text>
+                <Text style={st.emptyStateHint}>Tap any meal section below or use the{' '}
+                  <Text style={{ color: colors.purple, fontWeight: '700' }}>+</Text>
+                  {' '}button to add food.</Text>
+              </>
+            ) : (
+              <Text style={st.emptyStateTxt}>Nothing logged on this day</Text>
+            )}
+          </View>
+        )}
+
         {/* ── Today's meals ── */}
         <Text style={st.sectionHdr}>Today's meals</Text>
         {MEALS.map((meal) => {
@@ -2278,6 +2298,9 @@ export default function DiaryScreen() {
                   <TouchableOpacity onPress={() => saveFavorite(f)} style={{ marginLeft: 8, padding: 4 }}>
                     <Ionicons name="heart" size={18} color={colors.rose} />
                   </TouchableOpacity>
+                  <View style={[st.addFoodBtn, { backgroundColor: MEAL_ACCENT[searchMeal] + '22', borderColor: MEAL_ACCENT[searchMeal] + '66' }]}>
+                    <Ionicons name="add" size={20} color={MEAL_ACCENT[searchMeal]} />
+                  </View>
                 </TouchableOpacity>
               )}
             />
@@ -2745,6 +2768,10 @@ const st = StyleSheet.create({
   foodResultKcal: { color: colors.lavender, fontSize: fontSize.md, fontWeight: '800' },
   foodResultKcalLbl: { color: colors.ink3, fontSize: fontSize.xs },
   addFoodBtn: { width: 38, height: 38, borderRadius: radius.md, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  emptyState: { marginHorizontal: spacing.md, marginBottom: spacing.md, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
+  emptyStateIcon: { fontSize: fontSize['2xl'] },
+  emptyStateTxt: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
+  emptyStateHint: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', lineHeight: 20 },
 });
 
 // ── Sleep modal styles ────────────────────────────────────────────────────────
