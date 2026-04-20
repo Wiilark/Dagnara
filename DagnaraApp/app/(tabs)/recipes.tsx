@@ -16,6 +16,13 @@ import { FOOD_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 
 const DIET_FILTERS = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Quick', 'High Protein', 'Low Carb', 'Vegan', 'Keto', 'Vegetarian', 'Mediterranean'];
 
+const MEAL_PICK = [
+  { key: 'breakfast' as const, icon: '🍳', label: 'Breakfast', color: colors.honey },
+  { key: 'lunch'     as const, icon: '🥗', label: 'Lunch',     color: colors.violet },
+  { key: 'dinner'    as const, icon: '🍝', label: 'Dinner',    color: colors.sky },
+  { key: 'snack'     as const, icon: '🍌', label: 'Snack',     color: colors.rose },
+];
+
 const RECIPES = [
   { id: '1',  icon: '🥗',  name: 'Greek Salad',          diet: 'Vegan',       meal: 'Lunch',     kcal: 220, carbs: 18, protein: 6,  fat: 14, time: '10 min', goal: 'weight_loss',   ingredients: [{ qty: '200g', name: 'Cucumber' }, { qty: '250g', name: 'Tomato' }, { qty: '50g', name: 'Kalamata olives' }, { qty: '80g', name: 'Feta cheese' }, { qty: '60g', name: 'Red onion' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }], steps: ['Chop all vegetables.', 'Combine in a bowl.', 'Add feta and olives.', 'Drizzle with olive oil and season.'] },
   { id: '2',  icon: '🍗',  name: 'Grilled Chicken',       diet: 'High Protein', meal: 'Dinner',   kcal: 320, carbs: 2,  protein: 52, fat: 10, time: '25 min', goal: 'muscle_gain',   ingredients: [{ qty: '200g', name: 'Chicken breast' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '½ piece', name: 'Lemon' }, { qty: '2 sprigs', name: 'Rosemary' }], steps: ['Marinate chicken with olive oil, garlic, and lemon.', 'Grill for 12 min each side.', 'Rest 5 min before serving.'] },
@@ -760,16 +767,7 @@ export default function RecipesScreen() {
                 <Ionicons name="close" size={22} color={colors.ink2} />
               </TouchableOpacity>
               <Text style={styles.modalMeal}>{selected.meal}</Text>
-              <TouchableOpacity onPress={async () => {
-                const meal = selected.meal.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack';
-                await addFood(selectedDate, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal });
-                await checkAndUpdateStreak(selectedDate);
-                await addXp(10);
-                Alert.alert('Added to diary ✓', `${selected.name} logged as ${meal}. +10 XP`);
-                setSelected(null);
-              }} style={styles.addBtn}>
-                <Text style={styles.addBtnTxt}>+ Add</Text>
-              </TouchableOpacity>
+              <View style={{ width: 36 }} />
             </View>
             <ScrollView contentContainerStyle={styles.modalScroll}>
               <Text style={styles.modalIcon}>{selected.icon}</Text>
@@ -815,16 +813,30 @@ export default function RecipesScreen() {
                 </View>
               ))}
 
-              <TouchableOpacity style={styles.logBtn} onPress={async () => {
-                const meal = selected.meal.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack';
-                await addFood(selectedDate, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal });
-                await checkAndUpdateStreak(selectedDate);
-                await addXp(10);
-                Alert.alert('Meal logged ✓', `${selected.name} added to your ${meal}. +10 XP`);
-                setSelected(null);
-              }}>
-                <Text style={styles.logBtnTxt}>Log this meal</Text>
-              </TouchableOpacity>
+              <View style={styles.mealPickSection}>
+                <Text style={styles.mealPickHdr}>Log to today</Text>
+                <View style={styles.mealPickGrid}>
+                  {MEAL_PICK.map(({ key, icon, label, color }) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.mealPickBtn, { borderColor: color + '55', backgroundColor: color + '14' }]}
+                      activeOpacity={0.72}
+                      onPress={async () => {
+                        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        await addFood(selectedDate, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal: key });
+                        await checkAndUpdateStreak(selectedDate);
+                        await addXp(10);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        Alert.alert('Logged ✓', `${selected.name} added to ${label}. +10 XP`);
+                        setSelected(null);
+                      }}
+                    >
+                      <Text style={styles.mealPickIcon}>{icon}</Text>
+                      <Text style={[styles.mealPickLabel, { color }]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </ScrollView>
           </SafeAreaView>
         )}
@@ -915,6 +927,14 @@ const styles = StyleSheet.create({
   stepTxt: { flex: 1, color: colors.ink2, fontSize: fontSize.sm, lineHeight: 20 },
   logBtn: { backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.md },
   logBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
+
+  // Meal picker (recipe log)
+  mealPickSection: { marginTop: spacing.lg },
+  mealPickHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm },
+  mealPickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  mealPickBtn: { width: '47%', borderWidth: 1, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', gap: spacing.xs },
+  mealPickIcon: { fontSize: fontSize.xl },
+  mealPickLabel: { fontSize: fontSize.sm, fontWeight: '700' },
 
   // Tab switcher
   tabSwitcher: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: 3, gap: 3 },
