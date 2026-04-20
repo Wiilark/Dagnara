@@ -1609,7 +1609,9 @@ export default function DiaryScreen() {
           <Ionicons name="chevron-back" size={20} color={colors.ink2} />
         </TouchableOpacity>
         <Text style={st.dateText}>
-          {isToday ? 'Today' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          {isToday
+            ? `Today · ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </Text>
         <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, 1))} style={st.navBtn} disabled={isToday}>
           <Ionicons name="chevron-forward" size={20} color={isToday ? colors.ink3 : colors.ink2} />
