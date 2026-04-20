@@ -421,14 +421,14 @@ const s = StyleSheet.create({
 
   section: { gap: spacing.md },
 
-  big: { fontSize: 56, textAlign: 'center', marginBottom: spacing.xs },
+  big: { fontSize: fontSize['2xl'] + 18, textAlign: 'center', marginBottom: spacing.xs },
   stepLabel: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.5 },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, lineHeight: 32 },
   body: { fontSize: fontSize.sm, color: colors.ink2, lineHeight: 22 },
 
   featureList: { gap: spacing.sm, marginTop: spacing.sm },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
-  featureIcon: { fontSize: 22 },
+  featureIcon: { fontSize: fontSize.lg },
   featureTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   featureDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
 
@@ -439,11 +439,11 @@ const s = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md,
   },
   optionSelected: { borderColor: colors.purple, backgroundColor: colors.purpleTint },
-  optionIcon: { fontSize: 24 },
+  optionIcon: { fontSize: fontSize.lg + 2 },
   optionLabel: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink },
   optionLabelSelected: { color: colors.lavender },
   optionDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line2 },
+  radio: { width: spacing.lg - 4, height: spacing.lg - 4, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.line2 },
   radioSelected: { borderColor: colors.purple, backgroundColor: colors.purple },
 
   unitToggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -483,7 +483,7 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: spacing.sm,
     borderWidth: 1, borderColor: colors.line2,
   },
-  calNum: { fontSize: 56, fontWeight: '900', color: colors.lavender, lineHeight: 64 },
+  calNum: { fontSize: fontSize['2xl'] + 18, fontWeight: '900', color: colors.lavender, lineHeight: 64 },
   calLabel: { fontSize: fontSize.sm, color: colors.ink2, fontWeight: '600', marginBottom: spacing.sm },
   macroRow: { flexDirection: 'row', gap: spacing.xl },
   macroBox: { alignItems: 'center' },
