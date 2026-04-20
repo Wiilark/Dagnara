@@ -598,7 +598,7 @@ function BreathingGuideModal({ exercise, onClose }: { exercise: BreathExercise; 
         </View>
         {done ? (
           <View style={{ alignItems: 'center', gap: 16, marginTop: 16 }}>
-            <Text style={{ fontSize: 48 }}>✅</Text>
+            <Text style={{ fontSize: fontSize['2xl'] + 10 }}>✅</Text>
             <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Session complete!</Text>
             <TouchableOpacity style={{ backgroundColor: exercise.color, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, marginTop: 8 }} onPress={onClose}>
               <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm }}>Done · +20 XP</Text>
@@ -650,12 +650,12 @@ function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; 
           <Text style={[sbst.sectionLbl, { marginTop: 8 }]}>BREATHING EXERCISES</Text>
           {BREATH_EXERCISES.map((ex) => (
             <TouchableOpacity key={ex.name} style={[sbst.breathCard, { borderColor: ex.color + '25', backgroundColor: ex.color + '0d' }]} onPress={() => setActiveExercise(ex)}>
-              <Text style={{ fontSize: 28, flexShrink: 0 }}>{ex.icon}</Text>
+              <Text style={{ fontSize: fontSize.xl, flexShrink: 0 }}>{ex.icon}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={sbst.breathName}>{ex.name}</Text>
                 <Text style={sbst.breathDesc}>{ex.desc}</Text>
               </View>
-              <Text style={{ fontSize: 18, color: colors.ink3 }}>▶</Text>
+              <Text style={{ fontSize: fontSize.md + 1, color: colors.ink3 }}>▶</Text>
             </TouchableOpacity>
           ))}
           <View style={{ height: 40 }} />
@@ -674,8 +674,8 @@ const sbst = StyleSheet.create({
   emojiRow:   { flexDirection: 'row', gap: 4 },
   emojiBtn:   { flex: 1, alignItems: 'center', padding: 10, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: 'transparent' },
   emojiBtnSel:{ borderColor: colors.teal, backgroundColor: colors.teal + '11' },
-  emoji:      { fontSize: 22 },
-  emojiLbl:   { fontSize: 9, color: colors.ink3, marginTop: 4, textAlign: 'center' },
+  emoji:      { fontSize: fontSize.lg },
+  emojiLbl:   { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, textAlign: 'center' },
   saveBtn:    { backgroundColor: colors.teal, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
   saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   breathCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
@@ -734,8 +734,8 @@ const moodst = StyleSheet.create({
   emojiRow:   { flexDirection: 'row', gap: 4 },
   emojiBtn:   { flex: 1, alignItems: 'center', padding: 10, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: 'transparent' },
   emojiBtnSel:{ borderColor: colors.honey, backgroundColor: colors.honey + '11' },
-  emoji:      { fontSize: 22 },
-  emojiLbl:   { fontSize: 9, color: colors.ink3, marginTop: 4, textAlign: 'center' },
+  emoji:      { fontSize: fontSize.lg },
+  emojiLbl:   { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, textAlign: 'center' },
   notesInput: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, color: colors.ink, padding: 14, fontSize: fontSize.sm, minHeight: 90, textAlignVertical: 'top' },
   saveBtn:    { backgroundColor: colors.honey, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
   saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
@@ -810,11 +810,11 @@ const fr = StyleSheet.create({
   info:  { flex: 1, gap: 2 },
   name:  { fontSize: fontSize.sm, color: colors.ink, fontWeight: '500' },
   pills: { flexDirection: 'row', gap: 3, flexWrap: 'wrap' },
-  pill:  { fontSize: fontSize.xs, fontWeight: '600', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
+  pill:  { fontSize: fontSize.xs, fontWeight: '600', borderRadius: spacing.xs / 2, paddingHorizontal: 4, paddingVertical: 1 },
   pillP: { color: colors.sky,   backgroundColor: colors.sky   + '22', borderWidth: 1, borderColor: colors.sky   + '55' },
   pillC: { color: colors.honey, backgroundColor: colors.honey + '22', borderWidth: 1, borderColor: colors.honey + '55' },
   pillF: { color: colors.rose,  backgroundColor: colors.rose  + '22', borderWidth: 1, borderColor: colors.rose  + '55' },
-  kcal:  { fontSize: fontSize.sm, fontWeight: '700', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1 },
+  kcal:  { fontSize: fontSize.sm, fontWeight: '700', borderRadius: spacing.xs / 2, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1 },
   gradeBadge:  { width: 22, height: 22, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   gradeText:   { fontSize: fontSize.xs, fontWeight: '800', letterSpacing: 0.5, color: colors.white },
   trash:       { padding: 2 },
@@ -1461,6 +1461,7 @@ export default function DiaryScreen() {
         await addFood(selectedDate, food);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await checkAndUpdateStreak(selectedDate);
       await addXp(items.length * 10);
       setAiEstimateQuery('');
       setSearchVisible(false);
@@ -1593,7 +1594,7 @@ export default function DiaryScreen() {
       {/* ── Streak Risk Banner ── */}
       {showStreakRisk && (
         <View style={st.streakRisk}>
-          <Text style={{ fontSize: 22 }}>🔥</Text>
+          <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
           <View style={{ flex: 1 }}>
             <Text style={st.srbTitle}>Your streak is at risk!</Text>
             <Text style={st.srbSub}>Log before midnight to keep it alive.</Text>
@@ -1619,7 +1620,7 @@ export default function DiaryScreen() {
 
         {/* ── Calorie Ring ── */}
         <ExpoLinearGradient
-          colors={['rgba(124,77,255,0.14)', 'rgba(34,197,94,0.06)', 'transparent']}
+          colors={[colors.purple + '24', colors.green + '0f', 'transparent']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={st.calCard}
         >
@@ -1770,7 +1771,7 @@ export default function DiaryScreen() {
         )}
 
         {/* ── Today's meals ── */}
-        <Text style={st.sectionHdr}>Today's meals</Text>
+        <Text style={st.sectionHdr}>{isToday ? "Today's meals" : 'Meals'}</Text>
         {MEALS.map((meal) => {
           const mealFoods = foods.filter((f) => f.meal === meal);
           const mealKcal = mealFoods.reduce((s, f) => s + f.kcal, 0);
@@ -2254,7 +2255,7 @@ export default function DiaryScreen() {
                   await addXp(10);
                   setSearchVisible(false);
                 }}>
-                  <Text style={{ fontSize: 24, marginRight: 8 }}>{f.icon}</Text>
+                  <Text style={{ fontSize: fontSize.lg + 2, marginRight: spacing.xs + 2 }}>{f.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={st.foodResultName}>{f.name}</Text>
                     <Text style={st.foodResultMeta}>{f.unit}</Text>
@@ -2273,9 +2274,9 @@ export default function DiaryScreen() {
               keyExtractor={f => f.id}
               contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}
               ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingTop: 40, gap: 8 }}>
-                  <Text style={{ fontSize: 36 }}>❤️</Text>
-                  <Text style={{ color: colors.ink, fontSize: 16, fontWeight: '700' }}>No saved foods yet</Text>
+                <View style={{ alignItems: 'center', paddingTop: spacing.xl + 4, gap: spacing.xs + 2 }}>
+                  <Text style={{ fontSize: fontSize['2xl'] - 2 }}>❤️</Text>
+                  <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '700' }}>No saved foods yet</Text>
                   <Text style={{ color: colors.ink3, textAlign: 'center', paddingHorizontal: 24 }}>
                     Tap ♡ on any food in Search to save it here
                   </Text>
@@ -2288,7 +2289,7 @@ export default function DiaryScreen() {
                   await checkAndUpdateStreak(selectedDate);
                   setSearchVisible(false);
                 }}>
-                  <Text style={{ fontSize: 24, marginRight: 8 }}>{f.icon}</Text>
+                  <Text style={{ fontSize: fontSize.lg + 2, marginRight: spacing.xs + 2 }}>{f.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={st.foodResultName}>{f.name}</Text>
                     <Text style={st.foodResultMeta}>{f.unit} · P{r2(f.protein)}g C{r2(f.carbs)}g F{r2(f.fat)}g</Text>
@@ -2504,7 +2505,7 @@ export default function DiaryScreen() {
                   ? <ActivityIndicator color={colors.white} />
                   : <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.base }}>Import recipe</Text>}
               </TouchableOpacity>
-              <Text style={{ color: colors.ink3, fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
+              <Text style={{ color: colors.ink3, fontSize: fontSize.xs, textAlign: 'center', lineHeight: 16 }}>
                 Requires a deployed Dagnara server with ANTHROPIC_API_KEY configured.
               </Text>
             </ScrollView>
@@ -2588,8 +2589,8 @@ const st = StyleSheet.create({
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, letterSpacing: -0.03 * 28 },
-  upgradeBadge: { backgroundColor: 'rgba(124,77,255,0.18)', borderWidth: 1, borderColor: 'rgba(124,77,255,0.4)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  upgradeTxt: { fontSize: 9, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
+  upgradeBadge: { backgroundColor: colors.purple + '2e', borderWidth: 1, borderColor: colors.purple + '66', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
+  upgradeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Action buttons
   actionBtnPrimary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md },
@@ -2626,23 +2627,23 @@ const st = StyleSheet.create({
   browseItemKcal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
   browseItemKcalLbl: { fontSize: fontSize.xs, color: colors.ink3 },
   iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
+  notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: spacing.xs / 2, backgroundColor: colors.rose },
 
   // XP / Achievement
   achieveBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer2, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6, borderWidth: 1, borderColor: colors.line2 },
   xpBadge: { width: 32, height: 32, borderRadius: radius.md, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   xpBadgeTxt: { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink },
   xpMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 },
-  xpName: { fontSize: 12, fontWeight: '600', color: colors.ink },
-  xpPts: { fontSize: 11, color: colors.ink3 },
-  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: 2, overflow: 'hidden' },
-  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: 2 },
+  xpName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink },
+  xpPts: { fontSize: fontSize.xs, color: colors.ink3 },
+  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden' },
+  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
   // Streak risk
-  streakRisk: { flexDirection: 'row', alignItems: 'center', gap: 12, margin: 8, marginHorizontal: 14, padding: 11, backgroundColor: 'rgba(244,63,94,0.1)', borderWidth: 1, borderColor: 'rgba(244,63,94,0.25)', borderRadius: radius.lg },
-  srbTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(244,63,94,0.9)', marginBottom: 2 },
-  srbSub: { fontSize: 12, color: 'rgba(244,63,94,0.7)' },
-  srbCta: { fontSize: 11, fontWeight: '700', color: 'rgba(244,63,94,0.85)' },
+  streakRisk: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, margin: spacing.xs + 2, marginHorizontal: spacing.sm + 4, padding: spacing.sm + 1, backgroundColor: colors.rose + '1a', borderWidth: 1, borderColor: colors.rose + '40', borderRadius: radius.lg },
+  srbTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.rose, marginBottom: 2 },
+  srbSub: { fontSize: fontSize.xs, color: colors.rose + 'b3' },
+  srbCta: { fontSize: fontSize.xs, fontWeight: '700', color: colors.rose + 'd9' },
 
   // Date nav
   dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.line },
@@ -2652,7 +2653,7 @@ const st = StyleSheet.create({
   scroll: { paddingTop: spacing.xs, gap: spacing.xs, paddingBottom: 24 },
 
   // Section header
-  sectionHdr: { paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 4, fontSize: 11, fontWeight: '700', letterSpacing: 0.12 * 11, textTransform: 'uppercase', color: colors.ink3 },
+  sectionHdr: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 4, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.32, textTransform: 'uppercase', color: colors.ink3 },
 
   // Calorie ring
   calCard: {
@@ -2669,8 +2670,8 @@ const st = StyleSheet.create({
   calSection: { alignItems: 'center', paddingVertical: spacing.sm },
   ringWrap: { position: 'relative', width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center' },
-  ringNum: { fontSize: 32, fontWeight: '800', color: colors.ink },
-  ringLbl: { fontSize: 12, color: colors.ink3 },
+  ringNum: { fontSize: fontSize['2xl'] - 6, fontWeight: '800', color: colors.ink },
+  ringLbl: { fontSize: fontSize.xs, color: colors.ink3 },
   calStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md },
   calStat: { alignItems: 'center', gap: 2 },
   calStatVal: { fontSize: fontSize.lg, fontWeight: '700' },
@@ -2686,11 +2687,11 @@ const st = StyleSheet.create({
   macroTile: { flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', padding: spacing.sm, paddingTop: spacing.sm + 2, gap: 3 },
   macroTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
   macroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
-  macroName: { fontSize: 11, fontWeight: '600', color: colors.ink3 },
-  macroGoalLbl: { fontSize: 9, color: 'rgba(255,255,255,0.18)' },
-  macroVal: { fontSize: 12, fontWeight: '700' },
-  macroTrack: { height: 3, backgroundColor: colors.layer2, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
-  macroFill: { height: 3, borderRadius: 2 },
+  macroName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink3 },
+  macroGoalLbl: { fontSize: fontSize.xs, color: colors.ink + '2e' },
+  macroVal: { fontSize: fontSize.xs, fontWeight: '700' },
+  macroTrack: { height: 3, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden', marginTop: 4 },
+  macroFill: { height: 3, borderRadius: spacing.xs / 3 },
 
   // Scan
   scanRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center', paddingHorizontal: spacing.md },
@@ -2709,7 +2710,7 @@ const st = StyleSheet.create({
   mealName: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink },
   mealRec: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
   mealItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
-  mealItemTxt: { fontSize: 11, color: colors.ink2, flex: 1 },
+  mealItemTxt: { fontSize: fontSize.xs, color: colors.ink2, flex: 1 },
   skipBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.layer2 },
   skipTxt: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink3 },
   skipTxtActive: { color: colors.rose },
@@ -2717,7 +2718,7 @@ const st = StyleSheet.create({
   skippedBadgeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.rose, letterSpacing: 0.8 },
   skippedPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.rose + '22', borderWidth: 1, borderColor: colors.rose + '55' },
   skippedPillTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.rose, letterSpacing: 0.5 },
-  mealAddBtn: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  mealAddBtn: { width: 30, height: 30, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   // Win cards
   winCard: { marginHorizontal: spacing.md, padding: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line },
@@ -2743,16 +2744,16 @@ const st = StyleSheet.create({
 
   // Micronutrients
   microRow: { paddingHorizontal: spacing.md, marginBottom: 12 },
-  microHdr: { fontSize: 10, fontWeight: '700', color: colors.ink3, letterSpacing: 1, marginBottom: 8 },
-  microChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  microChip: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 2 },
-  microVal: { fontSize: 14, fontWeight: '700', color: colors.ink },
-  microLbl: { fontSize: 10, color: colors.ink3 },
-  macroNetCarbs: { fontSize: 10, color: colors.sky, fontWeight: '600', marginTop: 2 },
+  microHdr: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1, marginBottom: spacing.xs + 2 },
+  microChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  microChip: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm + 2, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2, alignItems: 'center', gap: 2 },
+  microVal: { fontSize: fontSize.sm + 1, fontWeight: '700', color: colors.ink },
+  microLbl: { fontSize: fontSize.xs, color: colors.ink3 },
+  macroNetCarbs: { fontSize: fontSize.xs, color: colors.sky, fontWeight: '600', marginTop: 2 },
   microDv:  { fontSize: fontSize.xs, color: colors.purple, fontWeight: '600' },
   // Food grade badge
-  gradeBadge: { width: 32, height: 32, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  gradeText: { fontSize: 14, fontWeight: '800' },
+  gradeBadge: { width: 32, height: 32, borderRadius: spacing.xs + 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  gradeText: { fontSize: fontSize.sm + 1, fontWeight: '800' },
 
   // Search modal
   searchModal: { flex: 1, backgroundColor: colors.bg },
@@ -2778,7 +2779,7 @@ const st = StyleSheet.create({
 const sl = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   content: { padding: spacing.md, gap: spacing.md },
   durationDisplay: { alignItems: 'center', paddingVertical: spacing.lg },
@@ -2790,9 +2791,9 @@ const sl = StyleSheet.create({
   timeCardLbl: { fontSize: fontSize.xs, color: colors.ink3, marginBottom: spacing.sm },
   timeVal: { fontSize: fontSize.lg, fontWeight: '700', color: colors.ink, textAlign: 'center' },
   qualityRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  qBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  qBtn: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   qBtnSel: { backgroundColor: colors.purple + '33', borderWidth: 2, borderColor: colors.purple },
-  qEmoji: { fontSize: 26 },
+  qEmoji: { fontSize: fontSize.xl - 2 },
   insight: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
   insightLbl: { fontSize: fontSize.xs, fontWeight: '700', color: colors.purple2, marginBottom: 6 },
   insightTxt: { fontSize: fontSize.sm, color: colors.ink2, lineHeight: 20 },

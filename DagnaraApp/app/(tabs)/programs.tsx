@@ -667,7 +667,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   const allDoneToday = meds.length > 0 && meds.every(med => (log[med.id]?.takenCount ?? 0) >= med.times.length);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>💊 Pill Reminder</Text>
@@ -675,7 +675,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
         </View>
 
         {/* Add medication sheet */}
-        <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet">
+        <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditSheet(false)}>
             <SafeAreaView style={m.sheet} edges={['bottom']}>
               <View style={m.sheetHeader}>
                 <Text style={m.sheetTitle}>{editMed ? 'Edit Medication' : 'Add Medication'}</Text>
@@ -1567,8 +1567,8 @@ const st = StyleSheet.create({
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
   scroll:   { padding: spacing.md, gap: spacing.sm },
   card:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.lg, padding: spacing.md },
-  iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  progIcon: { fontSize: 22 },
+  iconWrap: { width: 44, height: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  progIcon: { fontSize: fontSize.lg },
   cardBody: { flex: 1 },
   progName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   progDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
@@ -1594,21 +1594,21 @@ const m = StyleSheet.create({
 
   achieveRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.layer1, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.line },
   achieveLocked: { opacity: 0.55 },
-  achieveIcon:   { fontSize: 24, width: 32, textAlign: 'center' },
+  achieveIcon:   { fontSize: fontSize.lg + 2, width: 32, textAlign: 'center' },
   achieveTitle:  { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   achieveDesc:   { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
 
-  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   milestoneDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.layer3, borderWidth: 1, borderColor: colors.line },
-  milestoneIcon:{ fontSize: 16, width: 24, textAlign: 'center' },
+  milestoneIcon:{ fontSize: fontSize.base + 1, width: 24, textAlign: 'center' },
   milestoneTxt: { fontSize: fontSize.xs, color: colors.ink2, flex: 1 },
 
   label:      { fontSize: fontSize.xs, color: colors.ink3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   input:      { backgroundColor: colors.layer2, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, color: colors.ink, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: fontSize.sm },
 
-  primaryBtn:    { backgroundColor: colors.purple, borderRadius: radius.md, alignItems: 'center', paddingVertical: 14 },
+  primaryBtn:    { backgroundColor: colors.purple, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm + 4 },
   primaryBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
-  dangerBtn:     { borderRadius: radius.md, alignItems: 'center', paddingVertical: 12, backgroundColor: 'rgba(244,63,94,0.12)', borderWidth: 1, borderColor: 'rgba(244,63,94,0.25)' },
+  dangerBtn:     { borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm + 2, backgroundColor: colors.rose + '1e', borderWidth: 1, borderColor: colors.rose + '40' },
   dangerBtnTxt:  { color: colors.rose, fontWeight: '600', fontSize: fontSize.sm },
   ghostBtn:      { borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm, backgroundColor: colors.layer1 },
   ghostBtnTxt:   { color: colors.ink2, fontSize: fontSize.sm },
@@ -1619,16 +1619,16 @@ const m = StyleSheet.create({
   medName:   { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   medDosage: { fontSize: fontSize.xs, color: colors.ink2, marginTop: 1 },
   medTimes:  { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
-  medNotes:  { fontSize: fontSize.xs, color: colors.ink3, fontStyle: 'italic', marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.line },
+  medNotes:  { fontSize: fontSize.xs, color: colors.ink3, fontStyle: 'italic', marginTop: spacing.xs, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.line },
   doseBar:   { flex: 1, height: 6, backgroundColor: colors.layer2, borderRadius: 3, overflow: 'hidden' },
   doseFill:  { height: '100%', borderRadius: 3 },
   doseTxt:   { fontSize: fontSize.xs, color: colors.ink3, width: 30, textAlign: 'right' },
   doseBtn:   { borderRadius: radius.sm, alignItems: 'center', paddingVertical: 8 },
   doseBtnTxt:{ fontSize: fontSize.xs, fontWeight: '700' },
   undoBtn:   { backgroundColor: colors.layer1, borderRadius: radius.sm, paddingHorizontal: spacing.sm, justifyContent: 'center' },
-  colorDot:  { width: 28, height: 28, borderRadius: 14 },
-  emptyState:{ alignItems: 'center', paddingVertical: spacing.xl, gap: 8 },
-  emptyIcon: { fontSize: 48 },
+  colorDot:  { width: 28, height: 28, borderRadius: radius.pill },
+  emptyState:{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs + 2 },
+  emptyIcon: { fontSize: fontSize['2xl'] + 10 },
   emptyTitle:{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   emptyDesc: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center' },
 });

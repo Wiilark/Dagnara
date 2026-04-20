@@ -738,7 +738,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   onPress={() => { setSelectedPlan('premium'); void AsyncStorage.setItem(`${p}_plan`, 'premium'); }}
                   style={[subst.planCard, subst.planCardPremium, selectedPlan === 'premium' && subst.planCardSel]}>
-                  <LinearGradient colors={['rgba(124,77,255,0.18)', 'transparent']}
+                  <LinearGradient colors={[colors.purple + '2e', 'transparent']}
                     style={{ ...StyleSheet.absoluteFillObject as any, borderRadius: radius.lg }}
                     start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.5 }}
                     pointerEvents="none" />
@@ -1052,21 +1052,21 @@ export default function ProfileScreen() {
           <ScrollView contentContainerStyle={styles.modalScroll}>
             {/* Sex selector */}
             <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Biological Sex</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
               {(['male', 'female'] as const).map(s => (
                 <TouchableOpacity key={s} onPress={() => setSex(s)}
-                  style={{ flex: 1, padding: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center',
+                  style={{ flex: 1, padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
                     borderColor: sex === s ? colors.lavender : colors.line2,
                     backgroundColor: sex === s ? colors.purple + '22' : colors.layer2 }}>
-                  <Text style={{ fontSize: 22 }}>{s === 'male' ? '♂️' : '♀️'}</Text>
-                  <Text style={{ color: sex === s ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: 13, textTransform: 'capitalize' }}>{s}</Text>
+                  <Text style={{ fontSize: fontSize.lg }}>{s === 'male' ? '♂️' : '♀️'}</Text>
+                  <Text style={{ color: sex === s ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: fontSize.sm, textTransform: 'capitalize' }}>{s}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {/* Activity Level */}
             <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Activity Level</Text>
-            <View style={{ gap: 8, marginBottom: 16 }}>
+            <View style={{ gap: spacing.xs + 2, marginBottom: spacing.md }}>
               {([
                 { key: 'sedentary', label: 'Sedentary', desc: 'Little or no exercise' },
                 { key: 'light', label: 'Lightly Active', desc: '1–3 days/week' },
@@ -1075,12 +1075,12 @@ export default function ProfileScreen() {
                 { key: 'very_active', label: 'Extra Active', desc: 'Physical job or 2x/day' },
               ] as const).map(({ key, label, desc }) => (
                 <TouchableOpacity key={key} onPress={() => setLocalActivity(key)}
-                  style={{ padding: 12, borderRadius: 12, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 10,
+                  style={{ padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                     borderColor: localActivity === key ? colors.lavender : colors.line2,
                     backgroundColor: localActivity === key ? colors.purple + '22' : colors.layer2 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: localActivity === key ? colors.lavender : colors.ink, fontWeight: '600', fontSize: 14 }}>{label}</Text>
-                    <Text style={{ color: colors.ink3, fontSize: 12 }}>{desc}</Text>
+                    <Text style={{ color: localActivity === key ? colors.lavender : colors.ink, fontWeight: '600', fontSize: fontSize.sm + 1 }}>{label}</Text>
+                    <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{desc}</Text>
                   </View>
                   {localActivity === key && <Ionicons name="checkmark-circle" size={20} color={colors.lavender} />}
                 </TouchableOpacity>
@@ -1089,18 +1089,18 @@ export default function ProfileScreen() {
 
             {/* Weight Goal */}
             <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Weight Goal</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
               {([
                 { key: 'lose', label: 'Lose', emoji: '📉' },
                 { key: 'maintain', label: 'Maintain', emoji: '⚖️' },
                 { key: 'gain', label: 'Gain', emoji: '📈' },
               ] as const).map(({ key, label, emoji }) => (
                 <TouchableOpacity key={key} onPress={() => setLocalGoal(key)}
-                  style={{ flex: 1, padding: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center',
+                  style={{ flex: 1, padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
                     borderColor: localGoal === key ? colors.lavender : colors.line2,
                     backgroundColor: localGoal === key ? colors.purple + '22' : colors.layer2 }}>
-                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
-                  <Text style={{ color: localGoal === key ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: 13 }}>{label}</Text>
+                  <Text style={{ fontSize: fontSize.lg }}>{emoji}</Text>
+                  <Text style={{ color: localGoal === key ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: fontSize.sm }}>{label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1112,10 +1112,10 @@ export default function ProfileScreen() {
               const height = parseFloat(profile.height ?? '170') || 170;
               const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
               return (
-                <View style={{ backgroundColor: colors.layer2, borderRadius: 16, borderWidth: 1, borderColor: colors.line2, padding: 16, alignItems: 'center', gap: 4 }}>
-                  <Text style={{ color: colors.ink3, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Daily Calories</Text>
-                  <Text style={{ color: colors.lavender, fontSize: 36, fontWeight: '800' }}>{cal}</Text>
-                  <Text style={{ color: colors.ink2, fontSize: 13 }}>kcal / day</Text>
+                <View style={{ backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, alignItems: 'center', gap: 4 }}>
+                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs, textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Daily Calories</Text>
+                  <Text style={{ color: colors.lavender, fontSize: fontSize['2xl'] - 2, fontWeight: '800' }}>{cal}</Text>
+                  <Text style={{ color: colors.ink2, fontSize: fontSize.sm }}>kcal / day</Text>
                 </View>
               );
             })()}
@@ -1230,40 +1230,40 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: 24 },
 
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
 
   avatarCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.white, fontSize: 32, fontWeight: '800' },
+  avatar: { width: 80, height: 80, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.white, fontSize: fontSize['2xl'] - 6, fontWeight: '800' },
   avatarImg: { width: 80, height: 80, borderRadius: radius.pill },
   avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.layer1 },
   name: { color: colors.ink, fontSize: fontSize.lg, fontWeight: '700' },
   emailText: { color: colors.ink3, fontSize: fontSize.sm },
 
-  xpRow: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', marginTop: 4 },
-  xpBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
+  xpBadge: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   xpBadgeTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
   xpMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  xpName: { fontSize: 12, fontWeight: '600', color: colors.ink },
-  xpPts: { fontSize: 11, color: colors.ink3 },
-  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: 2, overflow: 'hidden' },
-  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: 2 },
+  xpName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink },
+  xpPts: { fontSize: fontSize.xs, color: colors.ink3 },
+  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden' },
+  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
   statsRow: { flexDirection: 'row', width: '100%', gap: spacing.xs },
   statChip: { flex: 1, backgroundColor: colors.layer2, borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
   statChipVal: { fontSize: fontSize.base, fontWeight: '700' },
   statChipLbl: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
 
-  sectionHdr: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, marginBottom: -6 },
+  sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, marginBottom: -6 },
 
   achieveBadge: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   achieveLbl: { fontSize: fontSize.xs, color: colors.ink2, textAlign: 'center' },
   achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
   menuCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  menuIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  menuIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
 
@@ -1280,47 +1280,47 @@ const styles = StyleSheet.create({
   inputLabel: { color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.xs },
   input: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, color: colors.ink, fontSize: fontSize.base },
   // BMI card
-  bmiCard: { backgroundColor: colors.layer2, borderRadius: 16, borderWidth: 1, borderColor: colors.line2, padding: 16, alignItems: 'center', gap: 6, marginBottom: 8 },
-  bmiSectionLbl: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
-  bmiNum: { fontSize: 48, fontWeight: '800', lineHeight: 52 },
-  bmiLbl: { fontSize: 13, color: colors.ink2, fontWeight: '500' },
-  bmiScale: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', width: '100%', gap: 2, marginTop: 4 },
-  bmiSeg: { flex: 1, height: '100%', borderRadius: 2 },
+  bmiCard: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs + 2 },
+  bmiSectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
+  bmiNum: { fontSize: fontSize['2xl'] + 10, fontWeight: '800', lineHeight: 52 },
+  bmiLbl: { fontSize: fontSize.sm, color: colors.ink2, fontWeight: '500' },
+  bmiScale: { flexDirection: 'row', height: 8, borderRadius: spacing.xs - 2, overflow: 'hidden', width: '100%', gap: 2, marginTop: 4 },
+  bmiSeg: { flex: 1, height: '100%', borderRadius: spacing.xs / 3 },
   bmiScaleLbls: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
-  bmiScaleLbl: { fontSize: 9, color: colors.ink3 },
+  bmiScaleLbl: { fontSize: fontSize.xs, color: colors.ink3 },
   // Measurement rows
-  measureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 12, padding: 12, marginBottom: 4 },
-  measureLbl: { fontSize: 14, fontWeight: '500', color: colors.ink, flex: 1 },
+  measureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm + 2, padding: spacing.sm + 2, marginBottom: 4 },
+  measureLbl: { fontSize: fontSize.sm + 1, fontWeight: '500', color: colors.ink, flex: 1 },
   measureInput: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  measureField: { fontSize: 16, fontWeight: '700', color: colors.ink, minWidth: 60, textAlign: 'right' },
-  measureUnit: { fontSize: 12, color: colors.ink3, width: 24 },
+  measureField: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink, minWidth: 60, textAlign: 'right' },
+  measureUnit: { fontSize: fontSize.xs, color: colors.ink3, width: 24 },
   // Settings button
-  settingsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  settingsBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
 });
 
 // ── Macros modal styles ──────────────────────────────────────────────────────
 const mst = StyleSheet.create({
-  macroRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 14, padding: 14, marginBottom: 8 },
-  macroDot: { width: 12, height: 12, borderRadius: 6, flexShrink: 0 },
-  macroLabel: { fontSize: 14, fontWeight: '600', color: colors.ink, marginBottom: 6 },
-  macroBar: { height: 6, backgroundColor: colors.layer3, borderRadius: 3, overflow: 'hidden' },
-  macroFill: { height: '100%', borderRadius: 3 },
+  macroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md - 2, padding: spacing.sm + 4, marginBottom: spacing.xs + 2 },
+  macroDot: { width: 12, height: 12, borderRadius: radius.pill, flexShrink: 0 },
+  macroLabel: { fontSize: fontSize.sm + 1, fontWeight: '600', color: colors.ink, marginBottom: spacing.xs },
+  macroBar: { height: 6, backgroundColor: colors.layer3, borderRadius: spacing.xs / 2, overflow: 'hidden' },
+  macroFill: { height: '100%', borderRadius: spacing.xs / 2 },
   macroVals: { alignItems: 'flex-end', gap: 2 },
-  macroPct: { fontSize: 16, fontWeight: '800' },
-  macroG: { fontSize: 11, color: colors.ink3 },
-  calCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 14, padding: 16, alignItems: 'center', gap: 4, marginTop: 4 },
-  calLbl: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
-  calVal: { fontSize: 28, fontWeight: '800', color: colors.honey },
+  macroPct: { fontSize: fontSize.base, fontWeight: '800' },
+  macroG: { fontSize: fontSize.xs, color: colors.ink3 },
+  calCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md - 2, padding: spacing.md, alignItems: 'center', gap: 4, marginTop: 4 },
+  calLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
+  calVal: { fontSize: fontSize.xl, fontWeight: '800', color: colors.honey },
 });
 
 // ── Settings modal styles ─────────────────────────────────────────────────────
 const sst = StyleSheet.create({
-  sectionLbl: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: 2, paddingTop: 16, paddingBottom: 8 },
+  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: 2, paddingTop: spacing.md, paddingBottom: spacing.xs + 2 },
   card: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 15, borderBottomWidth: 1, borderBottomColor: colors.line },
-  icon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  label: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.ink },
-  val: { fontSize: 12, color: colors.ink3, fontWeight: '500', marginRight: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 4, padding: spacing.md - 1, borderBottomWidth: 1, borderBottomColor: colors.line },
+  icon: { width: 32, height: 32, borderRadius: spacing.xs + 2, alignItems: 'center', justifyContent: 'center' },
+  label: { flex: 1, fontSize: fontSize.sm + 1, fontWeight: '500', color: colors.ink },
+  val: { fontSize: fontSize.xs, color: colors.ink3, fontWeight: '500', marginRight: 4 },
 });
 
 // ── Subscription modal styles ─────────────────────────────────────────────────

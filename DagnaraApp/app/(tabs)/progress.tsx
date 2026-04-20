@@ -267,7 +267,7 @@ function StatisticsModal({ visible, onClose, entries }: {
                 const h = maxKcal > 0 ? Math.max(2, (b.kcal / maxKcal) * 120) : 2;
                 return (
                   <View key={i} style={stat.barCol}>
-                    <View style={[stat.bar, { height: h, backgroundColor: b.kcal > 0 ? colors.lavender : 'rgba(124,77,255,0.15)' }]} />
+                    <View style={[stat.bar, { height: h, backgroundColor: b.kcal > 0 ? colors.lavender : colors.purple + '26' }]} />
                     {b.label ? <Text style={stat.barLbl}>{b.label}</Text> : null}
                   </View>
                 );
@@ -873,7 +873,7 @@ export default function ProgressScreen() {
           {nextMilestone && (
             <View style={st.milestoneWrap}>
               <View style={st.milestoneRow}>
-                <Text style={{ fontSize: 20 }}>{nextMilestone.emoji}</Text>
+                <Text style={{ fontSize: fontSize.lg - 2 }}>{nextMilestone.emoji}</Text>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={st.milestoneName}>{nextMilestone.label}</Text>
@@ -938,7 +938,7 @@ export default function ProgressScreen() {
             <View style={st.pillarsWrap}>
               {pillarScores.map((p) => (
                 <View key={p.key} style={st.pillarRow}>
-                  <Text style={{ fontSize: 16 }}>{p.emoji}</Text>
+                  <Text style={{ fontSize: fontSize.base + 1 }}>{p.emoji}</Text>
                   <Text style={st.pillarLabel}>{p.label}</Text>
                   <View style={st.pillarTrack}>
                     <View style={[st.pillarBar, { width: `${(p.score / p.max) * 100}%` as any, backgroundColor: p.color }]} />
@@ -1133,7 +1133,7 @@ export default function ProgressScreen() {
       <InsightDetailModal visible={insightDetailVisible} onClose={() => setInsightDetailVisible(false)} />
 
       {/* Life Score Quiz Modal */}
-      <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen">
+      <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
           {lsResult === null ? (
             <>
@@ -1223,26 +1223,26 @@ const st = StyleSheet.create({
   streakDesc: { fontSize: fontSize.sm, color: colors.ink2 },
   // Milestone
   milestoneWrap: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
-  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  milestoneName: { fontSize: 13, fontWeight: '700', color: colors.ink },
-  milestoneProg: { fontSize: 11, color: colors.ink3 },
+  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  milestoneName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
+  milestoneProg: { fontSize: fontSize.xs, color: colors.ink3 },
   milestoneTrack: { height: 4, backgroundColor: colors.layer3, borderRadius: 2, marginTop: 6, overflow: 'hidden' },
   milestoneBar: { height: 4, backgroundColor: colors.honey, borderRadius: 2 },
   // Pillars
   pillarsWrap: { marginBottom: spacing.md, gap: spacing.xs },
-  pillarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pillarLabel: { width: 62, fontSize: 12, color: colors.ink2 },
+  pillarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  pillarLabel: { width: 62, fontSize: fontSize.xs, color: colors.ink2 },
   pillarTrack: { flex: 1, height: 5, backgroundColor: colors.layer3, borderRadius: 3, overflow: 'hidden' },
   pillarBar: { height: 5, borderRadius: 3 },
-  pillarScore: { width: 36, textAlign: 'right', fontSize: 11, fontWeight: '600' },
+  pillarScore: { width: 36, textAlign: 'right', fontSize: fontSize.xs, fontWeight: '600' },
   // Insight locked
   insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.md, paddingLeft: spacing.sm, borderRadius: radius.sm, marginLeft: -spacing.sm },
   insightTitle: { fontSize: fontSize.sm, fontWeight: '700' },
   insightBody: { fontSize: fontSize.xs, color: colors.ink2, lineHeight: fontSize.xs * 1.55 },
   insightLocked: { marginTop: spacing.sm, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, overflow: 'hidden', position: 'relative' },
   insightBlur: { opacity: 0.4 },
-  insightBlurText: { fontSize: 14, fontWeight: '700', color: colors.ink },
-  insightBlurSub: { fontSize: 12, color: colors.ink3, marginTop: 3 },
+  insightBlurText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
+  insightBlurSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 3 },
   insightLockBadge: { position: 'absolute', top: spacing.md, right: spacing.md },
   // Life Score
   lsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
@@ -1255,10 +1255,10 @@ const st = StyleSheet.create({
   // Chart
   chart: { flexDirection: 'row', height: 100, alignItems: 'flex-end', gap: spacing.xs },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },
-  barVal: { color: colors.ink3, fontSize: 9 },
+  barVal: { color: colors.ink3, fontSize: fontSize.xs },
   barTrack: { flex: 1, width: '70%', justifyContent: 'flex-end' },
   bar: { width: '100%', backgroundColor: colors.purple, borderRadius: 4, minHeight: 2 },
-  barLabel: { color: colors.ink3, fontSize: 10 },
+  barLabel: { color: colors.ink3, fontSize: fontSize.xs },
   // Macros
   macroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   macroLabel: { width: 54, color: colors.ink2, fontSize: fontSize.sm },
@@ -1291,13 +1291,13 @@ const st = StyleSheet.create({
   lsCloseBtn: { padding: spacing.xs },
   lsStepTxt: { color: colors.ink3, fontSize: fontSize.sm },
   lsContent: { paddingHorizontal: spacing.lg, paddingBottom: 20, alignItems: 'center' },
-  lsEmoji: { fontSize: 64, marginBottom: spacing.md, marginTop: spacing.lg },
+  lsEmoji: { fontSize: fontSize['2xl'] + 26, marginBottom: spacing.md, marginTop: spacing.lg },
   lsQuestion: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: spacing.xs },
   lsHint: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', marginBottom: spacing.lg },
   lsOptions: { width: '100%', gap: spacing.xs, marginTop: spacing.md },
   lsOption: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md },
   lsOptionSelected: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
-  lsRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
+  lsRadio: { width: 20, height: 20, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
   lsRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.white },
   lsOptionTxt: { color: colors.ink2, fontSize: fontSize.base },
   lsNav: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
@@ -1306,9 +1306,9 @@ const st = StyleSheet.create({
   lsNextTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
   // Result
   lsResultWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
-  lsResultEmoji: { fontSize: 72 },
+  lsResultEmoji: { fontSize: fontSize['2xl'] + 34 },
   lsResultTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink },
-  lsResultScore: { fontSize: 80, fontWeight: '800' },
+  lsResultScore: { fontSize: fontSize['2xl'] * 2, fontWeight: '800' },
   lsResultMax: { fontSize: fontSize.lg, color: colors.ink3, marginTop: -16 },
   lsResultGrade: { fontSize: fontSize.base, fontWeight: '600', textAlign: 'center' },
   lsDoneBtn: { backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.xl, marginTop: spacing.md },
@@ -1316,57 +1316,57 @@ const st = StyleSheet.create({
   // Statistics modal extra styles (stat.* used inline)
 
   // Calendar
-  calHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  calCount: { fontSize: 12, color: colors.ink3, fontFamily: 'monospace' },
-  calWeekRow: { flexDirection: 'row', marginBottom: 4 },
-  calWeekDay: { flex: 1, textAlign: 'center', fontSize: 8, color: colors.ink3, fontFamily: 'monospace' },
+  calHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  calCount: { fontSize: fontSize.xs, color: colors.ink3, fontFamily: 'monospace' },
+  calWeekRow: { flexDirection: 'row', marginBottom: spacing.xs / 2 },
+  calWeekDay: { flex: 1, textAlign: 'center', fontSize: fontSize.xs, color: colors.ink3, fontFamily: 'monospace' },
   calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   calCell: { borderRadius: 3, backgroundColor: colors.layer2 },
-  calLegend: { flexDirection: 'row', gap: 12, marginTop: 10 },
-  calLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  calLegendDot: { width: 8, height: 8, borderRadius: 2 },
-  calLegendTxt: { fontSize: 10, color: colors.ink3 },
+  calLegend: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+  calLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs / 2 },
+  calLegendDot: { width: spacing.xs + 2, height: spacing.xs + 2, borderRadius: 2 },
+  calLegendTxt: { fontSize: fontSize.xs, color: colors.ink3 },
   // Weight chart
-  weightChartWrap: { gap: 10 },
+  weightChartWrap: { gap: spacing.sm },
   weightChartLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  weightChartLbl: { fontSize: 10, color: colors.ink3 },
+  weightChartLbl: { fontSize: fontSize.xs, color: colors.ink3 },
 });
 
 const stat = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line2 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  scroll: { padding: 16, gap: 14, paddingBottom: 40 },
-  tabs: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: 12, padding: 3, gap: 2 },
-  tab: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
+  backBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  scroll: { padding: spacing.md, gap: spacing.sm + 4, paddingBottom: spacing.xl + 4 },
+  tabs: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: radius.sm + 2, padding: 3, gap: 2 },
+  tab: { flex: 1, paddingVertical: spacing.xs + 2, borderRadius: radius.sm, alignItems: 'center' },
   tabActive: { backgroundColor: colors.purple },
-  tabTxt: { fontSize: 12, fontWeight: '600', color: colors.ink3 },
-  tabTxtActive: { color: '#fff' },
-  summaryRow: { flexDirection: 'row', gap: 10 },
-  summaryTile: { flex: 1, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 14, padding: 12, alignItems: 'center', gap: 2 },
-  summaryVal: { fontSize: 20, fontWeight: '800', color: colors.ink },
-  summaryUnit: { fontSize: 10, color: colors.ink3 },
-  summaryLbl: { fontSize: 10, color: colors.ink3, textAlign: 'center' },
-  chartCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 16, padding: 14, gap: 10 },
-  cardLbl: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
+  tabTxt: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink3 },
+  tabTxtActive: { color: colors.ink },
+  summaryRow: { flexDirection: 'row', gap: spacing.sm },
+  summaryTile: { flex: 1, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.sm + 2, alignItems: 'center', gap: 2 },
+  summaryVal: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink },
+  summaryUnit: { fontSize: fontSize.xs, color: colors.ink3 },
+  summaryLbl: { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center' },
+  chartCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.sm + 4, gap: spacing.sm },
+  cardLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
   chartBars: { flexDirection: 'row', alignItems: 'flex-end', height: 128, gap: 2 },
   barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 3 },
-  bar: { width: '90%', borderRadius: 3, minHeight: 2 },
-  barLbl: { fontSize: 8, color: colors.ink3, textAlign: 'center' },
-  avgLine: { borderTopWidth: 1, borderTopColor: colors.line2, paddingTop: 8 },
-  avgTxt: { fontSize: 11, color: colors.lavender, fontWeight: '600' },
-  lifestyleCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: 16, padding: 14, gap: 10, position: 'relative', overflow: 'hidden' },
+  bar: { width: '90%', borderRadius: spacing.xs / 2, minHeight: 2 },
+  barLbl: { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center' },
+  avgLine: { borderTopWidth: 1, borderTopColor: colors.line2, paddingTop: spacing.xs + 2 },
+  avgTxt: { fontSize: fontSize.xs, color: colors.lavender, fontWeight: '600' },
+  lifestyleCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.sm + 4, gap: spacing.sm, position: 'relative', overflow: 'hidden' },
   lifestyleHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,77,255,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  premiumTxt: { fontSize: 9, fontWeight: '700', color: colors.lavender, letterSpacing: 0.5 },
-  lsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  lsLbl: { fontSize: 12, color: colors.ink2, width: 110 },
-  lsTrack: { flex: 1, height: 5, backgroundColor: colors.layer3, borderRadius: 3, overflow: 'hidden' },
-  lsBar: { height: '100%', borderRadius: 3 },
-  lsPct: { fontSize: 11, fontWeight: '700', width: 34, textAlign: 'right' },
-  blurOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: colors.layer2 + 'cc', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 16, gap: 6 },
-  blurTxt: { fontSize: 13, fontWeight: '700', color: colors.lavender },
+  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.purple + '26', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
+  premiumTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.5 },
+  lsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  lsLbl: { fontSize: fontSize.xs, color: colors.ink2, width: 110 },
+  lsTrack: { flex: 1, height: 5, backgroundColor: colors.layer3, borderRadius: spacing.xs / 2, overflow: 'hidden' },
+  lsBar: { height: '100%', borderRadius: spacing.xs / 2 },
+  lsPct: { fontSize: fontSize.xs, fontWeight: '700', width: 34, textAlign: 'right' },
+  blurOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: colors.layer2 + 'cc', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: spacing.md, gap: spacing.xs },
+  blurTxt: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
 });
 
 // ── Daily Progress Modal styles ────────────────────────────────────────────────
@@ -1415,21 +1415,21 @@ const dp2 = StyleSheet.create({
 // ── Insight Detail Modal styles ───────────────────────────────────────────────
 const ins = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line2 },
-  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: '600', color: colors.ink },
-  scroll: { padding: 18, gap: 16, paddingBottom: 48 },
-  heroCard: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 24, alignItems: 'center', gap: 10 },
-  heroEmoji: { fontSize: 48 },
-  heroTitle: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center' },
-  heroBadge: { backgroundColor: 'rgba(124,77,255,0.15)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  heroBadgeTxt: { fontSize: 9, fontWeight: '700', color: colors.lavender, letterSpacing: 1.2 },
-  section: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 16, gap: 8 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sectionNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(124,77,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  sectionNumTxt: { fontSize: 12, fontWeight: '700', color: colors.lavender },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1 },
-  sectionBody: { fontSize: 14, color: colors.ink2, lineHeight: 22 },
-  actionCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(74,222,128,0.1)', borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)', borderRadius: 16, padding: 16 },
-  actionTxt: { fontSize: 13, color: colors.ink2, flex: 1, lineHeight: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md + 2, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
+  closeBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink },
+  scroll: { padding: spacing.md + 2, gap: spacing.md, paddingBottom: spacing.xl + 12 },
+  heroCard: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg - 2, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
+  heroEmoji: { fontSize: fontSize['2xl'] + 10 },
+  heroTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  heroBadge: { backgroundColor: colors.purple + '26', borderRadius: radius.pill, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
+  heroBadgeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 1.2 },
+  section: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs + 2 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionNum: { width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple + '26', alignItems: 'center', justifyContent: 'center' },
+  sectionNumTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender },
+  sectionTitle: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink, flex: 1 },
+  sectionBody: { fontSize: fontSize.sm + 1, color: colors.ink2, lineHeight: 22 },
+  actionCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, backgroundColor: colors.green + '1a', borderWidth: 1, borderColor: colors.green + '40', borderRadius: radius.md, padding: spacing.md },
+  actionTxt: { fontSize: fontSize.sm, color: colors.ink2, flex: 1, lineHeight: 20 },
 });
