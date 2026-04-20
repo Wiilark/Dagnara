@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   Modal, StyleSheet, Alert, ActivityIndicator,
@@ -416,7 +416,7 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
 }
 
 export default function RecipesScreen() {
-  const { entries, selectedDate, addFood } = useDiaryStore();
+  const { entries, addFood, loadEntry } = useDiaryStore();
   const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak } = useAppStore();
   const { email } = useAuthStore();
   const [recipeSearch, setRecipeSearch] = useState('');
@@ -428,7 +428,13 @@ export default function RecipesScreen() {
   const [foodFilter, setFoodFilter] = useState('All');
   const [selectedFood, setSelectedFood] = useState<LocalFood | null>(null);
 
-  const entry = entries[selectedDate];
+  // Recipes always log to today — never to a past date the user was browsing in diary
+  const today = new Date().toISOString().split('T')[0];
+
+  // Ensure today's entry is loaded into the store
+  useEffect(() => { loadEntry(today); }, []);
+
+  const entry = entries[today];
   const totalKcal = (entry?.foods ?? []).reduce((s, f) => s + f.kcal, 0);
   const remaining = Math.max(0, calorieGoal - totalKcal);
 
@@ -690,14 +696,14 @@ export default function RecipesScreen() {
               </TouchableOpacity>
               <Text style={styles.modalMeal}>{getFoodCategory(selectedFood)}</Text>
               <TouchableOpacity onPress={async () => {
-                await addFood(selectedDate, {
+                await addFood(today, {
                   id: `${Date.now()}`, icon: selectedFood.icon, name: selectedFood.name,
                   kcal: selectedFood.kcal, carbs: selectedFood.carbs,
                   protein: selectedFood.protein, fat: selectedFood.fat,
                   unit: '100g', meal: 'snack',
                   fiber: selectedFood.fiber, sugar: selectedFood.sugar, sodium: selectedFood.sodium,
                 });
-                await checkAndUpdateStreak(selectedDate);
+                await checkAndUpdateStreak(today);
                 await addXp(10);
                 Alert.alert('Added to diary ✓', `${selectedFood.name} logged (100g). +10 XP`);
                 setSelectedFood(null);
@@ -739,14 +745,14 @@ export default function RecipesScreen() {
               </View>
 
               <TouchableOpacity style={styles.logBtn} onPress={async () => {
-                await addFood(selectedDate, {
+                await addFood(today, {
                   id: `${Date.now()}`, icon: selectedFood.icon, name: selectedFood.name,
                   kcal: selectedFood.kcal, carbs: selectedFood.carbs,
                   protein: selectedFood.protein, fat: selectedFood.fat,
                   unit: '100g', meal: 'snack',
                   fiber: selectedFood.fiber, sugar: selectedFood.sugar, sodium: selectedFood.sodium,
                 });
-                await checkAndUpdateStreak(selectedDate);
+                await checkAndUpdateStreak(today);
                 await addXp(10);
                 Alert.alert('Food logged ✓', `${selectedFood.name} added to your diary. +10 XP`);
                 setSelectedFood(null);
@@ -823,8 +829,8 @@ export default function RecipesScreen() {
                       activeOpacity={0.72}
                       onPress={async () => {
                         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        await addFood(selectedDate, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal: key });
-                        await checkAndUpdateStreak(selectedDate);
+                        await addFood(today, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal: key });
+                        await checkAndUpdateStreak(today);
                         await addXp(10);
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         Alert.alert('Logged ✓', `${selected.name} added to ${label}. +10 XP`);
