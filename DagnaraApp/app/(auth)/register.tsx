@@ -14,8 +14,8 @@ const FIELDS = [
   { key: 'password',        label: 'PASSWORD',          placeholder: '••••••••',       auto: 'password'       as const, secure: true, required: true, hint: 'Minimum 6 characters' },
   { key: 'confirmPassword', label: 'CONFIRM PASSWORD',  placeholder: '••••••••',       auto: 'password'       as const, secure: true, required: true },
   { key: 'age',             label: 'AGE',               placeholder: 'e.g. 28',        keyboard: 'numeric'    as const },
-  { key: 'weight',          label: 'WEIGHT (kg)',        placeholder: 'e.g. 72',        keyboard: 'numeric'    as const },
-  { key: 'height',          label: 'HEIGHT (cm)',        placeholder: 'e.g. 175',       keyboard: 'numeric'    as const },
+  { key: 'weight',          label: 'WEIGHT',             placeholder: 'e.g. 72',        keyboard: 'numeric'    as const, hint: 'Enter in kg — you can change units in setup' },
+  { key: 'height',          label: 'HEIGHT',             placeholder: 'e.g. 175',       keyboard: 'numeric'    as const, hint: 'Enter in cm — you can change units in setup' },
 ];
 
 export default function RegisterScreen() {
