@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image } from 'react-native';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, PanResponder, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Circle, Defs, LinearGradient, Stop, G, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Stop, G, Polyline, Text as SvgText, Path, Line } from 'react-native-svg';
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
@@ -155,43 +155,164 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
   );
 }
 
-// ── Weight Trend Chart ────────────────────────────────────────────────────────
-function WeightChart({ weightHistory, unitSystem }: { weightHistory: { date: string; kg: number }[]; unitSystem: string }) {
-  if (weightHistory.length < 2) return null;
+// ── Interactive Weight Chart ──────────────────────────────────────────────────
+function WeightChart({
+  weightHistory,
+  unitSystem,
+  addWeightEntry,
+}: {
+  weightHistory: { date: string; kg: number }[];
+  unitSystem: string;
+  addWeightEntry: (kg: number) => Promise<void>;
+}) {
+  const SCREEN_W = Dimensions.get('window').width;
+  const CHART_W = SCREEN_W - spacing.md * 2 - spacing.lg * 2;
+  const CHART_H = 160;
+  const PAD_L = 38;
+  const INNER_W = CHART_W - PAD_L;
+  const today = new Date().toISOString().split('T')[0];
   const last = weightHistory.slice(-14);
-  const minKg = Math.min(...last.map(w => w.kg)) - 1;
-  const maxKg = Math.max(...last.map(w => w.kg)) + 1;
-  const range = maxKg - minKg || 1;
-  const W = 280; const H = 80;
-  const pts = last.map((w, i) => {
-    const x = (i / (last.length - 1)) * W;
-    const y = H - ((w.kg - minKg) / range) * H;
-    return `${x},${y}`;
-  }).join(' ');
+  const hasToday = last.length > 0 && last[last.length - 1].date === today;
+
+  const [dragKg, setDragKgState] = useState<number | null>(null);
+  const dragKgRef = useRef<number | null>(null);
+  const latestKgRef = useRef(last[last.length - 1]?.kg ?? 70);
+  const panStartKgRef = useRef(0);
+  const rangeRef = useRef(1);
+
+  latestKgRef.current = last[last.length - 1]?.kg ?? 70;
+
+  function setDragKg(v: number | null) { dragKgRef.current = v; setDragKgState(v); }
+
+  const kgValues = last.map(w => w.kg);
+  const dataMin = last.length ? Math.min(...kgValues) : 60;
+  const dataMax = last.length ? Math.max(...kgValues) : 80;
+  const spreadPad = Math.max(2, (dataMax - dataMin) * 0.4 + 1);
+  const minKg = dataMin - spreadPad;
+  const maxKg = dataMax + spreadPad;
+  const range = maxKg - minKg;
+  rangeRef.current = range;
+  const midKg = (minKg + maxKg) / 2;
+
+  const toY = (kg: number) => Math.max(4, Math.min(CHART_H - 4, CHART_H - ((kg - minKg) / range) * CHART_H));
+  const toX = (i: number) => PAD_L + (last.length <= 1 ? INNER_W / 2 : (i / (last.length - 1)) * INNER_W);
+
+  const isDragging = dragKg !== null;
+  const displayKg = isDragging ? dragKg : latestKgRef.current;
+
+  const points = last.map((w, i) => ({
+    x: toX(i),
+    y: toY(i === last.length - 1 ? displayKg : w.kg),
+    date: w.date,
+  }));
+  const latestPt = points[points.length - 1] ?? { x: PAD_L + INNER_W / 2, y: CHART_H / 2 };
+
+  const lineD = points.length >= 2
+    ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+    : '';
+  const fillD = lineD ? `${lineD} L ${latestPt.x} ${CHART_H} L ${PAD_L} ${CHART_H} Z` : '';
+
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      panStartKgRef.current = latestKgRef.current;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onPanResponderMove: (_, { dy }) => {
+      const newKg = Math.round(
+        Math.max(20, Math.min(300, panStartKgRef.current - (dy / CHART_H) * rangeRef.current)) * 10
+      ) / 10;
+      dragKgRef.current = newKg;
+      setDragKgState(newKg);
+    },
+    onPanResponderRelease: async () => {
+      const finalKg = dragKgRef.current;
+      dragKgRef.current = null;
+      setDragKgState(null);
+      if (finalKg !== null && Math.abs(finalKg - panStartKgRef.current) >= 0.1) {
+        await addWeightEntry(finalKg);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+    onPanResponderTerminate: () => { dragKgRef.current = null; setDragKgState(null); },
+  })).current;
+
+  const tooltipL = Math.max(PAD_L, Math.min(CHART_W - spacing.xl * 2, latestPt.x - spacing.xl));
+  const tooltipT = Math.max(0, latestPt.y - spacing.xl - spacing.md);
 
   return (
-    <View style={st.weightChartWrap}>
-      <Text style={st.cardLabel}>WEIGHT TREND</Text>
-      <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-        <Defs>
-          <LinearGradient id="wGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={colors.sky} stopOpacity="0.4" />
-            <Stop offset="100%" stopColor={colors.lavender} stopOpacity="0.8" />
-          </LinearGradient>
-        </Defs>
-        <Polyline points={pts} fill="none" stroke="url(#wGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {last.map((w, i) => {
-          const x = (i / (last.length - 1)) * W;
-          const y = H - ((w.kg - minKg) / range) * H;
-          return <Circle key={w.date} cx={x} cy={y} r={i === last.length - 1 ? 5 : 3}
-            fill={i === last.length - 1 ? colors.lavender : colors.sky} />;
-        })}
-      </Svg>
-      <View style={st.weightChartLabels}>
-        <Text style={st.weightChartLbl}>{new Date(last[0].date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-        <Text style={[st.weightChartLbl, { color: colors.lavender }]}>{formatWeight(last[last.length - 1].kg, unitSystem as any)}</Text>
-        <Text style={st.weightChartLbl}>{new Date(last[last.length - 1].date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+    <View style={{ marginTop: spacing.sm }}>
+      <View style={{ width: CHART_W, height: CHART_H }}>
+        <Svg width={CHART_W} height={CHART_H}>
+          <Defs>
+            <LinearGradient id="wFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={colors.sky} stopOpacity="0.2" />
+              <Stop offset="100%" stopColor={colors.sky} stopOpacity="0" />
+            </LinearGradient>
+            <LinearGradient id="wLine" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%" stopColor={colors.sky} stopOpacity="0.6" />
+              <Stop offset="100%" stopColor={colors.lavender} stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          {/* Grid lines */}
+          {([0.25, 0.5, 0.75] as const).map(f => (
+            <Line key={f} x1={PAD_L} y1={CHART_H * f} x2={CHART_W} y2={CHART_H * f}
+              stroke={colors.line} strokeWidth={1} />
+          ))}
+          {/* Y-axis labels */}
+          <SvgText x={PAD_L - 4} y={8} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(maxKg * 10) / 10}</SvgText>
+          <SvgText x={PAD_L - 4} y={CHART_H / 2 + 3} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(midKg * 10) / 10}</SvgText>
+          <SvgText x={PAD_L - 4} y={CHART_H - 2} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(minKg * 10) / 10}</SvgText>
+          {/* Fill */}
+          {fillD !== '' && <Path d={fillD} fill="url(#wFill)" />}
+          {/* Line */}
+          {lineD !== '' && <Path d={lineD} fill="none" stroke="url(#wLine)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />}
+          {/* Historical dots */}
+          {points.slice(0, hasToday ? -1 : undefined).map((p, i) => (
+            <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.sky} opacity={0.5} />
+          ))}
+          {/* Today dot — outer glow + core */}
+          {hasToday && <>
+            <Circle cx={latestPt.x} cy={latestPt.y} r={isDragging ? 20 : 14} fill={colors.lavender} opacity={isDragging ? 0.2 : 0.1} />
+            <Circle cx={latestPt.x} cy={latestPt.y} r={isDragging ? 9 : 6} fill={colors.lavender} stroke={colors.layer1} strokeWidth={2} />
+          </>}
+          {/* Last dot when not today */}
+          {!hasToday && last.length > 0 && (
+            <Circle cx={latestPt.x} cy={latestPt.y} r={4} fill={colors.lavender} stroke={colors.layer1} strokeWidth={1.5} />
+          )}
+        </Svg>
+        {/* Invisible drag handle over today's dot */}
+        {hasToday && (
+          <View
+            style={{ position: 'absolute', left: latestPt.x - spacing.lg, top: latestPt.y - spacing.lg, width: spacing.lg * 2, height: spacing.lg * 2 }}
+            {...panResponder.panHandlers}
+          />
+        )}
+        {/* Floating tooltip while dragging */}
+        {isDragging && dragKg !== null && (
+          <View style={{ position: 'absolute', left: tooltipL, top: tooltipT, backgroundColor: colors.layer3, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.lavender + '55' }}>
+            <Text style={{ color: colors.lavender, fontWeight: '800', fontSize: fontSize.md }}>{formatWeight(dragKg, unitSystem as 'metric' | 'imperial' | 'UK')}</Text>
+          </View>
+        )}
       </View>
+      {/* X-axis dates */}
+      {last.length >= 2 && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingLeft: PAD_L, marginTop: spacing.xs }}>
+          <Text style={{ fontSize: fontSize.xs - 2, color: colors.ink3 }}>
+            {new Date(last[0].date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </Text>
+          <Text style={{ fontSize: fontSize.xs - 2, color: colors.lavender }}>
+            {new Date(last[last.length - 1].date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </Text>
+        </View>
+      )}
+      {/* Drag hint */}
+      {hasToday && !isDragging && (
+        <Text style={{ fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', marginTop: spacing.xs }}>
+          Drag the dot ↕ to fine-tune today&apos;s weight
+        </Text>
+      )}
     </View>
   );
 }
@@ -781,6 +902,8 @@ export default function ProgressScreen() {
   const totalMacros = totalCarbs + totalProtein + totalFat || 1;
 
   const latestWeight = weightHistory[weightHistory.length - 1]?.kg;
+  const today = new Date().toISOString().split('T')[0];
+  const hasLoggedToday = weightHistory.some(w => w.date === today);
 
   const bmi = useMemo(() => {
     const heightCm = parseFloat(profile?.height ?? '0');
@@ -996,13 +1119,13 @@ export default function ProgressScreen() {
           ))}
         </View>
 
-        {/* Weight tracker */}
+        {/* Weight tracker + trend (unified) */}
         <View style={st.card}>
-          <Text style={st.cardLabel}>WEIGHT</Text>
+          <Text style={st.cardLabel}>WEIGHT TREND</Text>
           <View style={st.weightRow}>
             <View style={{ flex: 1 }}>
               <Text style={[st.weightNum, { color: colors.sky }]}>{latestWeight ? formatWeight(latestWeight, unitSystem) : '—'}</Text>
-              <Text style={st.weightLbl}>Current weight</Text>
+              <Text style={st.weightLbl}>{hasLoggedToday ? 'Logged today — drag dot to adjust' : 'Not logged today'}</Text>
             </View>
             <View style={st.weightInput}>
               <TextInput
@@ -1018,9 +1141,13 @@ export default function ProgressScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          {weightHistory.length >= 1
+            ? <WeightChart weightHistory={weightHistory} unitSystem={unitSystem} addWeightEntry={addWeightEntry} />
+            : <Text style={{ fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingVertical: spacing.md }}>Log your first weight to start tracking.</Text>
+          }
           {weightHistory.length > 1 && (
             <View style={st.weightHistory}>
-              {weightHistory.slice(-5).reverse().map((w, i) => (
+              {weightHistory.slice(-4).reverse().map((w, i) => (
                 <View key={w.date} style={st.weightEntry}>
                   <Text style={st.weightEntryDate}>{new Date(w.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
                   <Text style={[st.weightEntryVal, { color: i === 0 ? colors.sky : colors.ink3 }]}>{formatWeight(w.kg, unitSystem)}</Text>
@@ -1110,20 +1237,6 @@ export default function ProgressScreen() {
 
         {/* 30-day logging calendar */}
         <LoggingCalendar entries={entries} />
-
-        {/* Weight chart */}
-        {weightHistory.length < 2 ? (
-          <View style={st.card}>
-            <Text style={st.cardLabel}>WEIGHT TREND</Text>
-            <Text style={{ fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingVertical: spacing.md }}>
-              Log your weight at least twice to see your trend.
-            </Text>
-          </View>
-        ) : (
-          <View style={st.card}>
-            <WeightChart weightHistory={weightHistory} unitSystem={unitSystem} />
-          </View>
-        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
