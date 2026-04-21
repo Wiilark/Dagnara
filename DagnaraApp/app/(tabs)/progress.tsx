@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, PanResponder, Dimensions } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Circle, Defs, LinearGradient, Stop, G, Polyline, Text as SvgText, Path, Line } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Stop, G, Text as SvgText, Path, Line } from 'react-native-svg';
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
@@ -155,15 +155,13 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
   );
 }
 
-// ── Interactive Weight Chart ──────────────────────────────────────────────────
+// ── Weight Chart ─────────────────────────────────────────────────────────────
 function WeightChart({
   weightHistory,
   unitSystem,
-  addWeightEntry,
 }: {
   weightHistory: { date: string; kg: number }[];
   unitSystem: UnitSystem;
-  addWeightEntry: (kg: number) => Promise<void>;
 }) {
   const SCREEN_W = Dimensions.get('window').width;
   const CHART_W = SCREEN_W - spacing.md * 2 - spacing.lg * 2;
@@ -174,16 +172,6 @@ function WeightChart({
   const last = weightHistory.slice(-14);
   const hasToday = last.length > 0 && last[last.length - 1].date === today;
 
-  const [dragKg, setDragKgState] = useState<number | null>(null);
-  const dragKgRef = useRef<number | null>(null);
-  const latestKgRef = useRef(last[last.length - 1]?.kg ?? 70);
-  const panStartKgRef = useRef(0);
-  const rangeRef = useRef(1);
-
-  latestKgRef.current = last[last.length - 1]?.kg ?? 70;
-
-  function setDragKg(v: number | null) { dragKgRef.current = v; setDragKgState(v); }
-
   const kgValues = last.map(w => w.kg);
   const dataMin = last.length ? Math.min(...kgValues) : 60;
   const dataMax = last.length ? Math.max(...kgValues) : 80;
@@ -191,55 +179,19 @@ function WeightChart({
   const minKg = dataMin - spreadPad;
   const maxKg = dataMax + spreadPad;
   const range = maxKg - minKg;
-  rangeRef.current = range;
   const midKg = (minKg + maxKg) / 2;
 
   const toY = (kg: number) => Math.max(4, Math.min(CHART_H - 4, CHART_H - ((kg - minKg) / range) * CHART_H));
   const toX = (i: number) => PAD_L + (last.length <= 1 ? INNER_W / 2 : (i / (last.length - 1)) * INNER_W);
 
-  const isDragging = dragKg !== null;
-  const displayKg = isDragging ? dragKg : latestKgRef.current;
-
-  const points = last.map((w, i) => ({
-    x: toX(i),
-    y: toY(i === last.length - 1 ? displayKg : w.kg),
-    date: w.date,
-  }));
+  const points = last.map((w, i) => ({ x: toX(i), y: toY(w.kg), date: w.date }));
   const latestPt = points[points.length - 1] ?? { x: PAD_L + INNER_W / 2, y: CHART_H / 2 };
+  const latestKg = last[last.length - 1]?.kg;
 
   const lineD = points.length >= 2
     ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
     : '';
   const fillD = lineD ? `${lineD} L ${latestPt.x} ${CHART_H} L ${PAD_L} ${CHART_H} Z` : '';
-
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
-      panStartKgRef.current = latestKgRef.current;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-    onPanResponderMove: (_, { dy }) => {
-      const newKg = Math.round(
-        Math.max(20, Math.min(300, panStartKgRef.current - (dy / CHART_H) * rangeRef.current)) * 10
-      ) / 10;
-      dragKgRef.current = newKg;
-      setDragKgState(newKg);
-    },
-    onPanResponderRelease: async () => {
-      const finalKg = dragKgRef.current;
-      dragKgRef.current = null;
-      setDragKgState(null);
-      if (finalKg !== null && Math.abs(finalKg - panStartKgRef.current) >= 0.1) {
-        await addWeightEntry(finalKg);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    },
-    onPanResponderTerminate: () => { dragKgRef.current = null; setDragKgState(null); },
-  })).current;
-
-  const tooltipL = Math.max(PAD_L, Math.min(CHART_W - spacing.xl * 2, latestPt.x - spacing.xl));
-  const tooltipT = Math.max(0, latestPt.y - spacing.xl - spacing.md);
 
   return (
     <View style={{ marginTop: spacing.sm }}>
@@ -269,32 +221,24 @@ function WeightChart({
           {/* Line */}
           {lineD !== '' && <Path d={lineD} fill="none" stroke="url(#wLine)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />}
           {/* Historical dots */}
-          {points.slice(0, hasToday ? -1 : undefined).map((p, i) => (
-            <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.sky} opacity={0.5} />
+          {points.slice(0, -1).map((p, i) => (
+            <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.sky} opacity={0.55} />
           ))}
-          {/* Today dot — outer glow + core */}
-          {hasToday && <>
-            <Circle cx={latestPt.x} cy={latestPt.y} r={isDragging ? 20 : 14} fill={colors.lavender} opacity={isDragging ? 0.2 : 0.1} />
-            <Circle cx={latestPt.x} cy={latestPt.y} r={isDragging ? 9 : 6} fill={colors.lavender} stroke={colors.layer1} strokeWidth={2} />
-          </>}
-          {/* Last dot when not today */}
-          {!hasToday && last.length > 0 && (
-            <Circle cx={latestPt.x} cy={latestPt.y} r={4} fill={colors.lavender} stroke={colors.layer1} strokeWidth={1.5} />
+          {/* Latest dot — prominent glow ring + bright core + value label */}
+          <Circle cx={latestPt.x} cy={latestPt.y} r={18} fill={hasToday ? colors.lavender : colors.sky} opacity={0.15} />
+          <Circle cx={latestPt.x} cy={latestPt.y} r={10} fill={hasToday ? colors.lavender : colors.sky} opacity={0.3} />
+          <Circle cx={latestPt.x} cy={latestPt.y} r={6} fill={hasToday ? colors.lavender : colors.sky} stroke={colors.layer1} strokeWidth={2.5} />
+          {latestKg !== undefined && (
+            <SvgText
+              x={latestPt.x}
+              y={latestPt.y - 14}
+              textAnchor="middle"
+              fill={hasToday ? colors.lavender : colors.sky}
+              fontSize={fontSize.xs}
+              fontWeight="700"
+            >{formatWeight(latestKg, unitSystem)}</SvgText>
           )}
         </Svg>
-        {/* Invisible drag handle over today's dot */}
-        {hasToday && (
-          <View
-            style={{ position: 'absolute', left: latestPt.x - spacing.lg, top: latestPt.y - spacing.lg, width: spacing.lg * 2, height: spacing.lg * 2 }}
-            {...panResponder.panHandlers}
-          />
-        )}
-        {/* Floating tooltip while dragging */}
-        {isDragging && dragKg !== null && (
-          <View style={{ position: 'absolute', left: tooltipL, top: tooltipT, backgroundColor: colors.layer3, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.lavender + '55' }}>
-            <Text style={{ color: colors.lavender, fontWeight: '800', fontSize: fontSize.md }}>{formatWeight(dragKg, unitSystem)}</Text>
-          </View>
-        )}
       </View>
       {/* X-axis dates */}
       {last.length >= 2 && (
@@ -306,12 +250,6 @@ function WeightChart({
             {new Date(last[last.length - 1].date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </Text>
         </View>
-      )}
-      {/* Drag hint */}
-      {hasToday && !isDragging && (
-        <Text style={{ fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', marginTop: spacing.xs }}>
-          Drag the dot ↕ to fine-tune today&apos;s weight
-        </Text>
       )}
     </View>
   );
@@ -1132,7 +1070,7 @@ export default function ProgressScreen() {
           <View style={st.weightRow}>
             <View style={{ flex: 1 }}>
               <Text style={[st.weightNum, { color: colors.sky }]}>{latestWeight ? formatWeight(latestWeight, unitSystem) : '—'}</Text>
-              <Text style={st.weightLbl}>{hasLoggedToday ? 'Logged today — drag dot to adjust' : 'Not logged today'}</Text>
+              <Text style={st.weightLbl}>{hasLoggedToday ? 'Logged today' : 'Not logged today'}</Text>
             </View>
             <View style={st.weightInput}>
               <TextInput
@@ -1149,7 +1087,7 @@ export default function ProgressScreen() {
             </View>
           </View>
           {weightHistory.length >= 1
-            ? <WeightChart weightHistory={weightHistory} unitSystem={unitSystem} addWeightEntry={addWeightEntry} />
+            ? <WeightChart weightHistory={weightHistory} unitSystem={unitSystem} />
             : <Text style={{ fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingVertical: spacing.md }}>Log your first weight to start tracking.</Text>
           }
           {weightHistory.length > 1 && (
