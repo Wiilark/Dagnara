@@ -14,6 +14,7 @@ import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { coachMessage } from '../../src/lib/api';
+import { schedulePillReminders } from '../../src/lib/notifications';
 
 // ── Storage keys (scoped per user to prevent data leakage between accounts) ───
 function makeKeys(email: string) {
@@ -810,6 +811,10 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   function saveMeds(updated: Medication[]) {
     setMeds(updated);
     AsyncStorage.setItem(KEYS.PILLS, JSON.stringify(updated));
+    // Re-schedule daily push notifications for every med × time
+    void schedulePillReminders(
+      updated.map(m => ({ id: m.id, name: m.name, dosage: m.dosage, times: m.times }))
+    );
   }
 
   function saveLog(updated: PillLog) {

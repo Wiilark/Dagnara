@@ -154,3 +154,49 @@ export async function scheduleDailySummaryReminder(enabled: boolean) {
 export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
+
+// ── Pill reminder notifications ───────────────────────────────────────────────
+
+/**
+ * Re-schedule daily notifications for every medication × time.
+ * Call this whenever the medication list changes (add / edit / delete).
+ * Clears all existing pill_ notifications first so there are no stale ones.
+ */
+export async function schedulePillReminders(
+  meds: Array<{ id: string; name: string; dosage: string; times: string[] }>,
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  // Cancel every existing pill notification
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    const tag = String((n.content.data as Record<string, unknown>)?.tag ?? '');
+    if (tag.startsWith('pill_')) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+
+  if (meds.length === 0) return;
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+
+  for (const med of meds) {
+    for (const t of med.times) {
+      const parts = t.split(':');
+      const hour   = parseInt(parts[0]) || 0;
+      const minute = parseInt(parts[1]) || 0;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `💊 ${med.name}`,
+          body:  `Time to take ${med.dosage}`,
+          data:  { tag: `pill_${med.id}_${t}` },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
+        },
+      });
+    }
+  }
+}
