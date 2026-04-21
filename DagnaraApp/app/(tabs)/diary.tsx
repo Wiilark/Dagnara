@@ -22,6 +22,7 @@ import { analyzeFood, importRecipe, estimateNutrition } from '../../src/lib/api'
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
 import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
+import { ClockPickerModal } from '../../src/components/ClockPickerModal';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
@@ -158,14 +159,25 @@ const SLEEP_QUALITY = ['😫', '😕', '😐', '😊', '🌟'];
 
 type SleepSaveData = { bedtime: string; waketime: string; quality: number; duration: string };
 
+/** Format a 24-h "HH:MM" string as "10:30 PM" for display */
+function fmtSleepTime(t: string): string {
+  const parts = t.split(':');
+  const h24 = parseInt(parts[0]) || 0;
+  const m   = parseInt(parts[1]) || 0;
+  const suffix = h24 < 12 ? 'AM' : 'PM';
+  const h12  = h24 % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
 function SleepModal({ visible, onClose, onSave }: {
   visible: boolean;
   onClose: () => void;
   onSave: (data: SleepSaveData) => void;
 }) {
-  const [bedtime, setBedtime] = useState('22:30');
+  const [bedtime, setBedtime]   = useState('22:30');
   const [waketime, setWaketime] = useState('06:00');
-  const [quality, setQuality] = useState(2);
+  const [quality, setQuality]   = useState(2);
+  const [clockTarget, setClockTarget] = useState<'bed' | 'wake' | null>(null);
 
   function calcDuration(): string {
     const [bh, bm] = bedtime.split(':').map(Number);
@@ -176,55 +188,81 @@ function SleepModal({ visible, onClose, onSave }: {
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   }
 
+  function handleClockConfirm(time: string) {
+    if (clockTarget === 'bed') setBedtime(time);
+    else setWaketime(time);
+    setClockTarget(null);
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={sl.safe} edges={['bottom']}>
-        <View style={sl.header}>
-          <TouchableOpacity onPress={onClose} style={sl.backBtn}>
-            <Ionicons name="chevron-back" size={18} color={colors.ink2} />
-          </TouchableOpacity>
-          <Text style={sl.title}>Log Sleep</Text>
-          <View style={{ width: 34 }} />
-        </View>
-        <ScrollView contentContainerStyle={sl.content}>
-          <View style={sl.durationDisplay}>
-            <Text style={sl.durNum}>{calcDuration()}</Text>
-            <Text style={sl.durLbl}>Sleep duration</Text>
+    <>
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+        <SafeAreaView style={sl.safe} edges={['bottom']}>
+          <View style={sl.header}>
+            <TouchableOpacity onPress={onClose} style={sl.backBtn}>
+              <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+            </TouchableOpacity>
+            <Text style={sl.title}>Log Sleep</Text>
+            <View style={{ width: 34 }} />
           </View>
-          <Text style={sl.sectionLbl}>BEDTIME & WAKE TIME</Text>
-          <View style={sl.timeRow}>
-            <View style={[sl.timeCard, { borderColor: colors.purple + '80', backgroundColor: colors.purpleTint }]}>
-              <Text style={sl.timeCardLbl}>🌙 Bedtime</Text>
-              <TextInput style={sl.timeVal} value={bedtime} onChangeText={setBedtime} keyboardType="numbers-and-punctuation" />
+          <ScrollView contentContainerStyle={sl.content}>
+            <View style={sl.durationDisplay}>
+              <Text style={sl.durNum}>{calcDuration()}</Text>
+              <Text style={sl.durLbl}>Sleep duration</Text>
             </View>
-            <View style={sl.timeCard}>
-              <Text style={sl.timeCardLbl}>☀️ Wake time</Text>
-              <TextInput style={sl.timeVal} value={waketime} onChangeText={setWaketime} keyboardType="numbers-and-punctuation" />
-            </View>
-          </View>
-          <Text style={sl.sectionLbl}>SLEEP QUALITY</Text>
-          <View style={sl.qualityRow}>
-            {SLEEP_QUALITY.map((em, i) => (
-              <TouchableOpacity key={i} style={[sl.qBtn, quality === i && sl.qBtnSel]} onPress={() => setQuality(i)}>
-                <Text style={sl.qEmoji}>{em}</Text>
+            <Text style={sl.sectionLbl}>BEDTIME & WAKE TIME</Text>
+            <View style={sl.timeRow}>
+              <TouchableOpacity
+                style={[sl.timeCard, { borderColor: colors.purple + '80', backgroundColor: colors.purpleTint }]}
+                onPress={() => setClockTarget('bed')}
+                activeOpacity={0.75}
+              >
+                <Text style={sl.timeCardLbl}>🌙 Bedtime</Text>
+                <Text style={sl.timeVal}>{fmtSleepTime(bedtime)}</Text>
+                <Text style={sl.timeCardHint}>tap to change</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-          <View style={sl.insight}>
-            <Text style={sl.insightLbl}>✦ Insight</Text>
-            <Text style={sl.insightTxt}>On days following 8h+ sleep, your step count is 34% higher. Your mood also improves on average.</Text>
-          </View>
-          <TouchableOpacity style={sl.saveBtn} onPress={() => {
-            const duration = calcDuration();
-            if (duration === '—') { Alert.alert('Invalid time', 'Please enter times in HH:MM format (e.g. 22:30).'); return; }
-            onSave({ bedtime, waketime, quality, duration });
-            onClose();
-          }}>
-            <Text style={sl.saveTxt}>Save Sleep Log</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
+              <TouchableOpacity
+                style={sl.timeCard}
+                onPress={() => setClockTarget('wake')}
+                activeOpacity={0.75}
+              >
+                <Text style={sl.timeCardLbl}>☀️ Wake time</Text>
+                <Text style={sl.timeVal}>{fmtSleepTime(waketime)}</Text>
+                <Text style={sl.timeCardHint}>tap to change</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={sl.sectionLbl}>SLEEP QUALITY</Text>
+            <View style={sl.qualityRow}>
+              {SLEEP_QUALITY.map((em, i) => (
+                <TouchableOpacity key={i} style={[sl.qBtn, quality === i && sl.qBtnSel]} onPress={() => setQuality(i)}>
+                  <Text style={sl.qEmoji}>{em}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={sl.insight}>
+              <Text style={sl.insightLbl}>✦ Insight</Text>
+              <Text style={sl.insightTxt}>On days following 8h+ sleep, your step count is 34% higher. Your mood also improves on average.</Text>
+            </View>
+            <TouchableOpacity style={sl.saveBtn} onPress={() => {
+              const duration = calcDuration();
+              if (duration === '—') { Alert.alert('Invalid time', 'Check your times and try again.'); return; }
+              onSave({ bedtime, waketime, quality, duration });
+              onClose();
+            }}>
+              <Text style={sl.saveTxt}>Save Sleep Log</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Clock picker — rendered outside the pageSheet Modal to avoid z-index issues */}
+      <ClockPickerModal
+        visible={clockTarget !== null}
+        initial={clockTarget === 'bed' ? bedtime : waketime}
+        onConfirm={handleClockConfirm}
+        onClose={() => setClockTarget(null)}
+      />
+    </>
   );
 }
 
@@ -2791,7 +2829,8 @@ const sl = StyleSheet.create({
   timeRow: { flexDirection: 'row', gap: spacing.sm },
   timeCard: { flex: 1, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
   timeCardLbl: { fontSize: fontSize.xs, color: colors.ink3, marginBottom: spacing.sm },
-  timeVal: { fontSize: fontSize.lg, fontWeight: '700', color: colors.ink, textAlign: 'center' },
+  timeVal: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink, textAlign: 'center' },
+  timeCardHint: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, opacity: 0.7 },
   qualityRow: { flexDirection: 'row', justifyContent: 'space-between' },
   qBtn: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   qBtnSel: { backgroundColor: colors.purple + '33', borderWidth: 2, borderColor: colors.purple },
