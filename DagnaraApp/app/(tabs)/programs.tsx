@@ -47,11 +47,13 @@ interface Medication {
   notes: string;
   durationDays: number | null;  // null = ongoing
   startDate: string;            // YYYY-MM-DD
+  daysOfWeek: number[] | null;  // null = every day; 0=Mon…6=Sun
 }
 
 interface DoseEntry {
   takenCount: number;
   takenTimes: string[];
+  skippedSlots?: number[];   // slot indices the user explicitly skipped
 }
 
 interface PillLog {
@@ -522,12 +524,36 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   );
 }
 
+// ── Pill Reminder constants ───────────────────────────────────────────────────
+const STATUS_BG: Record<string, string> = {
+  taken:    colors.green  + '18',
+  skipped:  colors.honey  + '18',
+  overdue:  colors.rose   + '18',
+  upcoming: colors.layer2,
+};
+const STATUS_COLOR: Record<string, string> = {
+  taken:    colors.green,
+  skipped:  colors.honey,
+  overdue:  colors.rose,
+  upcoming: colors.ink3,
+};
+const STATUS_ICON: Record<string, string> = {
+  taken:    '✓',
+  skipped:  '–',
+  overdue:  '!',
+  upcoming: '○',
+};
+const DURATION_PRESETS = [7, 14, 30, 90];
+// 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun (Apple Health convention)
+const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
 // ── Pill Reminder Modal ───────────────────────────────────────────────────────
 function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { email } = useAuthStore();
   const KEYS = makeKeys(email ?? 'anon');
   const [meds, setMeds] = useState<Medication[]>([]);
   const [log, setLog] = useState<PillLog>({});
+  const [weekHistory, setWeekHistory] = useState<Record<string, PillLog>>({});
   // Add/Edit sheet
   const [editSheet, setEditSheet] = useState(false);
   const [editMed, setEditMed] = useState<Medication | null>(null);
@@ -538,8 +564,15 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [formColor, setFormColor] = useState(PILL_COLORS[0]);
   const [formDurationDays, setFormDurationDays] = useState('');
   const [formStartDate, setFormStartDate] = useState(todayKey());
+  const [formDaysOfWeek, setFormDaysOfWeek] = useState<number[] | null>(null);
 
   const today = todayKey();
+
+  // Last 7 days (oldest→newest), used for per-med history strips
+  const weekKeys = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split('T')[0];
+  });
 
   useEffect(() => {
     if (!visible) return;
@@ -563,13 +596,14 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   }
 
   function incrementDose(medId: string, totalTimes: number) {
-    const entry = log[medId] ?? { takenCount: 0, takenTimes: [] };
+    const entry = log[medId] ?? { takenCount: 0, takenTimes: [], skippedSlots: [] };
     if (entry.takenCount >= totalTimes) return;
     const updated: PillLog = {
       ...log,
       [medId]: {
         takenCount: entry.takenCount + 1,
         takenTimes: [...entry.takenTimes, new Date().toISOString()],
+        skippedSlots: entry.skippedSlots ?? [],
       },
     };
     saveLog(updated);
@@ -583,7 +617,28 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       [medId]: {
         takenCount: entry.takenCount - 1,
         takenTimes: entry.takenTimes.slice(0, -1),
+        skippedSlots: entry.skippedSlots ?? [],
       },
+    };
+    saveLog(updated);
+  }
+
+  function skipSlot(medId: string, slotIdx: number) {
+    const entry = log[medId] ?? { takenCount: 0, takenTimes: [], skippedSlots: [] };
+    if ((entry.skippedSlots ?? []).includes(slotIdx)) return;
+    const updated: PillLog = {
+      ...log,
+      [medId]: { ...entry, skippedSlots: [...(entry.skippedSlots ?? []), slotIdx] },
+    };
+    saveLog(updated);
+  }
+
+  function unskipSlot(medId: string, slotIdx: number) {
+    const entry = log[medId];
+    if (!entry) return;
+    const updated: PillLog = {
+      ...log,
+      [medId]: { ...entry, skippedSlots: (entry.skippedSlots ?? []).filter(s => s !== slotIdx) },
     };
     saveLog(updated);
   }
@@ -600,6 +655,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     setFormName(''); setFormDosage(''); setFormNotes('');
     setFormTimes(['08:00']); setFormColor(PILL_COLORS[0]);
     setFormDurationDays(''); setFormStartDate(todayKey());
+    setFormDaysOfWeek(null);
     setEditSheet(true);
   }
 
@@ -609,6 +665,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     setFormTimes(med.times.length ? med.times : ['08:00']); setFormColor(med.color);
     setFormDurationDays(med.durationDays != null ? String(med.durationDays) : '');
     setFormStartDate(med.startDate ?? todayKey());
+    setFormDaysOfWeek(med.daysOfWeek ?? null);
     setEditSheet(true);
   }
 
@@ -624,16 +681,64 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       notes: formNotes.trim(),
       durationDays: formDurationDays.trim() && parsedDays > 0 ? parsedDays : null,
       startDate: formStartDate || todayKey(),
+      daysOfWeek: formDaysOfWeek,
     };
     const updated = editMed ? meds.map(x => x.id === editMed.id ? med : x) : [...meds, med];
     saveMeds(updated);
     setEditSheet(false);
   }
 
+  function toggleDow(day: number) {
+    if (formDaysOfWeek === null) {
+      // Currently every day → remove just this day
+      setFormDaysOfWeek([0, 1, 2, 3, 4, 5, 6].filter(d => d !== day));
+    } else {
+      const next = formDaysOfWeek.includes(day)
+        ? formDaysOfWeek.filter(d => d !== day)
+        : [...formDaysOfWeek, day].sort((a, b) => a - b);
+      // If all 7 selected, collapse back to null (every day)
+      setFormDaysOfWeek(next.length === 0 ? [day] : next.length === 7 ? null : next);
+    }
+  }
+
   function addTime() { setFormTimes([...formTimes, '12:00']); }
   function removeTime(i: number) { setFormTimes(formTimes.filter((_, idx) => idx !== i)); }
   function updateTime(i: number, val: string) {
     const updated = [...formTimes]; updated[i] = val; setFormTimes(updated);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  function isScheduledToday(med: Medication): boolean {
+    if (!med.daysOfWeek) return true;
+    const jsDay = new Date().getDay(); // 0=Sun … 6=Sat
+    const appleDay = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon … 6=Sun
+    return med.daysOfWeek.includes(appleDay);
+  }
+
+  function slotStatus(med: Medication, slotIdx: number): 'taken' | 'skipped' | 'overdue' | 'upcoming' {
+    const entry = log[med.id] ?? { takenCount: 0, takenTimes: [], skippedSlots: [] };
+    if (slotIdx < entry.takenCount) return 'taken';
+    if ((entry.skippedSlots ?? []).includes(slotIdx)) return 'skipped';
+    const [h, mins] = (med.times[slotIdx] ?? '00:00').split(':').map(Number);
+    const slot = new Date(); slot.setHours(h, mins, 0, 0);
+    return new Date() > slot ? 'overdue' : 'upcoming';
+  }
+
+  function getWeekDots(med: Medication): ('full' | 'partial' | 'missed' | 'today')[] {
+    return weekKeys.map((key) => {
+      const dayLog = key === today ? log : (weekHistory[key] ?? {});
+      const takenCount = Math.min(dayLog[med.id]?.takenCount ?? 0, med.times.length);
+      const total = med.times.length;
+      if (key === today) {
+        if (takenCount >= total && total > 0) return 'full';
+        if (takenCount > 0) return 'partial';
+        return 'today';
+      }
+      if (takenCount === 0) return 'missed';
+      if (takenCount >= total) return 'full';
+      return 'partial';
+    });
   }
 
   // Streak calculation: consecutive days all meds fully taken
@@ -651,19 +756,22 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     return streak;
   }
 
-  // 30-day adherence
+  // 30-day adherence + 7-day history per med
   const [adherence, setAdherence] = useState<number | null>(null);
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
-    if (!visible || meds.length === 0) { setAdherence(null); setStreak(0); return; }
+    if (!visible || meds.length === 0) { setAdherence(null); setStreak(0); setWeekHistory({}); return; }
     (async () => {
       let taken = 0, total = 0;
+      const wh: Record<string, PillLog> = {};
       for (let i = 0; i < 30; i++) {
         const d = new Date(); d.setDate(d.getDate() - i);
         const key = d.toISOString().split('T')[0];
         const raw = await AsyncStorage.getItem(KEYS.PILL_LOG(key));
         const dayLog: PillLog = raw ? JSON.parse(raw) : {};
+        // Store past 6 days (not today) for the history strips
+        if (i >= 1 && i <= 6) wh[key] = dayLog;
         meds.forEach(med => {
           total += med.times.length;
           taken += Math.min(dayLog[med.id]?.takenCount ?? 0, med.times.length);
@@ -671,6 +779,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       }
       setAdherence(total > 0 ? Math.round((taken / total) * 100) : 100);
       setStreak(await calcStreak());
+      setWeekHistory(wh);
     })();
   }, [visible, meds, log]);
 
@@ -714,7 +823,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
                 <Text style={m.label}>Reminder times (HH:MM)</Text>
                 {formTimes.map((t, i) => (
-                  <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <View key={i} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
                     <TextInput
                       style={[m.input, { flex: 1 }]}
                       value={t}
@@ -734,45 +843,73 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   <Text style={m.ghostBtnTxt}>+ Add time</Text>
                 </TouchableOpacity>
 
+                <Text style={m.label}>Schedule (days of week)</Text>
+                <View style={m.dowRow}>
+                  {DOW_LABELS.map((lbl, i) => {
+                    const active = formDaysOfWeek === null || formDaysOfWeek.includes(i);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        style={[m.dowBtn, active && { backgroundColor: colors.purple, borderColor: colors.purple }]}
+                        onPress={() => toggleDow(i)}
+                      >
+                        <Text style={[m.dowBtnTxt, active && { color: colors.white }]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {formDaysOfWeek !== null && formDaysOfWeek.length < 7 && (
+                  <TouchableOpacity onPress={() => setFormDaysOfWeek(null)}>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.purple, textAlign: 'center' }}>Tap to reset to every day</Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={m.label}>Duration</Text>
+                <View style={m.durationRow}>
+                  {DURATION_PRESETS.map((d) => {
+                    const sel = formDurationDays === String(d);
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={[m.durationChip, sel && { backgroundColor: colors.purpleTint, borderColor: colors.line3 }]}
+                        onPress={() => setFormDurationDays(sel ? '' : String(d))}
+                      >
+                        <Text style={[m.durationChipTxt, sel && { color: colors.purple }]}>{d}d</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={[m.durationChip, !formDurationDays && { backgroundColor: colors.purpleTint, borderColor: colors.line3 }]}
+                    onPress={() => setFormDurationDays('')}
+                  >
+                    <Text style={[m.durationChipTxt, !formDurationDays && { color: colors.purple }]}>Ongoing</Text>
+                  </TouchableOpacity>
+                </View>
+                {!!formDurationDays && (
+                  <>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.teal }}>
+                      📅 {parseInt(formDurationDays) || 0}-day course
+                    </Text>
+                    <Text style={m.label}>Start date</Text>
+                    <TextInput
+                      style={m.input}
+                      value={formStartDate}
+                      onChangeText={setFormStartDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.ink3}
+                      maxLength={10}
+                    />
+                  </>
+                )}
+
                 <Text style={m.label}>Color</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
                   {PILL_COLORS.map((c) => (
                     <TouchableOpacity key={c} onPress={() => setFormColor(c)}>
                       <View style={[m.colorDot, { backgroundColor: c, borderWidth: formColor === c ? 3 : 0, borderColor: colors.white }]} />
                     </TouchableOpacity>
                   ))}
                 </View>
-
-                <Text style={m.label}>Duration (days)</Text>
-                <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                  <TextInput
-                    style={[m.input, { flex: 1 }]}
-                    value={formDurationDays}
-                    onChangeText={setFormDurationDays}
-                    keyboardType="number-pad"
-                    placeholder="e.g. 7, 14, 30  (leave blank = ongoing)"
-                    placeholderTextColor={colors.ink3}
-                  />
-                </View>
-                {formDurationDays.trim() ? (
-                  <Text style={{ fontSize: fontSize.xs, color: colors.teal, marginTop: -spacing.xs }}>
-                    📅 {parseInt(formDurationDays) || 0}-day course — tracks your % complete each day
-                  </Text>
-                ) : (
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: -spacing.xs }}>
-                    Leave blank for an ongoing / daily medication
-                  </Text>
-                )}
-
-                <Text style={m.label}>Start date</Text>
-                <TextInput
-                  style={m.input}
-                  value={formStartDate}
-                  onChangeText={setFormStartDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.ink3}
-                  maxLength={10}
-                />
 
                 <Text style={m.label}>Notes</Text>
                 <TextInput
@@ -796,7 +933,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
           {meds.length > 0 && (
             <>
               <View style={m.todayCard}>
-                <View style={{ flex: 1, gap: 4 }}>
+                <View style={{ flex: 1, gap: spacing.xs }}>
                   <Text style={m.todaySectionLbl}>TODAY'S COMPLETION</Text>
                   <Text style={[m.todayPctBig, { color: allDoneToday ? colors.green : colors.purple }]}>
                     {todayPct}%
@@ -858,11 +995,12 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
           {/* Med cards */}
           {meds.map((med) => {
-            const entry = log[med.id] ?? { takenCount: 0, takenTimes: [] };
+            const entry = log[med.id] ?? { takenCount: 0, takenTimes: [], skippedSlots: [] };
             const total = med.times.length;
             const taken = entry.takenCount;
-            const done = taken >= total;
-            const dayPct = total > 0 ? Math.round((taken / total) * 100) : 0;
+            const scheduledToday = isScheduledToday(med);
+            const hasOverdue = scheduledToday && med.times.some((_, i) => slotStatus(med, i) === 'overdue');
+            const weekDots = getWeekDots(med);
 
             // Course progress
             const daysSinceStart = Math.floor((Date.now() - new Date(med.startDate ?? todayKey()).getTime()) / 86400000);
@@ -873,41 +1011,63 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
             const courseComplete = med.durationDays != null && daysSinceStart + 1 >= med.durationDays;
 
             return (
-              <View key={med.id} style={m.medCard}>
+              <View key={med.id} style={[m.medCard, !scheduledToday && { opacity: 0.6 }]}>
                 {/* Header row */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <View style={[m.medDot, { backgroundColor: med.color }]} />
                   <View style={{ flex: 1 }}>
-                    <Text style={m.medName}>{med.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' }}>
+                      <Text style={m.medName}>{med.name}</Text>
+                      {!scheduledToday && (
+                        <View style={m.notTodayBadge}><Text style={m.notTodayBadgeTxt}>NOT TODAY</Text></View>
+                      )}
+                      {scheduledToday && hasOverdue && taken < total && (
+                        <View style={m.overdueBadge}><Text style={m.overdueBadgeTxt}>OVERDUE</Text></View>
+                      )}
+                    </View>
                     {med.dosage ? <Text style={m.medDosage}>{med.dosage}</Text> : null}
-                    <Text style={m.medTimes}>{med.times.join(', ')}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => openEdit(med)} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => openEdit(med)} style={{ padding: spacing.xs }}>
                     <Ionicons name="pencil" size={16} color={colors.ink3} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteMed(med.id)} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => deleteMed(med.id)} style={{ padding: spacing.xs }}>
                     <Ionicons name="trash-outline" size={16} color={colors.rose} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Today's dose progress */}
-                <View style={m.doseSectionWrap}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-                    <Text style={m.doseSectionLbl}>TODAY</Text>
-                    <Text style={[m.dayPctTxt, { color: done ? colors.green : med.color }]}>
-                      {done ? '✓ Done' : `${dayPct}%`}
-                    </Text>
+                {/* Dose slot bubbles (only when scheduled today) */}
+                {scheduledToday && (
+                  <View style={m.slotRow}>
+                    {med.times.map((time, i) => {
+                      const status = slotStatus(med, i);
+                      const icon = STATUS_ICON[status] ?? '○';
+                      return (
+                        <View key={i} style={m.slotWrap}>
+                          <TouchableOpacity
+                            style={[m.slotBtn, {
+                              backgroundColor: STATUS_BG[status],
+                              borderColor: STATUS_COLOR[status] + '55',
+                            }]}
+                            onPress={() => {
+                              if (status === 'taken') undoDose(med.id);
+                              else if (status === 'skipped') unskipSlot(med.id, i);
+                              else incrementDose(med.id, total);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[m.slotIcon, { color: STATUS_COLOR[status] }]}>{icon}</Text>
+                            <Text style={[m.slotTime, { color: STATUS_COLOR[status] }]}>{time}</Text>
+                          </TouchableOpacity>
+                          {status === 'overdue' && (
+                            <TouchableOpacity onPress={() => skipSlot(med.id, i)} style={m.skipBtn}>
+                              <Text style={m.skipBtnTxt}>Skip</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
-                  <View style={m.doseBar}>
-                    <View style={[m.doseFill, {
-                      width: `${total > 0 ? (taken / total) * 100 : 0}%` as any,
-                      backgroundColor: done ? colors.green : med.color,
-                    }]} />
-                  </View>
-                  <Text style={[m.doseTxt, { marginTop: spacing.xs }, done && { color: colors.green }]}>
-                    {taken} of {total} dose{total !== 1 ? 's' : ''} taken
-                  </Text>
-                </View>
+                )}
 
                 {/* Course progress (only if durationDays set) */}
                 {med.durationDays != null && (
@@ -915,9 +1075,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
                       <Text style={m.doseSectionLbl}>COURSE</Text>
                       <Text style={[m.dayPctTxt, { color: courseComplete ? colors.green : colors.teal }]}>
-                        {courseComplete
-                          ? '✓ Complete'
-                          : `${Math.round((courseProgress ?? 0) * 100)}%`}
+                        {courseComplete ? '✓ Complete' : `${Math.round((courseProgress ?? 0) * 100)}%`}
                       </Text>
                     </View>
                     <View style={m.doseBar}>
@@ -934,22 +1092,28 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   </View>
                 )}
 
-                {/* Action buttons */}
-                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
-                  <TouchableOpacity
-                    style={[m.doseBtn, { backgroundColor: done ? colors.green + '18' : med.color + '22', flex: 1, borderColor: done ? colors.green + '44' : med.color + '44' }]}
-                    onPress={() => incrementDose(med.id, total)}
-                    disabled={done}
-                  >
-                    <Text style={[m.doseBtnTxt, { color: done ? colors.green : med.color }]}>
-                      {done ? 'All taken ✓' : 'Mark taken'}
-                    </Text>
-                  </TouchableOpacity>
-                  {taken > 0 && (
-                    <TouchableOpacity style={m.undoBtn} onPress={() => undoDose(med.id)}>
-                      <Ionicons name="arrow-undo" size={16} color={colors.ink3} />
-                    </TouchableOpacity>
-                  )}
+                {/* 7-day adherence history strip */}
+                <View style={m.historyStrip}>
+                  {weekDots.map((status, i) => {
+                    const dotColor =
+                      status === 'full'    ? colors.green :
+                      status === 'partial' ? colors.honey :
+                      status === 'today'   ? colors.purple + '44' :
+                      colors.rose + '44';  // missed
+                    const dayLabel = new Date(weekKeys[i] + 'T12:00:00')
+                      .toLocaleDateString([], { weekday: 'narrow' });
+                    const isToday = i === 6;
+                    return (
+                      <View key={i} style={m.historyDayWrap}>
+                        <View style={[
+                          m.historyDot,
+                          { backgroundColor: dotColor },
+                          isToday && { borderWidth: 1, borderColor: colors.purple + '66' },
+                        ]} />
+                        <Text style={[m.historyLbl, isToday && { color: colors.purple }]}>{dayLabel}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
 
                 {med.notes ? <Text style={m.medNotes}>{med.notes}</Text> : null}
@@ -1780,4 +1944,35 @@ const m = StyleSheet.create({
   emptyIcon: { fontSize: fontSize['2xl'] + 10 },
   emptyTitle:{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   emptyDesc: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center' },
+
+  // ── Apple-style slot bubbles ──────────────────────────────────────────────
+  slotRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  slotWrap:        { alignItems: 'center', gap: spacing.xs },
+  slotBtn:         { borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, minWidth: 56 },
+  slotIcon:        { fontSize: fontSize.sm, fontWeight: '800' },
+  slotTime:        { fontSize: fontSize.xs, fontWeight: '600', marginTop: 2 },
+  skipBtn:         { backgroundColor: colors.honey + '18', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.honey + '44' },
+  skipBtnTxt:      { fontSize: fontSize.xs, color: colors.honey, fontWeight: '700' },
+
+  // Badges
+  overdueBadge:    { backgroundColor: colors.rose + '1e', borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.rose + '40' },
+  overdueBadgeTxt: { fontSize: fontSize.xs, fontWeight: '800', color: colors.rose, letterSpacing: 0.5 },
+  notTodayBadge:   { backgroundColor: colors.line, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.line2 },
+  notTodayBadgeTxt:{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 0.4 },
+
+  // 7-day history strip
+  historyStrip:    { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.line, marginTop: spacing.xs },
+  historyDayWrap:  { alignItems: 'center', gap: spacing.xs },
+  historyDot:      { width: 9, height: 9, borderRadius: 5 },
+  historyLbl:      { fontSize: fontSize.xs, color: colors.ink3 },
+
+  // Days-of-week selector
+  dowRow:          { flexDirection: 'row', gap: spacing.xs },
+  dowBtn:          { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2 },
+  dowBtnTxt:       { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
+
+  // Duration preset chips
+  durationRow:     { flexDirection: 'row', gap: spacing.xs },
+  durationChip:    { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2 },
+  durationChipTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
 });
