@@ -259,6 +259,7 @@ function SleepModal({ visible, onClose, onSave }: {
       <ClockPickerModal
         visible={clockTarget !== null}
         initial={clockTarget === 'bed' ? bedtime : waketime}
+        label={clockTarget === 'bed' ? 'SET BEDTIME' : 'SET WAKE TIME'}
         onConfirm={handleClockConfirm}
         onClose={() => setClockTarget(null)}
       />
