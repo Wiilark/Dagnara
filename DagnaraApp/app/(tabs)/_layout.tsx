@@ -117,10 +117,14 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
 }
 
 // ── Quick-Add FAB Sheet ───────────────────────────────────────────────────────
-function QuickAddSheet({ visible, onClose, onExercise }: {
+function QuickAddSheet({ visible, onClose, onExercise, onWeight, onMood, onSleep, onActivity }: {
   visible: boolean;
   onClose: () => void;
   onExercise: () => void;
+  onWeight: () => void;
+  onMood: () => void;
+  onSleep: () => void;
+  onActivity: () => void;
 }) {
   const { setPendingAddMeal } = useAppStore();
 
@@ -130,6 +134,8 @@ function QuickAddSheet({ visible, onClose, onExercise }: {
     setTimeout(() => router.push('/(tabs)/diary' as any), 220);
   }
 
+  function open(cb: () => void) { onClose(); setTimeout(cb, 280); }
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={fab.backdrop} onPress={onClose}>
@@ -137,7 +143,7 @@ function QuickAddSheet({ visible, onClose, onExercise }: {
           {/* Exercise */}
           <TouchableOpacity
             style={fab.exerciseBtn}
-            onPress={() => { onClose(); setTimeout(onExercise, 280); }}
+            onPress={() => open(onExercise)}
             activeOpacity={0.75}
           >
             <Text style={fab.exerciseIcon}>🏋️</Text>
@@ -155,6 +161,21 @@ function QuickAddSheet({ visible, onClose, onExercise }: {
               <TouchableOpacity key={item.meal} style={fab.gridItem} onPress={() => openMeal(item.meal)} activeOpacity={0.75}>
                 <Text style={fab.gridIcon}>{item.icon}</Text>
                 <Text style={fab.gridLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Quick loggers row */}
+          <View style={fab.smallRow}>
+            {[
+              { icon: '⚖️', label: 'Weight',   cb: onWeight   },
+              { icon: '😊', label: 'Mood',     cb: onMood     },
+              { icon: '😴', label: 'Sleep',    cb: onSleep    },
+              { icon: '🏃', label: 'Activity', cb: onActivity },
+            ].map(item => (
+              <TouchableOpacity key={item.label} style={fab.smallItem} onPress={() => open(item.cb)} activeOpacity={0.75}>
+                <Text style={fab.smallIcon}>{item.icon}</Text>
+                <Text style={fab.smallLabel}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -546,6 +567,10 @@ export default function TabLayout() {
   const setMessagesOpen = useAppStore((s) => s.setMessagesOpen);
   const [fabOpen, setFabOpen] = useState(false);
   const [exerciseOpen, setExerciseOpen] = useState(false);
+  const [weightOpen, setWeightOpen] = useState(false);
+  const [moodOpen, setMoodOpen] = useState(false);
+  const [sleepOpen, setSleepOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   useEffect(() => { loadApp(); }, []);
 
@@ -628,8 +653,16 @@ export default function TabLayout() {
         visible={fabOpen}
         onClose={() => setFabOpen(false)}
         onExercise={() => setExerciseOpen(true)}
+        onWeight={() => setWeightOpen(true)}
+        onMood={() => setMoodOpen(true)}
+        onSleep={() => setSleepOpen(true)}
+        onActivity={() => setActivityOpen(true)}
       />
       <ExerciseLogger visible={exerciseOpen} onClose={() => setExerciseOpen(false)} />
+      <WeightLogger visible={weightOpen} onClose={() => setWeightOpen(false)} />
+      <MoodLogger visible={moodOpen} onClose={() => setMoodOpen(false)} />
+      <SleepLogger visible={sleepOpen} onClose={() => setSleepOpen(false)} />
+      <ActivityLogger visible={activityOpen} onClose={() => setActivityOpen(false)} />
       <MessagesModal visible={messagesOpen} onClose={() => setMessagesOpen(false)} />
     </>
   );

@@ -10,7 +10,7 @@ import Svg, { Circle, Defs, LinearGradient, Stop, G, Polyline, Text as SvgText, 
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
-import { formatWeight, parseWeight, weightUnit } from '../../src/lib/units';
+import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ function WeightChart({
   addWeightEntry,
 }: {
   weightHistory: { date: string; kg: number }[];
-  unitSystem: string;
+  unitSystem: UnitSystem;
   addWeightEntry: (kg: number) => Promise<void>;
 }) {
   const SCREEN_W = Dimensions.get('window').width;
@@ -292,7 +292,7 @@ function WeightChart({
         {/* Floating tooltip while dragging */}
         {isDragging && dragKg !== null && (
           <View style={{ position: 'absolute', left: tooltipL, top: tooltipT, backgroundColor: colors.layer3, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.lavender + '55' }}>
-            <Text style={{ color: colors.lavender, fontWeight: '800', fontSize: fontSize.md }}>{formatWeight(dragKg, unitSystem as 'metric' | 'imperial' | 'UK')}</Text>
+            <Text style={{ color: colors.lavender, fontWeight: '800', fontSize: fontSize.md }}>{formatWeight(dragKg, unitSystem)}</Text>
           </View>
         )}
       </View>
@@ -326,7 +326,14 @@ function StatisticsModal({ visible, onClose, entries }: {
 }) {
   const [period, setPeriod] = useState<StatPeriod>('Week');
 
-  const days = period === 'Week' ? 7 : period === '1 Month' ? 30 : period === '3 Months' ? 90 : 90;
+  const allDays = useMemo(() => {
+    const keys = Object.keys(entries).sort();
+    if (!keys.length) return 90;
+    const earliest = new Date(keys[0] + 'T12:00');
+    const span = Math.ceil((Date.now() - earliest.getTime()) / 86400000) + 1;
+    return Math.max(7, Math.min(365, span));
+  }, [entries]);
+  const days = period === 'Week' ? 7 : period === '1 Month' ? 30 : period === '3 Months' ? 90 : allDays;
   const bars: { label: string; kcal: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
