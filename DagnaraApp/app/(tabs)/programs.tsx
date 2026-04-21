@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Line as SvgLine } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
@@ -551,12 +552,21 @@ const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 const DOSAGE_UNITS = ['tab', 'caps', 'mg', 'mcg', 'g', 'IU', 'mL', 'drops', 'spray', 'puff', 'patch'];
 
-// Preset reminder times — hours on the hour, 6 AM → 11 PM
-const PRESET_TIMES = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
-];
+// Clock picker geometry
+const CK_SIZE = 260;
+const CK_CX   = CK_SIZE / 2;   // 130
+const CK_CY   = CK_SIZE / 2;
+const CK_FACE_R = 118;
+const CK_NUM_R  = 94;           // number labels radius
+const CK_HAND_R = 84;           // hand length
+const CK_SEL_R  = 19;           // selection circle
+
+function ckAngle(val: number, total: number): number {
+  return (val / total) * 2 * Math.PI - Math.PI / 2;
+}
+function ckPos(r: number, angle: number): { x: number; y: number } {
+  return { x: CK_CX + r * Math.cos(angle), y: CK_CY + r * Math.sin(angle) };
+}
 function fmtPresetTime(t: string): string {
   const h = parseInt(t.split(':')[0], 10);
   const suffix = h < 12 ? 'AM' : 'PM';
@@ -565,6 +575,194 @@ function fmtPresetTime(t: string): string {
 }
 function buildDosageStr(qty: number, unit: string): string {
   return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ${unit}`;
+}
+
+// ── Clock Time Picker ─────────────────────────────────────────────────────────
+function ClockPickerModal({
+  visible, initial, onConfirm, onClose,
+}: {
+  visible: boolean;
+  initial: string;
+  onConfirm: (time: string) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<'hour' | 'minute'>('hour');
+  const [hour24, setHour24] = useState(8);
+  const [minute, setMinute] = useState(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    setMode('hour');
+    const parts = initial.split(':');
+    const h = parseInt(parts[0]) || 8;
+    const m = Math.round((parseInt(parts[1]) || 0) / 5) * 5 % 60;
+    setHour24(h);
+    setMinute(m);
+  }, [visible, initial]);
+
+  const isAm  = hour24 < 12;
+  const hour12 = hour24 % 12 || 12;
+
+  function selectHour(h: number) {
+    const h24 = isAm ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12);
+    setHour24(h24);
+    setMode('minute');
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  function selectMinute(mn: number) {
+    setMinute(mn);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // auto-confirm on minute tap
+    const h  = String(hour24).padStart(2, '0');
+    const mm = String(mn).padStart(2, '0');
+    onConfirm(`${h}:${mm}`);
+  }
+
+  function toggleAmPm() {
+    setHour24(h => (h < 12 ? h + 12 : h - 12));
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  // Compute hand endpoint
+  const handAngle = mode === 'hour'
+    ? ckAngle(hour12 === 12 ? 0 : hour12, 12)
+    : ckAngle(minute, 60);
+  const handEnd = ckPos(CK_HAND_R, handAngle);
+
+  // Number sets
+  const HOURS   = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent statusBarTranslucent>
+      <View style={ck.overlay}>
+        <View style={ck.card}>
+
+          {/* ── Time header ── */}
+          <View style={ck.timeRow}>
+            <TouchableOpacity onPress={() => setMode('hour')}>
+              <Text style={[ck.timePart, mode === 'hour' && ck.timePartActive]}>
+                {String(hour12).padStart(2, '\u2007')}
+              </Text>
+            </TouchableOpacity>
+            <Text style={ck.timeColon}>:</Text>
+            <TouchableOpacity onPress={() => setMode('minute')}>
+              <Text style={[ck.timePart, mode === 'minute' && ck.timePartActive]}>
+                {String(minute).padStart(2, '0')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* AM / PM */}
+            <View style={ck.ampmWrap}>
+              <TouchableOpacity
+                style={[ck.ampmBtn, isAm && ck.ampmActive]}
+                onPress={() => { if (!isAm) toggleAmPm(); }}
+              >
+                <Text style={[ck.ampmTxt, isAm && ck.ampmTxtActive]}>AM</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[ck.ampmBtn, !isAm && ck.ampmActive]}
+                onPress={() => { if (isAm) toggleAmPm(); }}
+              >
+                <Text style={[ck.ampmTxt, !isAm && ck.ampmTxtActive]}>PM</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── Mode label ── */}
+          <Text style={ck.modeLabel}>
+            {mode === 'hour' ? 'SELECT HOUR' : 'TAP MINUTE TO CONFIRM'}
+          </Text>
+
+          {/* ── Clock face ── */}
+          <View style={{ width: CK_SIZE, height: CK_SIZE }}>
+            <Svg width={CK_SIZE} height={CK_SIZE} style={StyleSheet.absoluteFill}>
+              {/* Face background */}
+              <Circle cx={CK_CX} cy={CK_CY} r={CK_FACE_R} fill={colors.bg2} />
+              {/* Tick marks */}
+              {(mode === 'hour' ? HOURS : MINUTES).map((n, i) => {
+                const a = mode === 'hour'
+                  ? ckAngle(n === 12 ? 0 : n, 12)
+                  : ckAngle(n, 60);
+                const outer = ckPos(CK_FACE_R - 4, a);
+                const inner = ckPos(CK_FACE_R - 14, a);
+                return (
+                  <SvgLine
+                    key={i}
+                    x1={outer.x} y1={outer.y}
+                    x2={inner.x} y2={inner.y}
+                    stroke={colors.line2} strokeWidth={2}
+                  />
+                );
+              })}
+              {/* Hand */}
+              <SvgLine
+                x1={CK_CX} y1={CK_CY}
+                x2={handEnd.x} y2={handEnd.y}
+                stroke={colors.purple} strokeWidth={3} strokeLinecap="round"
+              />
+              {/* Selection circle at hand tip */}
+              <Circle cx={handEnd.x} cy={handEnd.y} r={CK_SEL_R} fill={colors.purple} />
+              {/* Center dot */}
+              <Circle cx={CK_CX} cy={CK_CY} r={5} fill={colors.purple} />
+            </Svg>
+
+            {/* Hour number labels */}
+            {mode === 'hour' && HOURS.map((h) => {
+              const angle = ckAngle(h === 12 ? 0 : h, 12);
+              const pos   = ckPos(CK_NUM_R, angle);
+              const isSel = hour12 === h;
+              return (
+                <TouchableOpacity
+                  key={h}
+                  style={[ck.numBtn, { left: pos.x - 20, top: pos.y - 20 }]}
+                  onPress={() => selectHour(h)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[ck.numTxt, isSel && ck.numTxtSel]}>{h}</Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Minute number labels */}
+            {mode === 'minute' && MINUTES.map((mn) => {
+              const angle = ckAngle(mn, 60);
+              const pos   = ckPos(CK_NUM_R, angle);
+              const isSel = minute === mn;
+              return (
+                <TouchableOpacity
+                  key={mn}
+                  style={[ck.numBtn, { left: pos.x - 20, top: pos.y - 20 }]}
+                  onPress={() => selectMinute(mn)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[ck.numTxt, ck.numTxtMin, isSel && ck.numTxtSel]}>
+                    {String(mn).padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* ── Footer ── */}
+          <View style={ck.footer}>
+            <TouchableOpacity style={ck.cancelBtn} onPress={onClose}>
+              <Text style={ck.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            {mode === 'hour' && (
+              <TouchableOpacity
+                style={ck.okBtn}
+                onPress={() => setMode('minute')}
+              >
+                <Text style={ck.okTxt}>Next →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 // ── Pill Reminder Modal ───────────────────────────────────────────────────────
@@ -586,6 +784,9 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [formDurationDays, setFormDurationDays] = useState('');
   const [formStartDate, setFormStartDate] = useState(todayKey());
   const [formDaysOfWeek, setFormDaysOfWeek] = useState<number[] | null>(null);
+  // Clock picker
+  const [clockVisible,  setClockVisible]  = useState(false);
+  const [clockEditIdx,  setClockEditIdx]  = useState<number>(-1); // -1 = add new
 
   const today = todayKey();
 
@@ -714,13 +915,23 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     setEditSheet(false);
   }
 
-  function togglePresetTime(value: string) {
-    if (formTimes.includes(value)) {
-      if (formTimes.length <= 1) return; // always keep at least one time
-      setFormTimes(formTimes.filter(t => t !== value).sort());
+  function openClock(idx: number) {
+    setClockEditIdx(idx);
+    setClockVisible(true);
+  }
+
+  function handleClockConfirm(time: string) {
+    if (clockEditIdx === -1) {
+      setFormTimes(prev => [...prev, time].sort());
     } else {
-      setFormTimes([...formTimes, value].sort());
+      setFormTimes(prev => prev.map((t, i) => i === clockEditIdx ? time : t).sort());
     }
+    setClockVisible(false);
+  }
+
+  function removeTime(i: number) {
+    if (formTimes.length <= 1) return;
+    setFormTimes(prev => prev.filter((_, idx) => idx !== i));
   }
 
   function toggleDow(day: number) {
@@ -734,12 +945,6 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       // If all 7 selected, collapse back to null (every day)
       setFormDaysOfWeek(next.length === 0 ? [day] : next.length === 7 ? null : next);
     }
-  }
-
-  function addTime() { setFormTimes([...formTimes, '12:00']); }
-  function removeTime(i: number) { setFormTimes(formTimes.filter((_, idx) => idx !== i)); }
-  function updateTime(i: number, val: string) {
-    const updated = [...formTimes]; updated[i] = val; setFormTimes(updated);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -838,6 +1043,14 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
         </View>
 
+        {/* Clock time picker */}
+        <ClockPickerModal
+          visible={clockVisible}
+          initial={clockEditIdx === -1 ? '08:00' : (formTimes[clockEditIdx] ?? '08:00')}
+          onConfirm={handleClockConfirm}
+          onClose={() => setClockVisible(false)}
+        />
+
         {/* Add medication sheet */}
         <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditSheet(false)}>
             <SafeAreaView style={m.sheet} edges={['bottom']}>
@@ -890,36 +1103,25 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                 </Text>
 
                 <Text style={m.label}>Reminder times</Text>
-                {/* Preset time chip grid */}
-                <View style={m.timeGrid}>
-                  {PRESET_TIMES.map((t) => {
-                    const sel = formTimes.includes(t);
-                    return (
-                      <TouchableOpacity
-                        key={t}
-                        style={[m.timeChip, sel && { backgroundColor: colors.purple, borderColor: colors.purple }]}
-                        onPress={() => togglePresetTime(t)}
-                      >
-                        <Text style={[m.timeChipTxt, sel && { color: colors.white }]}>{fmtPresetTime(t)}</Text>
+                {/* Selected time chips — tap to edit, × to remove */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                  {formTimes.map((t, i) => (
+                    <View key={`${t}-${i}`} style={m.timeChip}>
+                      <TouchableOpacity onPress={() => openClock(i)} style={{ flex: 1 }}>
+                        <Text style={m.timeChipTxt}>{fmtPresetTime(t)}</Text>
                       </TouchableOpacity>
-                    );
-                  })}
+                      {formTimes.length > 1 && (
+                        <TouchableOpacity onPress={() => removeTime(i)} style={{ paddingLeft: spacing.xs }}>
+                          <Text style={m.timeChipX}>×</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  {/* Add another time */}
+                  <TouchableOpacity style={m.timeAddBtn} onPress={() => openClock(-1)}>
+                    <Text style={m.timeAddBtnTxt}>+ Add time</Text>
+                  </TouchableOpacity>
                 </View>
-                {/* Non-preset times (from older data) shown as removable chips */}
-                {formTimes.filter(t => !PRESET_TIMES.includes(t)).length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                    {formTimes.filter(t => !PRESET_TIMES.includes(t)).map((t) => (
-                      <View key={t} style={[m.timeChip, { backgroundColor: colors.honey + '22', borderColor: colors.honey + '44', flexDirection: 'row', gap: spacing.xs }]}>
-                        <Text style={[m.timeChipTxt, { color: colors.honey }]}>{t}</Text>
-                        {formTimes.length > 1 && (
-                          <TouchableOpacity onPress={() => setFormTimes(formTimes.filter(x => x !== t))}>
-                            <Text style={{ color: colors.honey, fontSize: fontSize.xs, fontWeight: '700' }}>×</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                )}
 
                 <Text style={m.label}>Schedule (days of week)</Text>
                 <View style={m.dowRow}>
@@ -2065,11 +2267,38 @@ const m = StyleSheet.create({
   unitChip:        { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2 },
   unitChipTxt:     { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink3 },
 
-  // ── Time preset chips ───────────────────────────────────────────────────────
-  timeGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  timeChip:        { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2, minWidth: 52, alignItems: 'center' },
-  timeChipTxt:     { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
+  // ── Time chips (tap-to-edit) ──────────────────────────────────────────────────
+  timeChip:        { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.purple + '55', backgroundColor: colors.purpleTint, minWidth: 62 },
+  timeChipTxt:     { fontSize: fontSize.sm, fontWeight: '700', color: colors.purple, flex: 1, textAlign: 'center' },
+  timeChipX:       { fontSize: fontSize.base, fontWeight: '700', color: colors.purple, lineHeight: fontSize.base + 2 },
+  timeAddBtn:      { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2, justifyContent: 'center' },
+  timeAddBtnTxt:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
 
   // ── Slot dosage label ────────────────────────────────────────────────────────
   slotDosage:      { fontSize: fontSize.xs, fontWeight: '600', marginTop: 1 },
+});
+
+// ── Clock picker styles ───────────────────────────────────────────────────────
+const ck = StyleSheet.create({
+  overlay:        { flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center' },
+  card:           { backgroundColor: colors.layer1, borderRadius: radius.xl, padding: spacing.lg, alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.line2, width: CK_SIZE + spacing.lg * 2 },
+  timeRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  timePart:       { fontSize: fontSize['2xl'] + 14, fontWeight: '800', color: colors.ink3, fontVariant: ['tabular-nums'], backgroundColor: colors.layer2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, minWidth: 72, textAlign: 'center' },
+  timePartActive: { color: colors.purple, backgroundColor: colors.purpleTint },
+  timeColon:      { fontSize: fontSize['2xl'] + 6, fontWeight: '800', color: colors.ink2, marginHorizontal: spacing.xs },
+  ampmWrap:       { gap: spacing.xs, marginLeft: spacing.xs },
+  ampmBtn:        { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2, minWidth: 46, alignItems: 'center' },
+  ampmActive:     { backgroundColor: colors.purpleTint, borderColor: colors.line3 },
+  ampmTxt:        { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink3 },
+  ampmTxtActive:  { color: colors.purple },
+  modeLabel:      { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1, textTransform: 'uppercase' },
+  numBtn:         { position: 'absolute', width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  numTxt:         { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  numTxtMin:      { fontSize: fontSize.xs, fontWeight: '700' },
+  numTxtSel:      { color: colors.white },
+  footer:         { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: spacing.xs },
+  cancelBtn:      { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md },
+  cancelTxt:      { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink3 },
+  okBtn:          { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.purple },
+  okTxt:          { fontSize: fontSize.sm, fontWeight: '700', color: colors.white },
 });
