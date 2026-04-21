@@ -41,13 +41,15 @@ interface QdData {
 interface Medication {
   id: string;
   name: string;
-  dosage: string;
+  dosage: string;              // display string, auto-built from qty+unit
+  dosageQty: number;           // e.g. 2
+  dosageUnit: string;          // e.g. 'tab'
   times: string[];
   color: string;
   notes: string;
-  durationDays: number | null;  // null = ongoing
-  startDate: string;            // YYYY-MM-DD
-  daysOfWeek: number[] | null;  // null = every day; 0=Mon…6=Sun
+  durationDays: number | null; // null = ongoing
+  startDate: string;           // YYYY-MM-DD
+  daysOfWeek: number[] | null; // null = every day; 0=Mon…6=Sun
 }
 
 interface DoseEntry {
@@ -547,6 +549,24 @@ const DURATION_PRESETS = [7, 14, 30, 90];
 // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun (Apple Health convention)
 const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+const DOSAGE_UNITS = ['tab', 'caps', 'mg', 'mcg', 'g', 'IU', 'mL', 'drops', 'spray', 'puff', 'patch'];
+
+// Preset reminder times — hours on the hour, 6 AM → 11 PM
+const PRESET_TIMES = [
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+];
+function fmtPresetTime(t: string): string {
+  const h = parseInt(t.split(':')[0], 10);
+  const suffix = h < 12 ? 'AM' : 'PM';
+  const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${display}${suffix}`;
+}
+function buildDosageStr(qty: number, unit: string): string {
+  return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ${unit}`;
+}
+
 // ── Pill Reminder Modal ───────────────────────────────────────────────────────
 function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { email } = useAuthStore();
@@ -558,7 +578,8 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [editSheet, setEditSheet] = useState(false);
   const [editMed, setEditMed] = useState<Medication | null>(null);
   const [formName, setFormName] = useState('');
-  const [formDosage, setFormDosage] = useState('');
+  const [formDosageQty, setFormDosageQty] = useState<number>(1);
+  const [formDosageUnit, setFormDosageUnit] = useState<string>('tab');
   const [formNotes, setFormNotes] = useState('');
   const [formTimes, setFormTimes] = useState<string[]>(['08:00']);
   const [formColor, setFormColor] = useState(PILL_COLORS[0]);
@@ -652,7 +673,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   function openAdd() {
     setEditMed(null);
-    setFormName(''); setFormDosage(''); setFormNotes('');
+    setFormName(''); setFormDosageQty(1); setFormDosageUnit('tab'); setFormNotes('');
     setFormTimes(['08:00']); setFormColor(PILL_COLORS[0]);
     setFormDurationDays(''); setFormStartDate(todayKey());
     setFormDaysOfWeek(null);
@@ -661,7 +682,10 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   function openEdit(med: Medication) {
     setEditMed(med);
-    setFormName(med.name); setFormDosage(med.dosage); setFormNotes(med.notes);
+    setFormName(med.name);
+    setFormDosageQty(med.dosageQty ?? 1);
+    setFormDosageUnit(med.dosageUnit ?? 'tab');
+    setFormNotes(med.notes);
     setFormTimes(med.times.length ? med.times : ['08:00']); setFormColor(med.color);
     setFormDurationDays(med.durationDays != null ? String(med.durationDays) : '');
     setFormStartDate(med.startDate ?? todayKey());
@@ -675,8 +699,10 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     const med: Medication = {
       id: editMed?.id ?? Date.now().toString(),
       name: formName.trim(),
-      dosage: formDosage.trim(),
-      times: formTimes.filter(t => t.trim()),
+      dosage: buildDosageStr(formDosageQty, formDosageUnit),
+      dosageQty: formDosageQty,
+      dosageUnit: formDosageUnit,
+      times: formTimes.filter(t => t.trim()).sort(),
       color: formColor,
       notes: formNotes.trim(),
       durationDays: formDurationDays.trim() && parsedDays > 0 ? parsedDays : null,
@@ -686,6 +712,15 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     const updated = editMed ? meds.map(x => x.id === editMed.id ? med : x) : [...meds, med];
     saveMeds(updated);
     setEditSheet(false);
+  }
+
+  function togglePresetTime(value: string) {
+    if (formTimes.includes(value)) {
+      if (formTimes.length <= 1) return; // always keep at least one time
+      setFormTimes(formTimes.filter(t => t !== value).sort());
+    } else {
+      setFormTimes([...formTimes, value].sort());
+    }
   }
 
   function toggleDow(day: number) {
@@ -818,30 +853,73 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                 <Text style={m.label}>Medication name *</Text>
                 <TextInput style={m.input} value={formName} onChangeText={setFormName} placeholder="e.g. Vitamin D" placeholderTextColor={colors.ink3} />
 
-                <Text style={m.label}>Dosage</Text>
-                <TextInput style={m.input} value={formDosage} onChangeText={setFormDosage} placeholder="e.g. 1000 IU, 2 tablets" placeholderTextColor={colors.ink3} />
-
-                <Text style={m.label}>Reminder times (HH:MM)</Text>
-                {formTimes.map((t, i) => (
-                  <View key={i} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                    <TextInput
-                      style={[m.input, { flex: 1 }]}
-                      value={t}
-                      onChangeText={(v) => updateTime(i, v)}
-                      placeholder="08:00"
-                      placeholderTextColor={colors.ink3}
-                      maxLength={5}
-                    />
-                    {formTimes.length > 1 && (
-                      <TouchableOpacity onPress={() => removeTime(i)}>
-                        <Ionicons name="remove-circle" size={22} color={colors.rose} />
+                <Text style={m.label}>Amount per dose</Text>
+                {/* Quantity stepper */}
+                <View style={m.doseStepperRow}>
+                  <TouchableOpacity
+                    style={m.doseStepBtn}
+                    onPress={() => setFormDosageQty(q => Math.max(0.5, +(q - (q > 1 ? 1 : 0.5)).toFixed(1)))}
+                  >
+                    <Text style={m.doseStepBtnTxt}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={m.doseStepVal}>{formDosageQty % 1 === 0 ? formDosageQty : formDosageQty.toFixed(1)}</Text>
+                  <TouchableOpacity
+                    style={m.doseStepBtn}
+                    onPress={() => setFormDosageQty(q => Math.min(20, +(q + (q >= 1 ? 1 : 0.5)).toFixed(1)))}
+                  >
+                    <Text style={m.doseStepBtnTxt}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                {/* Unit chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
+                  {DOSAGE_UNITS.map((u) => {
+                    const sel = formDosageUnit === u;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[m.unitChip, sel && { backgroundColor: colors.purpleTint, borderColor: colors.line3 }]}
+                        onPress={() => setFormDosageUnit(u)}
+                      >
+                        <Text style={[m.unitChipTxt, sel && { color: colors.purple }]}>{u}</Text>
                       </TouchableOpacity>
-                    )}
+                    );
+                  })}
+                </ScrollView>
+                <Text style={{ fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center' }}>
+                  Take {buildDosageStr(formDosageQty, formDosageUnit)} per dose
+                </Text>
+
+                <Text style={m.label}>Reminder times</Text>
+                {/* Preset time chip grid */}
+                <View style={m.timeGrid}>
+                  {PRESET_TIMES.map((t) => {
+                    const sel = formTimes.includes(t);
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        style={[m.timeChip, sel && { backgroundColor: colors.purple, borderColor: colors.purple }]}
+                        onPress={() => togglePresetTime(t)}
+                      >
+                        <Text style={[m.timeChipTxt, sel && { color: colors.white }]}>{fmtPresetTime(t)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {/* Non-preset times (from older data) shown as removable chips */}
+                {formTimes.filter(t => !PRESET_TIMES.includes(t)).length > 0 && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                    {formTimes.filter(t => !PRESET_TIMES.includes(t)).map((t) => (
+                      <View key={t} style={[m.timeChip, { backgroundColor: colors.honey + '22', borderColor: colors.honey + '44', flexDirection: 'row', gap: spacing.xs }]}>
+                        <Text style={[m.timeChipTxt, { color: colors.honey }]}>{t}</Text>
+                        {formTimes.length > 1 && (
+                          <TouchableOpacity onPress={() => setFormTimes(formTimes.filter(x => x !== t))}>
+                            <Text style={{ color: colors.honey, fontSize: fontSize.xs, fontWeight: '700' }}>×</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
                   </View>
-                ))}
-                <TouchableOpacity onPress={addTime} style={m.ghostBtn}>
-                  <Text style={m.ghostBtnTxt}>+ Add time</Text>
-                </TouchableOpacity>
+                )}
 
                 <Text style={m.label}>Schedule (days of week)</Text>
                 <View style={m.dowRow}>
@@ -1056,7 +1134,10 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                             activeOpacity={0.7}
                           >
                             <Text style={[m.slotIcon, { color: STATUS_COLOR[status] }]}>{icon}</Text>
-                            <Text style={[m.slotTime, { color: STATUS_COLOR[status] }]}>{time}</Text>
+                            <Text style={[m.slotTime, { color: STATUS_COLOR[status] }]}>{fmtPresetTime(time)}</Text>
+                            <Text style={[m.slotDosage, { color: STATUS_COLOR[status] + 'cc' }]}>
+                              {buildDosageStr(med.dosageQty ?? 1, med.dosageUnit ?? 'tab')}
+                            </Text>
                           </TouchableOpacity>
                           {status === 'overdue' && (
                             <TouchableOpacity onPress={() => skipSlot(med.id, i)} style={m.skipBtn}>
@@ -1975,4 +2056,20 @@ const m = StyleSheet.create({
   durationRow:     { flexDirection: 'row', gap: spacing.xs },
   durationChip:    { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2 },
   durationChipTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
+
+  // ── Dosage stepper ─────────────────────────────────────────────────────────
+  doseStepperRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  doseStepBtn:     { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  doseStepBtnTxt:  { fontSize: fontSize.xl, fontWeight: '700', color: colors.ink },
+  doseStepVal:     { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, minWidth: 52, textAlign: 'center' },
+  unitChip:        { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2 },
+  unitChipTxt:     { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink3 },
+
+  // ── Time preset chips ───────────────────────────────────────────────────────
+  timeGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  timeChip:        { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2, minWidth: 52, alignItems: 'center' },
+  timeChipTxt:     { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3 },
+
+  // ── Slot dosage label ────────────────────────────────────────────────────────
+  slotDosage:      { fontSize: fontSize.xs, fontWeight: '600', marginTop: 1 },
 });
