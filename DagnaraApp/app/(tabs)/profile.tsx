@@ -23,7 +23,7 @@ const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
-  const { updateCaloriesBurned, logSleep, selectedDate } = useDiaryStore();
+  const { updateCaloriesBurned, logSleep } = useDiaryStore();
   const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts } = useAppStore();
   const xpInfo = getXpLevel(xp);
 
@@ -281,7 +281,7 @@ export default function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,

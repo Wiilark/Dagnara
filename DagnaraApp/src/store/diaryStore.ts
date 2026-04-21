@@ -61,6 +61,8 @@ export interface DiaryEntry {
   water: number;
   calories_burned: number;
   sleep?: SleepLog;
+  mood?: number;   // 0–4 index (Awful → Amazing)
+  steps?: number;
   veggies?: number;
   fruits?: number;
   skippedMeals?: Record<string, boolean>;
@@ -85,6 +87,8 @@ interface DiaryState {
   setSkippedMeals: (date: string, meals: Record<string, boolean>) => Promise<void>;
   updateCaloriesBurned: (date: string, kcal: number) => Promise<void>;
   logSleep: (date: string, sleep: SleepLog) => Promise<void>;
+  logMood: (date: string, mood: number) => Promise<void>;
+  logSteps: (date: string, steps: number) => Promise<void>;
   addStrengthSession: (date: string, session: StrengthSession) => Promise<void>;
   removeStrengthSession: (date: string, id: string) => Promise<void>;
   addCardioSession: (date: string, session: CardioSession) => Promise<void>;
@@ -249,6 +253,22 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entries = get().entries;
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, sleep };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  logMood: async (date, mood) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, mood };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail());
+  },
+
+  logSteps: async (date, steps) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, steps };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
     await saveEntry(date, updated, getEmail());
   },

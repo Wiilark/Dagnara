@@ -200,8 +200,10 @@ function MoodLogger({ visible, onClose }: { visible: boolean; onClose: () => voi
   const [selected, setSelected] = useState(2);
   const [notes, setNotes] = useState('');
   const { addXp } = useAppStore();
+  const { logMood } = useDiaryStore();
 
-  function handleLog() {
+  async function handleLog() {
+    await logMood(TODAY(), selected);
     addXp(10);
     Alert.alert('Mood logged!', `${MOODS[selected]} Feeling ${MOOD_LABELS[selected]} saved. +10 XP`);
     setNotes('');
@@ -456,13 +458,15 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
 // ── Activity / Steps Logger ───────────────────────────────────────────────────
 function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { addXp } = useAppStore();
+  const { logSteps } = useDiaryStore();
   const [steps, setSteps] = useState(0);
   const STEP_GOAL = 8000;
 
   function addSteps(n: number) { setSteps(s => Math.min(s + n, 30000)); }
 
-  function handleSave() {
+  async function handleSave() {
     if (steps <= 0) { Alert.alert('No steps', 'Tap a quick-add button to log steps.'); return; }
+    await logSteps(TODAY(), steps);
     const xpEarned = Math.round(steps / 100);
     addXp(xpEarned);
     Alert.alert('Steps logged!', `${steps.toLocaleString()} steps saved. +${xpEarned} XP`);
