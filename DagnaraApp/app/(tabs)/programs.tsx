@@ -45,6 +45,8 @@ interface Medication {
   times: string[];
   color: string;
   notes: string;
+  durationDays: number | null;  // null = ongoing
+  startDate: string;            // YYYY-MM-DD
 }
 
 interface DoseEntry {
@@ -534,6 +536,8 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [formNotes, setFormNotes] = useState('');
   const [formTimes, setFormTimes] = useState<string[]>(['08:00']);
   const [formColor, setFormColor] = useState(PILL_COLORS[0]);
+  const [formDurationDays, setFormDurationDays] = useState('');
+  const [formStartDate, setFormStartDate] = useState(todayKey());
 
   const today = todayKey();
 
@@ -595,6 +599,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     setEditMed(null);
     setFormName(''); setFormDosage(''); setFormNotes('');
     setFormTimes(['08:00']); setFormColor(PILL_COLORS[0]);
+    setFormDurationDays(''); setFormStartDate(todayKey());
     setEditSheet(true);
   }
 
@@ -602,11 +607,14 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     setEditMed(med);
     setFormName(med.name); setFormDosage(med.dosage); setFormNotes(med.notes);
     setFormTimes(med.times.length ? med.times : ['08:00']); setFormColor(med.color);
+    setFormDurationDays(med.durationDays != null ? String(med.durationDays) : '');
+    setFormStartDate(med.startDate ?? todayKey());
     setEditSheet(true);
   }
 
   function saveMedForm() {
     if (!formName.trim()) { Alert.alert('Name required'); return; }
+    const parsedDays = parseInt(formDurationDays);
     const med: Medication = {
       id: editMed?.id ?? Date.now().toString(),
       name: formName.trim(),
@@ -614,6 +622,8 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       times: formTimes.filter(t => t.trim()),
       color: formColor,
       notes: formNotes.trim(),
+      durationDays: formDurationDays.trim() && parsedDays > 0 ? parsedDays : null,
+      startDate: formStartDate || todayKey(),
     };
     const updated = editMed ? meds.map(x => x.id === editMed.id ? med : x) : [...meds, med];
     saveMeds(updated);
@@ -665,6 +675,16 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   }, [visible, meds, log]);
 
   const allDoneToday = meds.length > 0 && meds.every(med => (log[med.id]?.takenCount ?? 0) >= med.times.length);
+
+  const todayPct = meds.length === 0 ? 0 : Math.round(
+    (meds.reduce((acc, med) => acc + Math.min((log[med.id]?.takenCount ?? 0) / Math.max(med.times.length, 1), 1), 0) / meds.length) * 100
+  );
+  const todayDoneCount = meds.filter(med => (log[med.id]?.takenCount ?? 0) >= med.times.length).length;
+
+  // SVG ring constants for today % ring
+  const PR_R = 28;
+  const PR_CIRC = 2 * Math.PI * PR_R;
+  const prOffset = PR_CIRC * (1 - todayPct / 100);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -723,6 +743,37 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   ))}
                 </View>
 
+                <Text style={m.label}>Duration (days)</Text>
+                <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+                  <TextInput
+                    style={[m.input, { flex: 1 }]}
+                    value={formDurationDays}
+                    onChangeText={setFormDurationDays}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 7, 14, 30  (leave blank = ongoing)"
+                    placeholderTextColor={colors.ink3}
+                  />
+                </View>
+                {formDurationDays.trim() ? (
+                  <Text style={{ fontSize: fontSize.xs, color: colors.teal, marginTop: -spacing.xs }}>
+                    📅 {parseInt(formDurationDays) || 0}-day course — tracks your % complete each day
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: -spacing.xs }}>
+                    Leave blank for an ongoing / daily medication
+                  </Text>
+                )}
+
+                <Text style={m.label}>Start date</Text>
+                <TextInput
+                  style={m.input}
+                  value={formStartDate}
+                  onChangeText={setFormStartDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.ink3}
+                  maxLength={10}
+                />
+
                 <Text style={m.label}>Notes</Text>
                 <TextInput
                   style={[m.input, { minHeight: 60, textAlignVertical: 'top' }]}
@@ -741,24 +792,60 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
         </Modal>
 
         <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
-          {/* Summary stats */}
+          {/* Today's overall completion */}
           {meds.length > 0 && (
-            <View style={m.statsRow}>
-              <View style={m.statCard}>
-                <Text style={m.statVal}>{streak}</Text>
-                <Text style={m.statLbl}>day streak</Text>
+            <>
+              <View style={m.todayCard}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={m.todaySectionLbl}>TODAY'S COMPLETION</Text>
+                  <Text style={[m.todayPctBig, { color: allDoneToday ? colors.green : colors.purple }]}>
+                    {todayPct}%
+                  </Text>
+                  <Text style={m.todaySub}>
+                    {allDoneToday
+                      ? '🎉 All medications taken!'
+                      : `${todayDoneCount} of ${meds.length} medications done`}
+                  </Text>
+                  {/* Day progress bar */}
+                  <View style={m.todayBarBg}>
+                    <View style={[m.todayBarFill, {
+                      width: `${todayPct}%` as any,
+                      backgroundColor: allDoneToday ? colors.green : colors.purple,
+                    }]} />
+                  </View>
+                </View>
+                {/* SVG ring */}
+                <View style={m.todayRingWrap}>
+                  <Svg width={72} height={72}>
+                    <Circle cx={36} cy={36} r={PR_R} stroke={colors.layer3} strokeWidth={6} fill="none" />
+                    <Circle
+                      cx={36} cy={36} r={PR_R}
+                      stroke={allDoneToday ? colors.green : colors.purple}
+                      strokeWidth={6} fill="none"
+                      strokeDasharray={PR_CIRC}
+                      strokeDashoffset={prOffset}
+                      strokeLinecap="round"
+                      rotation="-90"
+                      origin="36,36"
+                    />
+                  </Svg>
+                  <Text style={[m.todayRingPct, { color: allDoneToday ? colors.green : colors.purple }]}>
+                    {todayPct}%
+                  </Text>
+                </View>
               </View>
-              <View style={m.statCard}>
-                <Text style={m.statVal}>{adherence !== null ? `${adherence}%` : '—'}</Text>
-                <Text style={m.statLbl}>30-day avg</Text>
+              {/* Streak + adherence mini-row */}
+              <View style={m.statsRow}>
+                <View style={m.statCard}>
+                  <Text style={m.statVal}>{streak}</Text>
+                  <Text style={m.statLbl}>day streak 🔥</Text>
+                </View>
+                <View style={m.statCard}>
+                  <Text style={m.statVal}>{adherence !== null ? `${adherence}%` : '—'}</Text>
+                  <Text style={m.statLbl}>30-day avg</Text>
+                </View>
               </View>
-              <View style={m.statCard}>
-                <Text style={[m.statVal, { color: allDoneToday ? colors.green : colors.honey }]}>
-                  {allDoneToday ? '✓' : `${meds.filter(med => (log[med.id]?.takenCount ?? 0) >= med.times.length).length}/${meds.length}`}
-                </Text>
-                <Text style={m.statLbl}>today</Text>
-              </View>
-            </View>
+            </>
           )}
 
           {meds.length === 0 && (
@@ -775,9 +862,20 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
             const total = med.times.length;
             const taken = entry.takenCount;
             const done = taken >= total;
+            const dayPct = total > 0 ? Math.round((taken / total) * 100) : 0;
+
+            // Course progress
+            const daysSinceStart = Math.floor((Date.now() - new Date(med.startDate ?? todayKey()).getTime()) / 86400000);
+            const courseProgress = med.durationDays != null
+              ? Math.min(1, (daysSinceStart + 1) / med.durationDays) : null;
+            const daysRemaining = med.durationDays != null
+              ? Math.max(0, med.durationDays - daysSinceStart - 1) : null;
+            const courseComplete = med.durationDays != null && daysSinceStart + 1 >= med.durationDays;
+
             return (
               <View key={med.id} style={m.medCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {/* Header row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <View style={[m.medDot, { backgroundColor: med.color }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={m.medName}>{med.name}</Text>
@@ -792,21 +890,60 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   </TouchableOpacity>
                 </View>
 
-                {/* Dose progress */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                  <View style={m.doseBar}>
-                    <View style={[m.doseFill, { width: `${total > 0 ? (taken / total) * 100 : 0}%`, backgroundColor: med.color }]} />
+                {/* Today's dose progress */}
+                <View style={m.doseSectionWrap}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                    <Text style={m.doseSectionLbl}>TODAY</Text>
+                    <Text style={[m.dayPctTxt, { color: done ? colors.green : med.color }]}>
+                      {done ? '✓ Done' : `${dayPct}%`}
+                    </Text>
                   </View>
-                  <Text style={[m.doseTxt, done && { color: colors.green }]}>{taken}/{total}</Text>
+                  <View style={m.doseBar}>
+                    <View style={[m.doseFill, {
+                      width: `${total > 0 ? (taken / total) * 100 : 0}%` as any,
+                      backgroundColor: done ? colors.green : med.color,
+                    }]} />
+                  </View>
+                  <Text style={[m.doseTxt, { marginTop: spacing.xs }, done && { color: colors.green }]}>
+                    {taken} of {total} dose{total !== 1 ? 's' : ''} taken
+                  </Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                {/* Course progress (only if durationDays set) */}
+                {med.durationDays != null && (
+                  <View style={m.courseSectionWrap}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                      <Text style={m.doseSectionLbl}>COURSE</Text>
+                      <Text style={[m.dayPctTxt, { color: courseComplete ? colors.green : colors.teal }]}>
+                        {courseComplete
+                          ? '✓ Complete'
+                          : `${Math.round((courseProgress ?? 0) * 100)}%`}
+                      </Text>
+                    </View>
+                    <View style={m.doseBar}>
+                      <View style={[m.doseFill, {
+                        width: `${Math.round((courseProgress ?? 0) * 100)}%` as any,
+                        backgroundColor: courseComplete ? colors.green : colors.teal,
+                      }]} />
+                    </View>
+                    <Text style={[m.doseTxt, { marginTop: spacing.xs }, courseComplete && { color: colors.green }]}>
+                      {courseComplete
+                        ? `${med.durationDays}-day course complete 🎉`
+                        : `Day ${Math.min(daysSinceStart + 1, med.durationDays)} of ${med.durationDays}${daysRemaining != null && daysRemaining > 0 ? ` · ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left` : ''}`}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Action buttons */}
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
                   <TouchableOpacity
-                    style={[m.doseBtn, { backgroundColor: med.color + '22', flex: 1 }]}
+                    style={[m.doseBtn, { backgroundColor: done ? colors.green + '18' : med.color + '22', flex: 1, borderColor: done ? colors.green + '44' : med.color + '44' }]}
                     onPress={() => incrementDose(med.id, total)}
                     disabled={done}
                   >
-                    <Text style={[m.doseBtnTxt, { color: med.color }]}>{done ? 'All taken ✓' : 'Mark taken'}</Text>
+                    <Text style={[m.doseBtnTxt, { color: done ? colors.green : med.color }]}>
+                      {done ? 'All taken ✓' : 'Mark taken'}
+                    </Text>
                   </TouchableOpacity>
                   {taken > 0 && (
                     <TouchableOpacity style={m.undoBtn} onPress={() => undoDose(med.id)}>
@@ -1614,18 +1751,30 @@ const m = StyleSheet.create({
   ghostBtnTxt:   { color: colors.ink2, fontSize: fontSize.sm },
 
   // Pill-specific
-  medCard:   { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.line },
+  medCard:   { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.line, gap: spacing.xs },
   medDot:    { width: 14, height: 14, borderRadius: 7 },
   medName:   { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   medDosage: { fontSize: fontSize.xs, color: colors.ink2, marginTop: 1 },
   medTimes:  { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
   medNotes:  { fontSize: fontSize.xs, color: colors.ink3, fontStyle: 'italic', marginTop: spacing.xs, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.line },
-  doseBar:   { flex: 1, height: 6, backgroundColor: colors.layer2, borderRadius: 3, overflow: 'hidden' },
-  doseFill:  { height: '100%', borderRadius: 3 },
-  doseTxt:   { fontSize: fontSize.xs, color: colors.ink3, width: 30, textAlign: 'right' },
-  doseBtn:   { borderRadius: radius.sm, alignItems: 'center', paddingVertical: 8 },
+  doseBar:   { height: 7, backgroundColor: colors.layer2, borderRadius: radius.sm, overflow: 'hidden' },
+  doseFill:  { height: '100%', borderRadius: radius.sm },
+  doseTxt:   { fontSize: fontSize.xs, color: colors.ink3 },
+  doseBtn:   { borderRadius: radius.sm, alignItems: 'center', paddingVertical: spacing.sm, borderWidth: 1 },
   doseBtnTxt:{ fontSize: fontSize.xs, fontWeight: '700' },
-  undoBtn:   { backgroundColor: colors.layer1, borderRadius: radius.sm, paddingHorizontal: spacing.sm, justifyContent: 'center' },
+  undoBtn:   { backgroundColor: colors.layer2, borderRadius: radius.sm, paddingHorizontal: spacing.sm, justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  doseSectionWrap:  { backgroundColor: colors.layer2, borderRadius: radius.sm, padding: spacing.sm, gap: spacing.xs },
+  courseSectionWrap:{ backgroundColor: colors.teal + '0e', borderRadius: radius.sm, padding: spacing.sm, gap: spacing.xs, borderWidth: 1, borderColor: colors.teal + '33' },
+  doseSectionLbl:   { fontSize: fontSize.xs - 1, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1, textTransform: 'uppercase' },
+  dayPctTxt:        { fontSize: fontSize.sm, fontWeight: '800' },
+  todayCard:        { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  todaySectionLbl:  { fontSize: fontSize.xs - 1, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1, textTransform: 'uppercase' },
+  todayPctBig:      { fontSize: fontSize['2xl'] - 2, fontWeight: '800' },
+  todaySub:         { fontSize: fontSize.xs, color: colors.ink2 },
+  todayBarBg:       { height: 6, backgroundColor: colors.layer3, borderRadius: 3, overflow: 'hidden', marginTop: spacing.xs },
+  todayBarFill:     { height: '100%', borderRadius: 3 },
+  todayRingWrap:    { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
+  todayRingPct:     { position: 'absolute', fontSize: fontSize.xs + 1, fontWeight: '800' },
   colorDot:  { width: 28, height: 28, borderRadius: radius.pill },
   emptyState:{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs + 2 },
   emptyIcon: { fontSize: fontSize['2xl'] + 10 },
