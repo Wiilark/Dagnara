@@ -17,7 +17,7 @@ const BAR_AREA_W = SCREEN_W - spacing.md * 2 - CHART_PAD_H * 2;
 const BAR_SLOT = BAR_AREA_W / DAYS;
 const BAR_W = BAR_SLOT * 0.55;
 
-function dateStr(d: Date) { return d.toISOString().split('T')[0]; }
+function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 
 function dayShort(iso: string) {
   return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2);

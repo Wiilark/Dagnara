@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Modal, Switch, Image, Platform, KeyboardAvoidingView,
+  Alert, TextInput, Modal, Switch, Image, Platform, KeyboardAvoidingView, Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -90,7 +90,10 @@ export default function ProfileScreen() {
       `${p}_language`, `${p}_unit_system`, `${p}_water_goal`, `${p}_plan`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
-      if (m[`${p}_body_measurements`]) setMeasurements(JSON.parse(m[`${p}_body_measurements`]!));
+      if (m[`${p}_body_measurements`]) {
+        try { setMeasurements(JSON.parse(m[`${p}_body_measurements`]!)); }
+        catch { void AsyncStorage.removeItem(`${p}_body_measurements`); }
+      }
       if (m[`${p}_notif_checkin`]) setNotifCheckIn(m[`${p}_notif_checkin`] === 'true');
       if (m[`${p}_notif_meals`])   setNotifMeals(m[`${p}_notif_meals`] === 'true');
       if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
@@ -113,7 +116,8 @@ export default function ProfileScreen() {
       if (m[`${p}_health_writeback`]) setHealthWriteBack(m[`${p}_health_writeback`] === 'true');
       if (m[`${p}_health_last_sync`]) setHealthLastSync(m[`${p}_health_last_sync`]);
     });
-  }, []);
+    // `setUnitSystem` is a stable Zustand action — safe to omit. `p` already covers email changes.
+  }, [p]);
 
   // Reset local TDEE state when modal opens
   useEffect(() => {
@@ -166,7 +170,7 @@ export default function ProfileScreen() {
     if (!healthConnected) { await handleHealthConnect(); return; }
     setHealthSyncing(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       const data = await readHealthData(today);
       if (healthSyncCalories && data.activeCalories > 0) {
         await updateCaloriesBurned(today, data.activeCalories);
@@ -195,7 +199,7 @@ export default function ProfileScreen() {
   async function handleSave() {
     const wKg = parseWeight(draftWeightInput, unitSystem);
     const hCm = parseHeight(draftHeightInput, unitSystem);
-    const ageNum = parseInt(draft.age ?? '');
+    const ageNum = parseInt(draft.age ?? '', 10);
     if (draft.age && !isNaN(ageNum) && (ageNum < 16 || ageNum > 100)) {
       Alert.alert('Invalid age', 'Age must be between 16 and 100 years.');
       return;
@@ -506,9 +510,9 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Macro Goals</Text>
             <TouchableOpacity onPress={() => {
-              const c = parseInt(localCarbs) || 0;
-              const p = parseInt(localProtein) || 0;
-              const f = parseInt(localFat) || 0;
+              const c = parseInt(localCarbs, 10) || 0;
+              const p = parseInt(localProtein, 10) || 0;
+              const f = parseInt(localFat, 10) || 0;
               if (c + p + f !== 100) { Alert.alert('Invalid split', 'Carbs + Protein + Fat must equal 100%.'); return; }
               void setMacroPcts({ carbs: c, protein: p, fat: f });
               setMacrosModal(false);
@@ -522,7 +526,7 @@ export default function ProfileScreen() {
               { key: 'protein', label: 'Protein',        color: colors.rose, val: localProtein, set: setLocalProtein },
               { key: 'fat',     label: 'Fat',            color: colors.honey, val: localFat,    set: setLocalFat },
             ] as const).map(({ key, label, color, val, set }) => {
-              const pct = parseInt(val) || 0;
+              const pct = parseInt(val, 10) || 0;
               const grams = Math.round(calorieGoal * pct / 100 / (key === 'fat' ? 9 : 4));
               return (
                 <View key={key} style={mst.macroRow}>
@@ -549,7 +553,7 @@ export default function ProfileScreen() {
             })}
 
             {(() => {
-              const total = (parseInt(localCarbs) || 0) + (parseInt(localProtein) || 0) + (parseInt(localFat) || 0);
+              const total = (parseInt(localCarbs, 10) || 0) + (parseInt(localProtein, 10) || 0) + (parseInt(localFat, 10) || 0);
               const ok = total === 100;
               return (
                 <View style={[mst.calCard, { borderColor: ok ? colors.line2 : colors.rose + '55' }]}>
@@ -816,8 +820,10 @@ export default function ProfileScreen() {
                     <Text style={[sst.label, { flex: 1 }]}>{healthPlatformName()}</Text>
                     {healthConnected
                       ? <Text style={{ fontSize: fontSize.xs, color: colors.green, fontWeight: '700' }}>Connected</Text>
-                      : <TouchableOpacity onPress={handleHealthConnect} style={{ backgroundColor: colors.purple, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
-                          <Text style={{ fontSize: fontSize.xs, color: colors.white, fontWeight: '700' }}>Connect</Text>
+                      : <TouchableOpacity onPress={handleHealthConnect} activeOpacity={0.85} style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
+                          <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
+                            <Text style={{ fontSize: fontSize.xs, color: colors.white, fontWeight: '700' }}>Connect</Text>
+                          </LinearGradient>
                         </TouchableOpacity>
                     }
                   </View>
@@ -962,7 +968,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Dietary Preferences Modal ── */}
-      <Modal visible={dietaryModal} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setDietaryModal(false)}>
+      <Modal visible={dietaryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietaryModal(false)}>
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
           <View style={dp.header}>
             <TouchableOpacity onPress={() => setDietaryModal(false)} style={dp.backBtn}>
@@ -1040,7 +1046,7 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => setTdeeModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Calorie & Goals</Text>
             <TouchableOpacity onPress={() => {
-              const age = parseInt(profile.age ?? '25') || 25;
+              const age = parseInt(profile.age ?? '25', 10) || 25;
               const weight = parseFloat(profile.weight ?? '70') || 70;
               const height = parseFloat(profile.height ?? '170') || 170;
               const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
@@ -1058,7 +1064,7 @@ export default function ProfileScreen() {
                   style={{ flex: 1, padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
                     borderColor: sex === s ? colors.lavender : colors.line2,
                     backgroundColor: sex === s ? colors.purple + '22' : colors.layer2 }}>
-                  <Text style={{ fontSize: fontSize.lg }}>{s === 'male' ? '♂️' : '♀️'}</Text>
+                  <Ionicons name={s === 'male' ? 'male' : 'female'} size={24} color={s === 'male' ? colors.sky : colors.rose} />
                   <Text style={{ color: sex === s ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: fontSize.sm, textTransform: 'capitalize' }}>{s}</Text>
                 </TouchableOpacity>
               ))}
@@ -1107,7 +1113,7 @@ export default function ProfileScreen() {
 
             {/* Calculated result */}
             {(() => {
-              const age = parseInt(profile.age ?? '25') || 25;
+              const age = parseInt(profile.age ?? '25', 10) || 25;
               const weight = parseFloat(profile.weight ?? '70') || 70;
               const height = parseFloat(profile.height ?? '170') || 170;
               const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
@@ -1146,6 +1152,8 @@ export default function ProfileScreen() {
                   placeholderTextColor={colors.ink3}
                   keyboardType={keyboard ?? 'default'}
                   autoCapitalize="none"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
                 />
               </View>
             ))}
@@ -1158,6 +1166,8 @@ export default function ProfileScreen() {
                 placeholderTextColor={colors.ink3}
                 keyboardType="decimal-pad"
                 autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={() => Keyboard.dismiss()}
               />
             </View>
             <View>
@@ -1169,6 +1179,8 @@ export default function ProfileScreen() {
                 placeholderTextColor={colors.ink3}
                 keyboardType={unitSystem === 'Metric' ? 'decimal-pad' : 'default'}
                 autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={() => Keyboard.dismiss()}
               />
             </View>
           </ScrollView>
@@ -1192,7 +1204,7 @@ export default function ProfileScreen() {
               placeholderTextColor={colors.ink3}
               returnKeyType="done"
               onSubmitEditing={() => {
-                const n = parseInt(waterGoalInput);
+                const n = parseInt(waterGoalInput, 10);
                 if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
                 else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
                 setWaterGoalModal(false);
@@ -1205,7 +1217,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  const n = parseInt(waterGoalInput);
+                  const n = parseInt(waterGoalInput, 10);
                   if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
                   else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
                   setWaterGoalModal(false);

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet,
-  Modal, Alert, TextInput, KeyboardAvoidingView, Platform,
+  Modal, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { ClockPickerModal } from '../../src/components/ClockPickerModal';
+import { CalendarPickerModal } from '../../src/components/CalendarPickerModal';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { coachMessage } from '../../src/lib/api';
@@ -70,31 +71,72 @@ const PILL_COLORS = [
   colors.violet, colors.teal, colors.purple2, colors.lavender,
 ];
 
-// ── Achievements & milestones ─────────────────────────────────────────────────
+// ── QuitNow-aligned: Time-based achievements (22) ─────────────────────────────
 const QS_ACHIEVEMENTS = [
-  { id: '20min', hours: 0.33,  icon: '🌟', title: '20 Minutes', desc: 'Heart rate and blood pressure drop' },
-  { id: '12h',   hours: 12,    icon: '💨', title: '12 Hours',   desc: 'Carbon monoxide levels normalize' },
-  { id: '24h',   hours: 24,    icon: '❤️', title: '1 Day',      desc: 'Heart attack risk begins to drop' },
-  { id: '48h',   hours: 48,    icon: '👃', title: '2 Days',     desc: 'Smell and taste start to improve' },
-  { id: '72h',   hours: 72,    icon: '🫁', title: '3 Days',     desc: 'Nicotine fully leaves your body' },
-  { id: '1w',    hours: 168,   icon: '🏃', title: '1 Week',     desc: 'Lung function begins to improve' },
-  { id: '2w',    hours: 336,   icon: '🌿', title: '2 Weeks',    desc: 'Circulation improves significantly' },
-  { id: '1mo',   hours: 720,   icon: '💪', title: '1 Month',    desc: 'Cough and fatigue decrease' },
-  { id: '3mo',   hours: 2160,  icon: '🫀', title: '3 Months',   desc: 'Lung capacity improves up to 30%' },
-  { id: '6mo',   hours: 4380,  icon: '🎯', title: '6 Months',   desc: 'Serious coughing episodes decrease' },
-  { id: '1yr',   hours: 8760,  icon: '🏆', title: '1 Year',     desc: 'Heart disease risk halved' },
+  { id: '20m',  hours: 0.33,    icon: '🌟', title: '20 Minutes', desc: 'Blood pressure normalizes' },
+  { id: '1h',   hours: 1,       icon: '⏱️',  title: '1 Hour',     desc: 'You can do this' },
+  { id: '8h',   hours: 8,       icon: '🩸', title: '8 Hours',    desc: 'CO and nicotine cut in half' },
+  { id: '12h',  hours: 12,      icon: '💨', title: '12 Hours',   desc: 'Carbon monoxide eliminated' },
+  { id: '1d',   hours: 24,      icon: '❤️', title: '1 Day',      desc: 'Heart attack risk drops' },
+  { id: '2d',   hours: 48,      icon: '👃', title: '2 Days',     desc: 'Taste and smell return' },
+  { id: '3d',   hours: 72,      icon: '🫁', title: '3 Days',     desc: 'Nicotine fully gone' },
+  { id: '1w',   hours: 168,     icon: '🏃', title: '1 Week',     desc: 'Lungs rebuilding' },
+  { id: '2w',   hours: 336,     icon: '🌿', title: '2 Weeks',    desc: 'Circulation improves' },
+  { id: '3w',   hours: 504,     icon: '💪', title: '3 Weeks',    desc: 'Habit reshaping' },
+  { id: '1mo',  hours: 720,     icon: '🌙', title: '1 Month',    desc: 'Cough and fatigue down' },
+  { id: '2mo',  hours: 1440,    icon: '🔥', title: '2 Months',   desc: 'Energy returning' },
+  { id: '3mo',  hours: 2160,    icon: '🫀', title: '3 Months',   desc: 'Lung function up 30%' },
+  { id: '6mo',  hours: 4380,    icon: '🎯', title: '6 Months',   desc: 'Major risk drop' },
+  { id: '9mo',  hours: 6480,    icon: '🌱', title: '9 Months',   desc: 'Cilia regenerated' },
+  { id: '1y',   hours: 8760,    icon: '🏆', title: '1 Year',     desc: 'Heart disease risk halved' },
+  { id: '2y',   hours: 17520,   icon: '⭐', title: '2 Years',    desc: 'Major milestone' },
+  { id: '3y',   hours: 26280,   icon: '💎', title: '3 Years',    desc: 'Truly free' },
+  { id: '5y',   hours: 43800,   icon: '🧠', title: '5 Years',    desc: 'Stroke risk = non-smoker' },
+  { id: '10y',  hours: 87600,   icon: '👑', title: '10 Years',   desc: 'Lung cancer risk halved' },
+  { id: '15y',  hours: 131400,  icon: '✨', title: '15 Years',   desc: 'Heart risk = non-smoker' },
+  { id: '20y',  hours: 175200,  icon: '🦋', title: '20 Years',   desc: 'A new life entirely' },
 ];
 
+// ── QuitNow-aligned: Cigarettes-avoided achievements (9) ──────────────────────
+const QS_CIG_ACHIEVEMENTS = [
+  { id: 'c10',  cigs: 10,     icon: '🚭', title: '10 Avoided',     desc: 'Off to a great start' },
+  { id: 'c50',  cigs: 50,     icon: '🌬️', title: '50 Avoided',     desc: 'Building momentum' },
+  { id: 'c100', cigs: 100,    icon: '💯', title: '100 Avoided',    desc: 'A century clean' },
+  { id: 'c500', cigs: 500,    icon: '🔥', title: '500 Avoided',    desc: 'Half a thousand' },
+  { id: 'c1k',  cigs: 1000,   icon: '⭐', title: '1,000 Avoided',  desc: 'Quadruple digits' },
+  { id: 'c5k',  cigs: 5000,   icon: '💎', title: '5,000 Avoided',  desc: 'Diamond level' },
+  { id: 'c10k', cigs: 10000,  icon: '🏆', title: '10,000 Avoided', desc: 'Five-figure freedom' },
+  { id: 'c25k', cigs: 25000,  icon: '👑', title: '25,000 Avoided', desc: 'Royal status' },
+  { id: 'c50k', cigs: 50000,  icon: '🌟', title: '50,000 Avoided', desc: 'Legendary' },
+];
+
+// ── QuitNow-aligned: Money-saved achievements (7) ─────────────────────────────
+const QS_MONEY_ACHIEVEMENTS = [
+  { id: 'm10',  money: 10,     icon: '💵', title: '$10 Saved',     desc: 'First savings' },
+  { id: 'm50',  money: 50,     icon: '💴', title: '$50 Saved',     desc: 'Building a fund' },
+  { id: 'm100', money: 100,    icon: '💰', title: '$100 Saved',    desc: 'Three figures' },
+  { id: 'm500', money: 500,    icon: '💎', title: '$500 Saved',    desc: 'Half a thousand' },
+  { id: 'm1k',  money: 1000,   icon: '🏆', title: '$1,000 Saved',  desc: 'Quadruple digits' },
+  { id: 'm5k',  money: 5000,   icon: '👑', title: '$5,000 Saved',  desc: 'Royal savings' },
+  { id: 'm10k', money: 10000,  icon: '🌟', title: '$10,000 Saved', desc: 'Wealthy and well' },
+];
+
+// ── QuitNow-aligned: Health milestones (14, full WHO timeline) ────────────────
 const QS_MILESTONES = [
-  { hours: 0.33,  icon: '❤️', text: 'Blood pressure drops' },
-  { hours: 8,     icon: '💨', text: 'Oxygen levels normalize' },
-  { hours: 24,    icon: '🫀', text: 'Heart attack risk drops' },
-  { hours: 48,    icon: '👃', text: 'Taste and smell recover' },
-  { hours: 72,    icon: '🫁', text: 'Breathing becomes easier' },
-  { hours: 336,   icon: '🏃', text: 'Circulation improves' },
-  { hours: 720,   icon: '💪', text: 'Lung function improves 10%' },
-  { hours: 4380,  icon: '🎯', text: 'Heart disease risk halved' },
-  { hours: 8760,  icon: '🏆', text: 'Stroke risk = non-smoker' },
+  { hours: 0.33,    icon: '❤️',  text: 'Blood pressure and pulse normalize' },
+  { hours: 8,       icon: '🩸',  text: 'Nicotine and CO in blood drop by 50%' },
+  { hours: 12,      icon: '💨',  text: 'Carbon monoxide eliminated from blood' },
+  { hours: 24,      icon: '🫀',  text: 'Risk of heart attack starts to drop' },
+  { hours: 48,      icon: '👃',  text: 'Taste and smell return — no nicotine left' },
+  { hours: 72,      icon: '🫁',  text: 'Bronchial tubes relax — breathing easier' },
+  { hours: 336,     icon: '🏃',  text: 'Circulation improves — walking gets easier' },
+  { hours: 720,     icon: '💪',  text: 'Coughing and shortness of breath decrease' },
+  { hours: 2160,    icon: '🌬️',  text: 'Lung function increases up to 30%' },
+  { hours: 6480,    icon: '🌿',  text: 'Cilia regenerate — fewer lung infections' },
+  { hours: 8760,    icon: '🏆',  text: 'Heart disease risk halved' },
+  { hours: 43800,   icon: '🧠',  text: 'Stroke risk equals a non-smoker' },
+  { hours: 87600,   icon: '🎯',  text: 'Lung cancer risk halved' },
+  { hours: 131400,  icon: '🌟',  text: 'Heart disease risk equals a non-smoker' },
 ];
 
 const QD_ACHIEVEMENTS = [
@@ -167,7 +209,18 @@ function formatDuration(ms: number): string {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toLocaleDateString('en-CA');
+}
+
+function fmtFriendlyDate(key: string): string {
+  // "YYYY-MM-DD" → "Apr 24, 2026"
+  const parts = key.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return key;
+  const date = new Date(y, m, d);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(iso: string): string {
@@ -193,14 +246,29 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [formCpd, setFormCpd] = useState('15');
   const [formCpp, setFormCpp] = useState('12');
   const [formCigsPerPack, setFormCigsPerPack] = useState('20');
+  // UI: which detail view is showing inside the modal
+  const [qsView, setQsView] = useState<'main' | 'progress' | 'achievements' | 'health'>('main');
+  // UI: which achievement category tab is selected on the achievements detail
+  const [qsAchTab, setQsAchTab] = useState<'time' | 'cigs' | 'money'>('time');
+
+  // Reset detail-view state any time the modal closes so the next open lands on main
+  useEffect(() => {
+    if (!visible) { setQsView('main'); setQsAchTab('time'); }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
     AsyncStorage.getItem(KEYS.QS).then((raw) => {
       if (raw) {
-        const d: QsData = JSON.parse(raw);
-        setData(d);
-        setShowSetup(false);
+        try {
+          const d: QsData = JSON.parse(raw);
+          setData(d);
+          setShowSetup(false);
+        } catch {
+          void AsyncStorage.removeItem(KEYS.QS);
+          setData(null);
+          setShowSetup(true);
+        }
       } else {
         setData(null);
         setShowSetup(true);
@@ -217,9 +285,9 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   }, [data]);
 
   function saveSetup() {
-    const cpd = parseInt(formCpd) || 15;
+    const cpd = parseInt(formCpd, 10) || 15;
     const cpp = parseFloat(formCpp) || 12;
-    const cip = parseInt(formCigsPerPack) || 20;
+    const cip = parseInt(formCigsPerPack, 10) || 20;
     if (cpd < 1 || cpd > 200) { Alert.alert('Invalid value', 'Cigarettes per day must be between 1 and 200.'); return; }
     if (cpp <= 0 || cpp > 500) { Alert.alert('Invalid value', 'Cost per pack must be between $0.01 and $500.'); return; }
     if (cip < 1 || cip > 100) { Alert.alert('Invalid value', 'Cigarettes per pack must be between 1 and 100.'); return; }
@@ -245,7 +313,61 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const cigsAvoided = data ? Math.floor(hours * (data.cigsPerDay / 24)) : 0;
   const moneySaved = data ? ((cigsAvoided / data.cigsPerPack) * data.costPerPack) : 0;
   const lifeRegained = cigsAvoided * 11; // minutes
-  const unlockedCount = data ? QS_ACHIEVEMENTS.filter(a => hours >= a.hours).length : 0;
+
+  // Per-category unlock counts
+  const timeUnlocked  = data ? QS_ACHIEVEMENTS.filter(a => hours >= a.hours).length : 0;
+  const cigsUnlocked  = data ? QS_CIG_ACHIEVEMENTS.filter(a => cigsAvoided >= a.cigs).length : 0;
+  const moneyUnlocked = data ? QS_MONEY_ACHIEVEMENTS.filter(a => moneySaved >= a.money).length : 0;
+  const totalUnlocked    = timeUnlocked + cigsUnlocked + moneyUnlocked;
+  const totalAchievements = QS_ACHIEVEMENTS.length + QS_CIG_ACHIEVEMENTS.length + QS_MONEY_ACHIEVEMENTS.length;
+
+  // Tri-counter parts (matches QuitNow: 50 days  01 hour  42 minutes)
+  const totalSec = Math.floor(elapsed / 1000);
+  const triDays  = Math.floor(totalSec / 86400);
+  const triHrs   = Math.floor((totalSec % 86400) / 3600);
+  const triMins  = Math.floor((totalSec % 3600) / 60);
+
+  // Time-regained as "Xd"/"Xh"/"Xm"
+  const lifeRegainedTxt = lifeRegained >= 1440
+    ? `${Math.floor(lifeRegained / 1440)}d`
+    : lifeRegained >= 60
+      ? `${Math.floor(lifeRegained / 60)}h`
+      : `${lifeRegained}m`;
+
+  // Latest unlocked achievement → drives "Health improvements" highlight card
+  const latestUnlocked = data
+    ? [...QS_ACHIEVEMENTS].reverse().find(a => hours >= a.hours) ?? null
+    : null;
+
+  // ── Per-period projections (drives Overall Progress detail screen) ───────────
+  const cpd = data?.cigsPerDay ?? 0;
+  const cpp = data?.costPerPack ?? 0;
+  const cip = data?.cigsPerPack ?? 1;
+  const moneyPerCig = cip > 0 ? cpp / cip : 0;
+  const minPerCig   = 11; // matches existing lifeRegained calc
+  const cigPer = {
+    day:   cpd,
+    week:  Math.round(cpd * 7),
+    month: Math.round(cpd * 30.42),
+    year:  Math.round(cpd * 365),
+  };
+  const moneyPer = {
+    day:   moneyPerCig * cpd,
+    week:  moneyPerCig * cpd * 7,
+    month: moneyPerCig * cpd * 30.42,
+    year:  moneyPerCig * cpd * 365,
+  };
+  function fmtMins(min: number): string {
+    if (min >= 1440) return `${(min / 1440).toFixed(min >= 14400 ? 0 : 1)} d`;
+    if (min >= 60)   return `${(min / 60).toFixed(min >= 600 ? 0 : 1)} h`;
+    return `${Math.round(min)} min`;
+  }
+  const timePer = {
+    day:   fmtMins(cpd * minPerCig),
+    week:  fmtMins(cpd * minPerCig * 7),
+    month: fmtMins(cpd * minPerCig * 30.42),
+    year:  fmtMins(cpd * minPerCig * 365),
+  };
 
   if (showSetup) {
     return (
@@ -268,15 +390,19 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 value={formDate}
                 onChangeText={setFormDate}
                 maxLength={10}
+                returnKeyType="next"
+                onSubmitEditing={() => Keyboard.dismiss()}
               />
               <Text style={m.label}>Cigarettes per day</Text>
-              <TextInput style={m.input} keyboardType="numeric" value={formCpd} onChangeText={setFormCpd} placeholderTextColor={colors.ink3} />
+              <TextInput style={m.input} keyboardType="numeric" value={formCpd} onChangeText={setFormCpd} placeholderTextColor={colors.ink3} returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()} />
               <Text style={m.label}>Cost per pack ($)</Text>
-              <TextInput style={m.input} keyboardType="decimal-pad" value={formCpp} onChangeText={setFormCpp} placeholderTextColor={colors.ink3} />
+              <TextInput style={m.input} keyboardType="decimal-pad" value={formCpp} onChangeText={setFormCpp} placeholderTextColor={colors.ink3} returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()} />
               <Text style={m.label}>Cigarettes per pack</Text>
-              <TextInput style={m.input} keyboardType="numeric" value={formCigsPerPack} onChangeText={setFormCigsPerPack} placeholderTextColor={colors.ink3} />
-              <TouchableOpacity style={m.primaryBtn} onPress={saveSetup}>
-                <Text style={m.primaryBtnTxt}>Start My Journey</Text>
+              <TextInput style={m.input} keyboardType="numeric" value={formCigsPerPack} onChangeText={setFormCigsPerPack} placeholderTextColor={colors.ink3} returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()} />
+              <TouchableOpacity style={m.primaryBtn} activeOpacity={0.85} onPress={saveSetup}>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={m.primaryBtnGrad}>
+                  <Text style={m.primaryBtnTxt}>Start My Journey</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </SafeAreaView>
@@ -287,71 +413,398 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['bottom']}>
+        {/* ── Header: back-arrow on detail views, X close on main ─────────── */}
         <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>🚭 Quit Smoking</Text>
-          <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
+          {qsView === 'main' ? (
+            <>
+              <Text style={m.sheetTitle}>🚭 Quit Smoking</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color={colors.ink2} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity onPress={() => setQsView('main')} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="chevron-back" size={26} color={colors.ink2} />
+              </TouchableOpacity>
+              <Text style={m.sheetTitle}>
+                {qsView === 'progress' && 'Overall progress'}
+                {qsView === 'achievements' && 'Achievements'}
+                {qsView === 'health' && 'Health improvements'}
+              </Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color={colors.ink2} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
+
         <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
-          {/* Timer */}
-          <View style={m.timerCard}>
-            <Text style={m.timerLabel}>Smoke-free for</Text>
-            <Text style={m.timerValue}>{formatDuration(elapsed)}</Text>
-            <Text style={m.timerSub}>{unlockedCount}/{QS_ACHIEVEMENTS.length} achievements unlocked</Text>
-          </View>
-
-          {/* Stats */}
-          <View style={m.statsRow}>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>{cigsAvoided}</Text>
-              <Text style={m.statLbl}>cigs avoided</Text>
-            </View>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>${moneySaved.toFixed(2)}</Text>
-              <Text style={m.statLbl}>money saved</Text>
-            </View>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>{lifeRegained >= 60 ? `${Math.floor(lifeRegained/60)}h` : `${lifeRegained}m`}</Text>
-              <Text style={m.statLbl}>life regained</Text>
-            </View>
-          </View>
-
-          {/* Achievements */}
-          <Text style={m.sectionTitle}>Achievements</Text>
-          {QS_ACHIEVEMENTS.map((a) => {
-            const done = hours >= a.hours;
-            return (
-              <View key={a.id} style={[m.achieveRow, !done && m.achieveLocked]}>
-                <Text style={[m.achieveIcon, !done && { opacity: 0.3 }]}>{a.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[m.achieveTitle, !done && { color: colors.ink3 }]}>{a.title}</Text>
-                  <Text style={m.achieveDesc}>{a.desc}</Text>
+          {/* ════════════════════════════════════════════════════════════════
+              MAIN VIEW
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'main' && (
+            <>
+              {/* ── Hero band: stopwatch + tri-counter ──────────────────── */}
+              <View style={m.qsHero}>
+                <LinearGradient
+                  colors={['rgba(124,77,255,0.18)', 'transparent']}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+                  pointerEvents="none"
+                />
+                <View style={m.qsHeroIconWrap}>
+                  <Ionicons name="stopwatch" size={64} color={colors.sky} />
                 </View>
-                {done && <Ionicons name="checkmark-circle" size={20} color={colors.green} />}
+                <View style={m.qsTriRow}>
+                  <View style={m.qsTriCol}>
+                    <Text style={m.qsTriNum}>{String(triDays).padStart(2, '0')}</Text>
+                    <Text style={m.qsTriLbl}>{triDays === 1 ? 'day' : 'days'}</Text>
+                  </View>
+                  <View style={m.qsTriCol}>
+                    <Text style={m.qsTriNum}>{String(triHrs).padStart(2, '0')}</Text>
+                    <Text style={m.qsTriLbl}>{triHrs === 1 ? 'hour' : 'hours'}</Text>
+                  </View>
+                  <View style={m.qsTriCol}>
+                    <Text style={m.qsTriNum}>{String(triMins).padStart(2, '0')}</Text>
+                    <Text style={m.qsTriLbl}>{triMins === 1 ? 'minute' : 'minutes'}</Text>
+                  </View>
+                </View>
               </View>
-            );
-          })}
 
-          {/* Health Timeline */}
-          <Text style={m.sectionTitle}>Health Timeline</Text>
-          {QS_MILESTONES.map((ms, i) => {
-            const done = hours >= ms.hours;
+              {/* ── Overall Progress card → opens detail ────────────────── */}
+              <TouchableOpacity activeOpacity={0.85} onPress={() => setQsView('progress')} style={m.qsProgCard}>
+                <View style={m.qsSectionHead}>
+                  <Text style={m.qsHeading}>Overall Progress</Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+                </View>
+                <View style={m.qsProgRow}>
+                  <View style={m.qsProgStat}>
+                    <View style={[m.qsProgCircle, { backgroundColor: colors.sky }]}>
+                      <Ionicons name="calendar" size={22} color={colors.white} />
+                    </View>
+                    <Text style={m.qsProgNum}>{triDays}</Text>
+                    <Text style={m.qsProgLbl}>days{'\n'}quit</Text>
+                  </View>
+                  <View style={m.qsProgStat}>
+                    <View style={[m.qsProgCircle, { backgroundColor: colors.rose }]}>
+                      <Ionicons name="flame" size={22} color={colors.white} />
+                    </View>
+                    <Text style={m.qsProgNum}>{cigsAvoided.toLocaleString()}</Text>
+                    <Text style={m.qsProgLbl}>cigarettes{'\n'}avoided</Text>
+                  </View>
+                  <View style={m.qsProgStat}>
+                    <View style={[m.qsProgCircle, { backgroundColor: colors.honey }]}>
+                      <Ionicons name="cash" size={22} color={colors.white} />
+                    </View>
+                    <Text style={m.qsProgNum}>${moneySaved.toFixed(0)}</Text>
+                    <Text style={m.qsProgLbl}>money{'\n'}saved</Text>
+                  </View>
+                  <View style={m.qsProgStat}>
+                    <View style={[m.qsProgCircle, { backgroundColor: colors.teal }]}>
+                      <Ionicons name="time" size={22} color={colors.white} />
+                    </View>
+                    <Text style={m.qsProgNum}>{lifeRegainedTxt}</Text>
+                    <Text style={m.qsProgLbl}>won{'\n'}back</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* ── Achievements (horizontal scroll + See all → detail) ─── */}
+              <View style={m.qsSectionHead}>
+                <Text style={m.qsHeading}>Achievements</Text>
+                <TouchableOpacity onPress={() => setQsView('achievements')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={m.qsSeeAll}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={m.qsAchScroll}
+              >
+                {QS_ACHIEVEMENTS.map((a) => {
+                  const done = hours >= a.hours;
+                  return (
+                    <View key={a.id} style={[m.qsAchTile, !done && m.qsAchTileLocked]}>
+                      <Text style={[m.qsAchTileIcon, !done && { opacity: 0.35 }]}>{a.icon}</Text>
+                      <Text style={[m.qsAchTileTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>{a.title}</Text>
+                      <Text style={m.qsAchTileDesc} numberOfLines={2}>{a.desc}</Text>
+                      {done && (
+                        <View style={m.qsAchCheck}>
+                          <Ionicons name="checkmark" size={12} color={colors.white} />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+              <Text style={m.qsAchSub}>{totalUnlocked}/{totalAchievements} achievements unlocked</Text>
+
+              {/* ── Health improvements card → opens detail ─────────────── */}
+              <View style={m.qsSectionHead}>
+                <Text style={m.qsHeading}>Health improvements</Text>
+                <TouchableOpacity onPress={() => setQsView('health')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={m.qsSeeAll}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity activeOpacity={0.85} onPress={() => setQsView('health')} style={m.qsHealthCard}>
+                <View style={m.qsHealthIconWrap}>
+                  <Ionicons name="document-text" size={28} color={colors.sky} />
+                  <View style={m.qsHealthIconCross}>
+                    <Ionicons name="add" size={14} color={colors.white} />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.qsHealthDesc} numberOfLines={2}>
+                    {latestUnlocked ? latestUnlocked.desc : 'Your first health milestone unlocks 20 minutes after your last cigarette.'}
+                  </Text>
+                </View>
+                {latestUnlocked && (
+                  <View style={m.qsHealthCheck}>
+                    <Ionicons name="checkmark" size={16} color={colors.white} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* ── Actions ─────────────────────────────────────────────── */}
+              <TouchableOpacity style={m.dangerBtn} onPress={resetProgress}>
+                <Text style={m.dangerBtnTxt}>I had a slip — reset timer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={m.ghostBtn} onPress={() => setShowSetup(true)}>
+                <Text style={m.ghostBtnTxt}>Edit setup</Text>
+              </TouchableOpacity>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              OVERALL PROGRESS DETAIL — Per day / week / month / year
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'progress' && (
+            <>
+              {/* Cigarettes avoided */}
+              <View style={m.qsDetailGroup}>
+                <View style={m.qsDetailGroupHead}>
+                  <View style={[m.qsDetailIconCircle, { backgroundColor: colors.rose }]}>
+                    <Ionicons name="flame" size={20} color={colors.white} />
+                  </View>
+                  <Text style={m.qsDetailGroupTitle}>Cigarettes avoided</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per day</Text>
+                  <Text style={m.qsDetailRowVal}>{cigPer.day.toLocaleString()}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per week</Text>
+                  <Text style={m.qsDetailRowVal}>{cigPer.week.toLocaleString()}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per month</Text>
+                  <Text style={m.qsDetailRowVal}>{cigPer.month.toLocaleString()}</Text>
+                </View>
+                <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                  <Text style={m.qsDetailRowLbl}>Per year</Text>
+                  <Text style={m.qsDetailRowVal}>{cigPer.year.toLocaleString()}</Text>
+                </View>
+              </View>
+
+              {/* Money saved */}
+              <View style={m.qsDetailGroup}>
+                <View style={m.qsDetailGroupHead}>
+                  <View style={[m.qsDetailIconCircle, { backgroundColor: colors.honey }]}>
+                    <Ionicons name="cash" size={20} color={colors.white} />
+                  </View>
+                  <Text style={m.qsDetailGroupTitle}>Money saved</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per day</Text>
+                  <Text style={m.qsDetailRowVal}>${moneyPer.day.toFixed(2)}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per week</Text>
+                  <Text style={m.qsDetailRowVal}>${moneyPer.week.toFixed(2)}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per month</Text>
+                  <Text style={m.qsDetailRowVal}>${moneyPer.month.toFixed(2)}</Text>
+                </View>
+                <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                  <Text style={m.qsDetailRowLbl}>Per year</Text>
+                  <Text style={m.qsDetailRowVal}>${moneyPer.year.toFixed(0)}</Text>
+                </View>
+              </View>
+
+              {/* Time won back */}
+              <View style={m.qsDetailGroup}>
+                <View style={m.qsDetailGroupHead}>
+                  <View style={[m.qsDetailIconCircle, { backgroundColor: colors.teal }]}>
+                    <Ionicons name="time" size={20} color={colors.white} />
+                  </View>
+                  <Text style={m.qsDetailGroupTitle}>Time won back</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per day</Text>
+                  <Text style={m.qsDetailRowVal}>{timePer.day}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per week</Text>
+                  <Text style={m.qsDetailRowVal}>{timePer.week}</Text>
+                </View>
+                <View style={m.qsDetailRow}>
+                  <Text style={m.qsDetailRowLbl}>Per month</Text>
+                  <Text style={m.qsDetailRowVal}>{timePer.month}</Text>
+                </View>
+                <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                  <Text style={m.qsDetailRowLbl}>Per year</Text>
+                  <Text style={m.qsDetailRowVal}>{timePer.year}</Text>
+                </View>
+              </View>
+              <Text style={m.qsDetailFootnote}>Estimated based on your setup ({cpd} cigarettes/day · {minPerCig} min lost per cigarette).</Text>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              ACHIEVEMENTS DETAIL — Time / Cigarettes / Money tabs + grid
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'achievements' && (() => {
+            const tabUnlocked =
+              qsAchTab === 'time'  ? timeUnlocked  :
+              qsAchTab === 'cigs'  ? cigsUnlocked  :
+                                     moneyUnlocked;
+            const tabTotal =
+              qsAchTab === 'time'  ? QS_ACHIEVEMENTS.length      :
+              qsAchTab === 'cigs'  ? QS_CIG_ACHIEVEMENTS.length  :
+                                     QS_MONEY_ACHIEVEMENTS.length;
+            const tabLbl =
+              qsAchTab === 'time'  ? 'time achievements'      :
+              qsAchTab === 'cigs'  ? 'cigarette achievements' :
+                                     'money achievements';
             return (
-              <View key={`ms-${i}`} style={m.milestoneRow}>
-                <View style={[m.milestoneDot, done && { backgroundColor: colors.green }]} />
-                <Text style={m.milestoneIcon}>{ms.icon}</Text>
-                <Text style={[m.milestoneTxt, !done && { color: colors.ink3 }]}>{ms.text}</Text>
-              </View>
-            );
-          })}
+              <>
+                {/* Tab segment */}
+                <View style={m.qsAchTabsRow}>
+                  <TouchableOpacity
+                    style={[m.qsAchTabBtn, qsAchTab === 'time' && m.qsAchTabBtnActive]}
+                    onPress={() => setQsAchTab('time')}
+                  >
+                    <Text style={[m.qsAchTabTxt, qsAchTab === 'time' && m.qsAchTabTxtActive]}>Time</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[m.qsAchTabBtn, qsAchTab === 'cigs' && m.qsAchTabBtnActive]}
+                    onPress={() => setQsAchTab('cigs')}
+                  >
+                    <Text style={[m.qsAchTabTxt, qsAchTab === 'cigs' && m.qsAchTabTxtActive]}>Cigarettes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[m.qsAchTabBtn, qsAchTab === 'money' && m.qsAchTabBtnActive]}
+                    onPress={() => setQsAchTab('money')}
+                  >
+                    <Text style={[m.qsAchTabTxt, qsAchTab === 'money' && m.qsAchTabTxtActive]}>Money</Text>
+                  </TouchableOpacity>
+                </View>
 
-          {/* Actions */}
-          <TouchableOpacity style={m.dangerBtn} onPress={resetProgress}>
-            <Text style={m.dangerBtnTxt}>I had a slip — reset timer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={m.ghostBtn} onPress={() => setShowSetup(true)}>
-            <Text style={m.ghostBtnTxt}>Edit setup</Text>
-          </TouchableOpacity>
-          <View style={{ height: 24 }} />
+                {/* Header card with trophy + counter */}
+                <View style={m.qsAchHeaderCard}>
+                  <View style={m.qsAchTrophy}>
+                    <Ionicons name="trophy" size={36} color={colors.honey} />
+                  </View>
+                  <Text style={m.qsAchHeaderNum}>{tabUnlocked}/{tabTotal}</Text>
+                  <Text style={m.qsAchHeaderLbl}>{tabLbl}</Text>
+                </View>
+
+                {/* Grid (rendered per active tab) */}
+                {qsAchTab === 'time' && (
+                  <View style={m.qsAchGrid}>
+                    {QS_ACHIEVEMENTS.map((a) => {
+                      const done = hours >= a.hours;
+                      return (
+                        <View key={a.id} style={[m.qsAchTileFlex, !done && m.qsAchTileLocked]}>
+                          <Text style={[m.qsAchTileIcon, !done && { opacity: 0.35 }]}>{a.icon}</Text>
+                          <Text style={[m.qsAchTileTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>{a.title}</Text>
+                          <Text style={m.qsAchTileDesc} numberOfLines={3}>{a.desc}</Text>
+                          {done && (
+                            <View style={m.qsAchCheck}>
+                              <Ionicons name="checkmark" size={12} color={colors.white} />
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                {qsAchTab === 'cigs' && (
+                  <View style={m.qsAchGrid}>
+                    {QS_CIG_ACHIEVEMENTS.map((a) => {
+                      const done = cigsAvoided >= a.cigs;
+                      return (
+                        <View key={a.id} style={[m.qsAchTileFlex, !done && m.qsAchTileLocked]}>
+                          <Text style={[m.qsAchTileIcon, !done && { opacity: 0.35 }]}>{a.icon}</Text>
+                          <Text style={[m.qsAchTileTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>{a.title}</Text>
+                          <Text style={m.qsAchTileDesc} numberOfLines={3}>{a.desc}</Text>
+                          {done && (
+                            <View style={m.qsAchCheck}>
+                              <Ionicons name="checkmark" size={12} color={colors.white} />
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                {qsAchTab === 'money' && (
+                  <View style={m.qsAchGrid}>
+                    {QS_MONEY_ACHIEVEMENTS.map((a) => {
+                      const done = moneySaved >= a.money;
+                      return (
+                        <View key={a.id} style={[m.qsAchTileFlex, !done && m.qsAchTileLocked]}>
+                          <Text style={[m.qsAchTileIcon, !done && { opacity: 0.35 }]}>{a.icon}</Text>
+                          <Text style={[m.qsAchTileTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>{a.title}</Text>
+                          <Text style={m.qsAchTileDesc} numberOfLines={3}>{a.desc}</Text>
+                          {done && (
+                            <View style={m.qsAchCheck}>
+                              <Ionicons name="checkmark" size={12} color={colors.white} />
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                <View style={{ height: 24 }} />
+              </>
+            );
+          })()}
+
+          {/* ════════════════════════════════════════════════════════════════
+              HEALTH IMPROVEMENTS DETAIL — Progress bars per milestone
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'health' && (
+            <>
+              {QS_MILESTONES.map((ms, i) => {
+                const pct  = Math.min(100, Math.round((hours / ms.hours) * 100));
+                const done = pct >= 100;
+                return (
+                  <View key={i} style={m.qsHealthRowCard}>
+                    <View style={m.qsHealthRowTopline}>
+                      <Text style={[m.qsHealthRowPct, { color: done ? colors.sky : colors.rose }]}>{pct}</Text>
+                      <View style={m.qsHealthRowBarTrack}>
+                        <View style={[m.qsHealthRowBarFill, { width: `${pct}%`, backgroundColor: done ? colors.sky : colors.rose }]} />
+                      </View>
+                      <Text style={m.qsHealthRowEnd}>100</Text>
+                    </View>
+                    <View style={m.qsHealthRowBody}>
+                      <Text style={m.qsHealthRowIcon}>{ms.icon}</Text>
+                      <Text style={m.qsHealthRowText}>{ms.text}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+                    </View>
+                  </View>
+                );
+              })}
+              <Text style={m.qsDetailFootnote}>Based on World Health Organization data.</Text>
+              <View style={{ height: 24 }} />
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -374,8 +827,14 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     if (!visible) return;
     AsyncStorage.getItem(KEYS.QD).then((raw) => {
       if (raw) {
-        setData(JSON.parse(raw));
-        setShowSetup(false);
+        try {
+          setData(JSON.parse(raw));
+          setShowSetup(false);
+        } catch {
+          void AsyncStorage.removeItem(KEYS.QD);
+          setData(null);
+          setShowSetup(true);
+        }
       } else {
         setData(null);
         setShowSetup(true);
@@ -446,8 +905,10 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
               <TextInput style={m.input} keyboardType="decimal-pad" value={formDpd} onChangeText={setFormDpd} placeholderTextColor={colors.ink3} />
               <Text style={m.label}>Cost per drink ($)</Text>
               <TextInput style={m.input} keyboardType="decimal-pad" value={formCpd} onChangeText={setFormCpd} placeholderTextColor={colors.ink3} />
-              <TouchableOpacity style={m.primaryBtn} onPress={saveSetup}>
-                <Text style={m.primaryBtnTxt}>Start My Journey</Text>
+              <TouchableOpacity style={m.primaryBtn} activeOpacity={0.85} onPress={saveSetup}>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={m.primaryBtnGrad}>
+                  <Text style={m.primaryBtnTxt}>Start My Journey</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </SafeAreaView>
@@ -554,10 +1015,11 @@ const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DOSAGE_UNITS = ['tab', 'caps', 'mg', 'mcg', 'g', 'IU', 'mL', 'drops', 'spray', 'puff', 'patch'];
 
 function fmtPresetTime(t: string): string {
-  const h = parseInt(t.split(':')[0], 10);
+  const [hStr, mStr = '00'] = t.split(':');
+  const h = parseInt(hStr, 10);
   const suffix = h < 12 ? 'AM' : 'PM';
   const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${display}${suffix}`;
+  return `${String(display).padStart(2, '0')}:${mStr.padStart(2, '0')} ${suffix}`;
 }
 function buildDosageStr(qty: number, unit: string): string {
   return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ${unit}`;
@@ -585,13 +1047,15 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   // Clock picker
   const [clockVisible,  setClockVisible]  = useState(false);
   const [clockEditIdx,  setClockEditIdx]  = useState<number>(-1); // -1 = add new
+  // Calendar picker (start date)
+  const [startDateOpen, setStartDateOpen] = useState(false);
 
   const today = todayKey();
 
   // Last 7 days (oldest→newest), used for per-med history strips
   const weekKeys = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
+    return d.toLocaleDateString('en-CA');
   });
 
   useEffect(() => {
@@ -600,17 +1064,27 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       AsyncStorage.getItem(KEYS.PILLS),
       AsyncStorage.getItem(KEYS.PILL_LOG(today)),
     ]).then(([medsRaw, logRaw]) => {
-      setMeds(medsRaw ? JSON.parse(medsRaw) : []);
-      setLog(logRaw ? JSON.parse(logRaw) : {});
+      let parsedMeds: Medication[] = [];
+      if (medsRaw) {
+        try { parsedMeds = JSON.parse(medsRaw); }
+        catch { void AsyncStorage.removeItem(KEYS.PILLS); }
+      }
+      let parsedLog: PillLog = {};
+      if (logRaw) {
+        try { parsedLog = JSON.parse(logRaw); }
+        catch { void AsyncStorage.removeItem(KEYS.PILL_LOG(today)); }
+      }
+      setMeds(parsedMeds);
+      setLog(parsedLog);
     });
   }, [visible]);
 
   function saveMeds(updated: Medication[]) {
     setMeds(updated);
     AsyncStorage.setItem(KEYS.PILLS, JSON.stringify(updated));
-    // Re-schedule daily push notifications for every med × time
+    // Re-schedule push notifications for every med × time, respecting daysOfWeek
     void schedulePillReminders(
-      updated.map(m => ({ id: m.id, name: m.name, dosage: m.dosage, times: m.times }))
+      updated.map(m => ({ id: m.id, name: m.name, dosage: m.dosage, times: m.times, daysOfWeek: m.daysOfWeek }))
     );
   }
 
@@ -698,7 +1172,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   function saveMedForm() {
     if (!formName.trim()) { Alert.alert('Name required'); return; }
-    const parsedDays = parseInt(formDurationDays);
+    const parsedDays = parseInt(formDurationDays, 10);
     const med: Medication = {
       id: editMed?.id ?? Date.now().toString(),
       name: formName.trim(),
@@ -789,9 +1263,13 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const key = d.toISOString().split('T')[0];
+      const key = d.toLocaleDateString('en-CA');
       const raw = await AsyncStorage.getItem(KEYS.PILL_LOG(key));
-      const dayLog: PillLog = raw ? JSON.parse(raw) : {};
+      let dayLog: PillLog = {};
+      if (raw) {
+        try { dayLog = JSON.parse(raw); }
+        catch { void AsyncStorage.removeItem(KEYS.PILL_LOG(key)); }
+      }
       const allDone = meds.every(med => (dayLog[med.id]?.takenCount ?? 0) >= med.times.length);
       if (allDone) streak++; else break;
     }
@@ -809,9 +1287,13 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
       const wh: Record<string, PillLog> = {};
       for (let i = 0; i < 30; i++) {
         const d = new Date(); d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
+        const key = d.toLocaleDateString('en-CA');
         const raw = await AsyncStorage.getItem(KEYS.PILL_LOG(key));
-        const dayLog: PillLog = raw ? JSON.parse(raw) : {};
+        let dayLog: PillLog = {};
+        if (raw) {
+          try { dayLog = JSON.parse(raw); }
+          catch { void AsyncStorage.removeItem(KEYS.PILL_LOG(key)); }
+        }
         // Store past 6 days (not today) for the history strips
         if (i >= 1 && i <= 6) wh[key] = dayLog;
         meds.forEach(med => {
@@ -845,14 +1327,6 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
         </View>
 
-        {/* Clock time picker */}
-        <ClockPickerModal
-          visible={clockVisible}
-          initial={clockEditIdx === -1 ? '08:00' : (formTimes[clockEditIdx] ?? '08:00')}
-          onConfirm={handleClockConfirm}
-          onClose={() => setClockVisible(false)}
-        />
-
         {/* Add medication sheet */}
         <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditSheet(false)}>
             <SafeAreaView style={m.sheet} edges={['bottom']}>
@@ -866,7 +1340,15 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                 keyboardShouldPersistTaps="handled"
               >
                 <Text style={m.label}>Medication name *</Text>
-                <TextInput style={m.input} value={formName} onChangeText={setFormName} placeholder="e.g. Vitamin D" placeholderTextColor={colors.ink3} />
+                <TextInput
+                  style={m.input}
+                  value={formName}
+                  onChangeText={setFormName}
+                  placeholder="e.g. Vitamin D"
+                  placeholderTextColor={colors.ink3}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
 
                 <Text style={m.label}>Amount per dose</Text>
                 {/* Quantity stepper */}
@@ -910,7 +1392,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   {formTimes.map((t, i) => (
                     <View key={`${t}-${i}`} style={m.timeChip}>
                       <TouchableOpacity onPress={() => openClock(i)} style={{ flex: 1 }}>
-                        <Text style={m.timeChipTxt}>{fmtPresetTime(t)}</Text>
+                        <Text style={m.timeChipTxt} numberOfLines={1}>{fmtPresetTime(t)}</Text>
                       </TouchableOpacity>
                       {formTimes.length > 1 && (
                         <TouchableOpacity onPress={() => removeTime(i)} style={{ paddingLeft: spacing.xs }}>
@@ -970,17 +1452,22 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                 {!!formDurationDays && (
                   <>
                     <Text style={{ fontSize: fontSize.xs, color: colors.teal }}>
-                      📅 {parseInt(formDurationDays) || 0}-day course
+                      📅 {parseInt(formDurationDays, 10) || 0}-day course
                     </Text>
                     <Text style={m.label}>Start date</Text>
-                    <TextInput
-                      style={m.input}
-                      value={formStartDate}
-                      onChangeText={setFormStartDate}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={colors.ink3}
-                      maxLength={10}
-                    />
+                    <TouchableOpacity
+                      style={[m.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setStartDateOpen(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ color: formStartDate ? colors.ink : colors.ink3, fontSize: fontSize.base }}>
+                        {formStartDate ? fmtFriendlyDate(formStartDate) : 'Pick a date'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={18} color={colors.ink3} />
+                    </TouchableOpacity>
                   </>
                 )}
 
@@ -1002,11 +1489,34 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   placeholderTextColor={colors.ink3}
                   multiline
                 />
-                <TouchableOpacity style={m.primaryBtn} onPress={saveMedForm}>
-                  <Text style={m.primaryBtnTxt}>{editMed ? 'Save Changes' : 'Add Medication'}</Text>
+                <TouchableOpacity style={m.primaryBtn} activeOpacity={0.85} onPress={saveMedForm}>
+                  <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={m.primaryBtnGrad}>
+                    <Text style={m.primaryBtnTxt}>{editMed ? 'Save Changes' : 'Add Medication'}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
                 <View style={{ height: spacing.lg }} />
               </ScrollView>
+
+              {/* Clock time picker — rendered inside editSheet so it stacks above pageSheet */}
+              <ClockPickerModal
+                visible={clockVisible}
+                initial={clockEditIdx === -1 ? '08:00' : (formTimes[clockEditIdx] ?? '08:00')}
+                label="SET REMINDER TIME"
+                onConfirm={handleClockConfirm}
+                onClose={() => setClockVisible(false)}
+              />
+
+              {/* Calendar picker for start date */}
+              <CalendarPickerModal
+                visible={startDateOpen}
+                initial={formStartDate || todayKey()}
+                label="PICK START DATE"
+                onConfirm={(d) => {
+                  setFormStartDate(d);
+                  setStartDateOpen(false);
+                }}
+                onClose={() => setStartDateOpen(false)}
+              />
             </SafeAreaView>
         </Modal>
 
@@ -1085,7 +1595,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
             const weekDots = getWeekDots(med);
 
             // Course progress
-            const daysSinceStart = Math.floor((Date.now() - new Date(med.startDate ?? todayKey()).getTime()) / 86400000);
+            const daysSinceStart = Math.floor((Date.now() - new Date(`${med.startDate ?? todayKey()}T12:00:00`).getTime()) / 86400000);
             const courseProgress = med.durationDays != null
               ? Math.min(1, (daysSinceStart + 1) / med.durationDays) : null;
             const daysRemaining = med.durationDays != null
@@ -1138,7 +1648,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                             activeOpacity={0.7}
                           >
                             <Text style={[m.slotIcon, { color: STATUS_COLOR[status] }]}>{icon}</Text>
-                            <Text style={[m.slotTime, { color: STATUS_COLOR[status] }]}>{fmtPresetTime(time)}</Text>
+                            <Text style={[m.slotTime, { color: STATUS_COLOR[status] }]} numberOfLines={1}>{fmtPresetTime(time)}</Text>
                             <Text style={[m.slotDosage, { color: STATUS_COLOR[status] + 'cc' }]}>
                               {buildDosageStr(med.dosageQty ?? 1, med.dosageUnit ?? 'tab')}
                             </Text>
@@ -1206,8 +1716,10 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
             );
           })}
 
-          <TouchableOpacity style={m.primaryBtn} onPress={openAdd}>
-            <Text style={m.primaryBtnTxt}>+ Add Medication</Text>
+          <TouchableOpacity style={m.primaryBtn} activeOpacity={0.85} onPress={openAdd}>
+            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={m.primaryBtnGrad}>
+              <Text style={m.primaryBtnTxt}>+ Add Medication</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <View style={{ height: 24 }} />
         </ScrollView>
@@ -1244,7 +1756,9 @@ function FastingModal({ visible, onClose }: { visible: boolean; onClose: () => v
   useEffect(() => {
     if (!visible) return;
     AsyncStorage.getItem(FASTING_KEY).then((raw) => {
-      if (raw) setState(JSON.parse(raw));
+      if (!raw) return;
+      try { setState(JSON.parse(raw)); }
+      catch { void AsyncStorage.removeItem(FASTING_KEY); }
     });
   }, [visible]);
 
@@ -1304,6 +1818,24 @@ function FastingModal({ visible, onClose }: { visible: boolean; onClose: () => v
     const mm = Math.floor((hrs - h) * 60);
     return `${h}h ${String(mm).padStart(2, '0')}m`;
   }
+
+  function fmtHMS(ms: number) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  // Live countdowns
+  const fastRemainingMs    = Math.max(0, fastingMs - elapsed);
+  const eatingRemainingMs  = Math.max(0, fastingMs + eatingMs - elapsed);
+  const countdownDisplay   = state.active
+    ? (inEatingWindow ? fmtHMS(eatingRemainingMs) : fmtHMS(fastRemainingMs))
+    : `${String(modeInfo.fasting).padStart(2, '0')}:00:00`;
+  const countdownLabel = state.active
+    ? (inEatingWindow ? 'EATING ENDS IN' : 'FASTING ENDS IN')
+    : 'READY TO START';
 
   const strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
 
@@ -1372,13 +1904,46 @@ function FastingModal({ visible, onClose }: { visible: boolean; onClose: () => v
                   />
                 )}
               </Svg>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: state.active ? 42 : 36, fontWeight: '800', color: statusColor, fontVariant: ['tabular-nums'] }}>
-                  {state.active ? `${progressPct}%` : '—'}
+              <View style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: RING_R * 2 - RING_STROKE * 2,
+                height: RING_R * 2 - RING_STROKE * 2,
+              }}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  style={{
+                    fontSize: fontSize.xl,
+                    fontWeight: '800',
+                    color: statusColor,
+                    fontVariant: ['tabular-nums'],
+                    letterSpacing: 0,
+                  }}
+                >
+                  {countdownDisplay}
                 </Text>
-                <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 4 }}>
-                  {state.active ? (inEatingWindow ? `${fmtHM(elapsedHrs - modeInfo.fasting)} eaten` : `${fmtHM(elapsedHrs)} fasted`) : 'Not active'}
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: fontSize.xs,
+                    fontWeight: '700',
+                    color: colors.ink3,
+                    letterSpacing: 1.1,
+                    marginTop: 4,
+                  }}
+                >
+                  {countdownLabel}
                 </Text>
+                {state.active && (
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}
+                  >
+                    {progressPct}% · {inEatingWindow ? `${fmtHM(elapsedHrs - modeInfo.fasting)} eaten` : `${fmtHM(elapsedHrs)} fasted`}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -1695,10 +2260,15 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newCat, setNewCat] = useState('produce');
+  const qtyInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!visible) return;
-    AsyncStorage.getItem(GROCERY_KEY).then(raw => { if (raw) setItems(JSON.parse(raw)); });
+    AsyncStorage.getItem(GROCERY_KEY).then(raw => {
+      if (!raw) return;
+      try { setItems(JSON.parse(raw)); }
+      catch { void AsyncStorage.removeItem(GROCERY_KEY); }
+    });
   }, [visible]);
 
   function save(next: GroceryItem[]) {
@@ -1769,8 +2339,11 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
               value={newName}
               onChangeText={setNewName}
               returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => qtyInputRef.current?.focus()}
             />
             <TextInput
+              ref={qtyInputRef}
               style={{ width: 76, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.base, textAlign: 'center' }}
               placeholder="Qty"
               placeholderTextColor={colors.ink3}
@@ -1992,7 +2565,8 @@ const m = StyleSheet.create({
   label:      { fontSize: fontSize.xs, color: colors.ink3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   input:      { backgroundColor: colors.layer2, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, color: colors.ink, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: fontSize.sm },
 
-  primaryBtn:    { backgroundColor: colors.purple, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm + 4 },
+  primaryBtn:    { borderRadius: radius.md, overflow: 'hidden' },
+  primaryBtnGrad: { alignItems: 'center', paddingVertical: spacing.sm + 4 },
   primaryBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   dangerBtn:     { borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm + 2, backgroundColor: colors.rose + '1e', borderWidth: 1, borderColor: colors.rose + '40' },
   dangerBtnTxt:  { color: colors.rose, fontWeight: '600', fontSize: fontSize.sm },
@@ -2033,7 +2607,7 @@ const m = StyleSheet.create({
   // ── Apple-style slot bubbles ──────────────────────────────────────────────
   slotRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   slotWrap:        { alignItems: 'center', gap: spacing.xs },
-  slotBtn:         { borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, minWidth: 56 },
+  slotBtn:         { borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, minWidth: 84 },
   slotIcon:        { fontSize: fontSize.sm, fontWeight: '800' },
   slotTime:        { fontSize: fontSize.xs, fontWeight: '600', marginTop: 2 },
   skipBtn:         { backgroundColor: colors.honey + '18', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.honey + '44' },
@@ -2070,7 +2644,7 @@ const m = StyleSheet.create({
   unitChipTxt:     { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink3 },
 
   // ── Time chips (tap-to-edit) ──────────────────────────────────────────────────
-  timeChip:        { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.purple + '55', backgroundColor: colors.purpleTint, minWidth: 62 },
+  timeChip:        { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.purple + '55', backgroundColor: colors.purpleTint, minWidth: 100 },
   timeChipTxt:     { fontSize: fontSize.sm, fontWeight: '700', color: colors.purple, flex: 1, textAlign: 'center' },
   timeChipX:       { fontSize: fontSize.base, fontWeight: '700', color: colors.purple, lineHeight: fontSize.base + 2 },
   timeAddBtn:      { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.layer2, justifyContent: 'center' },
@@ -2078,5 +2652,198 @@ const m = StyleSheet.create({
 
   // ── Slot dosage label ────────────────────────────────────────────────────────
   slotDosage:      { fontSize: fontSize.xs, fontWeight: '600', marginTop: 1 },
+
+  // ── Quit Smoking — QuitNow-inspired layout ───────────────────────────────────
+  qsHero: {
+    alignItems: 'center',
+    backgroundColor: colors.layer1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    paddingVertical: spacing.lg + spacing.sm,
+    paddingHorizontal: spacing.md,
+    overflow: 'hidden',
+    shadowColor: colors.purple,
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  qsHeroIconWrap: {
+    width: 110, height: 110, borderRadius: radius.pill,
+    backgroundColor: colors.sky + '1f',
+    borderWidth: 2, borderColor: colors.sky + '55',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  qsTriRow:    { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
+  qsTriCol:    { alignItems: 'center', minWidth: 64 },
+  qsTriNum:    { fontSize: fontSize['2xl'] + 6, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'], lineHeight: fontSize['2xl'] + 8 },
+  qsTriLbl:    { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
+
+  qsHeading:    { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
+
+  qsProgCard:   { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, gap: spacing.md },
+  qsProgRow:    { flexDirection: 'row', justifyContent: 'space-between' },
+  qsProgStat:   { alignItems: 'center', flex: 1, gap: 2 },
+  qsProgCircle: { width: 50, height: 50, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  qsProgNum:    { fontSize: fontSize.md + 1, fontWeight: '800', color: colors.ink, marginTop: 6, fontVariant: ['tabular-nums'] },
+  qsProgLbl:    { fontSize: fontSize.xs - 1, color: colors.ink3, textAlign: 'center', marginTop: 1, lineHeight: fontSize.xs + 3 },
+
+  qsSectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qsSeeAll:      { fontSize: fontSize.sm, fontWeight: '700', color: colors.purple },
+
+  qsAchScroll:   { paddingVertical: spacing.xs, gap: spacing.sm, paddingRight: spacing.sm },
+  qsAchGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  qsAchTile:     {
+    width: 140, minHeight: 150,
+    borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.line2,
+    backgroundColor: colors.layer1,
+    alignItems: 'center', justifyContent: 'center',
+    padding: spacing.sm, gap: spacing.xs,
+    position: 'relative',
+  },
+  qsAchTileLocked: { opacity: 0.6, backgroundColor: colors.layer2 },
+  qsAchTileIcon:   { fontSize: fontSize['2xl'] },
+  qsAchTileTitle:  { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  qsAchTileDesc:   { fontSize: fontSize.xs - 1, color: colors.ink3, textAlign: 'center', lineHeight: fontSize.xs + 3 },
+  qsAchCheck:      {
+    position: 'absolute', top: spacing.xs, right: spacing.xs,
+    width: 22, height: 22, borderRadius: radius.pill,
+    backgroundColor: colors.green,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.layer1,
+  },
+  qsAchSub:        { fontSize: fontSize.xs, color: colors.ink3, marginTop: -spacing.xs, marginBottom: spacing.xs },
+
+  qsHealthCard:    {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.layer1,
+    borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.line2,
+    padding: spacing.md,
+  },
+  qsHealthIconWrap: {
+    width: 56, height: 64,
+    backgroundColor: colors.layer2,
+    borderRadius: radius.sm,
+    borderWidth: 1, borderColor: colors.line2,
+    alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+  },
+  qsHealthIconCross: {
+    position: 'absolute', top: 6, right: 6,
+    width: 18, height: 18, borderRadius: radius.pill,
+    backgroundColor: colors.sky,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  qsHealthDesc:    { fontSize: fontSize.sm, color: colors.ink, fontWeight: '600', lineHeight: fontSize.sm + 6 },
+  qsHealthCheck:   {
+    width: 28, height: 28, borderRadius: radius.pill,
+    backgroundColor: colors.green,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // ── Overall Progress detail (Per day / week / month / year groups) ──────────
+  qsDetailGroup: {
+    backgroundColor: colors.layer1,
+    borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.line2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  qsDetailGroupHead: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+    marginBottom: spacing.xs,
+  },
+  qsDetailIconCircle: {
+    width: 36, height: 36, borderRadius: radius.pill,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  qsDetailGroupTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
+  qsDetailRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  qsDetailRowLast:   { borderBottomWidth: 0 },
+  qsDetailRowLbl:    { fontSize: fontSize.base, color: colors.ink2 },
+  qsDetailRowVal:    { fontSize: fontSize.base, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] },
+  qsDetailFootnote:  { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', marginTop: spacing.xs, paddingHorizontal: spacing.md },
+
+  // ── Achievements detail tab segment (Time / Cigarettes / Money) ────────────
+  qsAchTabsRow:    {
+    flexDirection: 'row',
+    backgroundColor: colors.layer2,
+    borderRadius: radius.sm + 2,
+    padding: 3,
+    gap: 2,
+  },
+  qsAchTabBtn:     {
+    flex: 1,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  qsAchTabBtnActive: { backgroundColor: colors.purple },
+  qsAchTabTxt:       { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink3 },
+  qsAchTabTxtActive: { color: colors.white },
+
+  // ── Achievements detail (full grid header + flexible tile) ─────────────────
+  qsAchHeaderCard: {
+    backgroundColor: colors.layer1,
+    borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.line2,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    gap: spacing.xs,
+  },
+  qsAchTrophy: {
+    width: 72, height: 72, borderRadius: radius.pill,
+    backgroundColor: colors.honey + '22',
+    borderWidth: 2, borderColor: colors.honey + '55',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  qsAchHeaderNum: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, fontVariant: ['tabular-nums'] },
+  qsAchHeaderLbl: { fontSize: fontSize.sm, color: colors.ink3 },
+  qsAchTileFlex: {
+    width: '47.5%',
+    minHeight: 160,
+    borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.line2,
+    backgroundColor: colors.layer1,
+    alignItems: 'center', justifyContent: 'center',
+    padding: spacing.sm, gap: spacing.xs,
+    position: 'relative',
+  },
+
+  // ── Health improvements detail (per-milestone progress bars) ───────────────
+  qsHealthRowCard: {
+    backgroundColor: colors.layer1,
+    borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.line2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  qsHealthRowTopline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  qsHealthRowPct:     { fontSize: fontSize.md, fontWeight: '800', minWidth: 38, textAlign: 'left', fontVariant: ['tabular-nums'] },
+  qsHealthRowBarTrack:{
+    flex: 1, height: 8,
+    backgroundColor: colors.layer2,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  qsHealthRowBarFill: { height: '100%', borderRadius: radius.pill },
+  qsHealthRowEnd:     { fontSize: fontSize.sm, color: colors.ink3, fontWeight: '700', minWidth: 28, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  qsHealthRowBody:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  qsHealthRowIcon:    { fontSize: fontSize.lg },
+  qsHealthRowText:    { flex: 1, fontSize: fontSize.base, color: colors.ink, fontWeight: '600' },
 });
 

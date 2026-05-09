@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Dimensions, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -48,6 +49,9 @@ export default function OnboardingScreen() {
   const [height, setHeight] = useState(profile.height ?? '');
   const [targetWeight, setTargetWeight] = useState('');
   const [saving, setSaving] = useState(false);
+  // `saving` state updates async — a ref blocks synchronous double-taps between
+  // the press handler and the next render.
+  const submittingRef = useRef(false);
 
   // Parse weight/height from display unit to metric for TDEE calc
   const wKg = parseWeight(weight, unitSystem) ?? (parseFloat(weight) || 0);
@@ -55,12 +59,14 @@ export default function OnboardingScreen() {
   const tgtKg = parseWeight(targetWeight, unitSystem) ?? (parseFloat(targetWeight) || 0);
 
   const calorieGoal = (() => {
-    const a = parseInt(age);
+    const a = parseInt(age, 10);
     if (!a || !wKg || !hCm) return 2000;
     return calcTDEE(a, wKg, hCm, sex, activity, goal);
   })();
 
   async function finish() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     let navigated = false;
     const doNavigate = () => { if (!navigated) { navigated = true; router.replace('/(tabs)/diary'); } };
@@ -102,13 +108,14 @@ export default function OnboardingScreen() {
     } finally {
       clearTimeout(timer);
       setSaving(false);
+      submittingRef.current = false;
     }
   }
 
   function next() { if (step < STEPS - 1) setStep(s => s + 1); else finish(); }
   function back() { if (step > 0) setStep(s => s - 1); }
 
-  const ageNum    = age ? parseInt(age) : NaN;
+  const ageNum    = age ? parseInt(age, 10) : NaN;
   const ageErr    = age && !isNaN(ageNum)
     ? (ageNum < 16 ? 'Minimum age is 16' : ageNum > 100 ? 'Maximum age is 100' : null)
     : null;

@@ -12,7 +12,7 @@ import { formatWeight } from '../../src/lib/units';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
 
-const TODAY = () => new Date().toISOString().split('T')[0];
+const TODAY = () => new Date().toLocaleDateString('en-CA');
 
 // ── FAB Tab Button ────────────────────────────────────────────────────────────
 function FabTabButton({ onPress }: { onPress: () => void }) {
@@ -52,8 +52,8 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={msg.safe} edges={['top', 'bottom']}>
         <View style={msg.header}>
-          <TouchableOpacity style={msg.closeBtn} onPress={onClose}>
-            <Ionicons name="close" size={16} color={colors.ink2} />
+          <TouchableOpacity style={msg.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
           <Text style={msg.title}>Messages</Text>
           <View style={{ width: 34 }} />
@@ -359,7 +359,7 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
     : EXERCISE_CATS;
 
   async function handleAdd(ex: typeof EXERCISE_CATS[0]) {
-    const mins = parseInt(duration) || 30;
+    const mins = parseInt(duration, 10) || 30;
     const kcal = ex.kcalPerMin * mins;
     const todayKey = TODAY();
     const current = entries[todayKey]?.calories_burned ?? 0;
@@ -372,7 +372,7 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
   }
 
   async function handleManualAdd() {
-    const k = parseInt(manualKcal);
+    const k = parseInt(manualKcal, 10);
     if (!k || k <= 0) { Alert.alert('Enter a valid calorie amount'); return; }
     const todayKey = TODAY();
     const current = entries[todayKey]?.calories_burned ?? 0;
@@ -387,8 +387,8 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={el.safe} edges={['top', 'bottom']}>
         <View style={el.header}>
-          <TouchableOpacity onPress={onClose} style={el.closeBtn}>
-            <Ionicons name="close" size={16} color={colors.ink} />
+          <TouchableOpacity onPress={onClose} style={el.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
           <Text style={el.title}>Exercise</Text>
           <TouchableOpacity onPress={() => Alert.alert('Add exercise', 'Custom exercise coming soon.')}>

@@ -40,7 +40,7 @@ export default function RegisterScreen() {
       return;
     }
     if (values.age) {
-      const a = parseInt(values.age);
+      const a = parseInt(values.age, 10);
       if (isNaN(a) || a < 16 || a > 100) { Alert.alert('Invalid age', 'Age must be between 16 and 100.'); return; }
     }
     if (values.weight) {

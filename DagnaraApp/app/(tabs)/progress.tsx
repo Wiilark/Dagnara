@@ -79,7 +79,7 @@ function scoreColor(s: number) {
   return colors.rose;
 }
 
-function dateStr(d: Date) { return d.toISOString().split('T')[0]; }
+function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 
 const PILLARS = [
   { key: 'nutrition', label: 'Nutrition', emoji: '🥗', color: colors.green, max: 40 },
@@ -109,7 +109,7 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
   for (let i = 29; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    const key = d.toISOString().split('T')[0];
+    const key = d.toLocaleDateString('en-CA');
     const entry = entries[key];
     const kcal = (entry?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
     days.push({ date: key, status: kcal >= 1200 ? 'logged' : kcal > 0 ? 'partial' : 'none' });
@@ -168,7 +168,7 @@ function WeightChart({
   const CHART_H = 160;
   const PAD_L = 38;
   const INNER_W = CHART_W - PAD_L;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const last = weightHistory.slice(-14);
   const hasToday = last.length > 0 && last[last.length - 1].date === today;
 
@@ -275,7 +275,7 @@ function StatisticsModal({ visible, onClose, entries }: {
   const bars: { label: string; kcal: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    const key = d.toISOString().split('T')[0];
+    const key = d.toLocaleDateString('en-CA');
     const kcal = (entries[key]?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
     const label = days <= 7
       ? d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)
@@ -384,8 +384,8 @@ function StatisticsModal({ visible, onClose, entries }: {
 function DailyProgressModal({ visible, onClose, entries }: {
   visible: boolean; onClose: () => void; entries: Record<string, any>;
 }) {
-  const { calorieGoal: storeCalGoal } = useAppStore();
-  const today = new Date().toISOString().split('T')[0];
+  const { calorieGoal: storeCalGoal, macroPcts } = useAppStore();
+  const today = new Date().toLocaleDateString('en-CA');
   const todayEntry = entries[today];
   const foods = todayEntry?.foods ?? [];
   const kcal = foods.reduce((s: number, f: any) => s + f.kcal, 0);
@@ -394,15 +394,22 @@ function DailyProgressModal({ visible, onClose, entries }: {
   const fat = foods.reduce((s: number, f: any) => s + f.fat, 0);
 
   const KCAL_GOAL   = storeCalGoal || 2000;
-  const CARBS_GOAL  = Math.round(KCAL_GOAL * 0.45 / 4);
-  const PROT_GOAL   = Math.round(KCAL_GOAL * 0.30 / 4);
-  const FAT_GOAL    = Math.round(KCAL_GOAL * 0.25 / 9);
+  const CARBS_GOAL  = Math.round(KCAL_GOAL * (macroPcts.carbs / 100) / 4);
+  const PROT_GOAL   = Math.round(KCAL_GOAL * (macroPcts.protein / 100) / 4);
+  const FAT_GOAL    = Math.round(KCAL_GOAL * (macroPcts.fat / 100) / 9);
+  // Cumulative arc offsets for the goal donut: each macro starts where the previous ended.
+  const cPct = macroPcts.carbs / 100;
+  const pPct = macroPcts.protein / 100;
+  const fPct = macroPcts.fat / 100;
+  const carbsOffset = 0.25;                       // start at top (12 o'clock)
+  const protOffset  = 0.25 - cPct;
+  const fatOffset   = 0.25 - cPct - pPct;
   const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   // 7-day bars
   const weekBars = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const key = d.toISOString().split('T')[0];
+    const key = d.toLocaleDateString('en-CA');
     const dayKcal = (entries[key]?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
     const label = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1);
     return { key, kcal: dayKcal, label, isToday: key === today };
@@ -420,11 +427,11 @@ function DailyProgressModal({ visible, onClose, entries }: {
   const fatArc   = (fatPct / 100) * CIRC;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={dp2.safe} edges={['top', 'bottom']}>
         <View style={dp2.header}>
-          <TouchableOpacity onPress={onClose} style={dp2.closeBtn}>
-            <Ionicons name="close" size={16} color={colors.ink} />
+          <TouchableOpacity onPress={onClose} style={dp2.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
           <Text style={dp2.title}>Daily progress</Text>
           <View style={{ width: 36 }} />
@@ -486,7 +493,11 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <Text style={dp2.h2}>Goal intake</Text>
           <View style={dp2.donutCard}>
             <View style={dp2.donutLegend}>
-              {[[colors.honey,'45%','CARBS'],[colors.sky,'30%','PROTEIN'],[colors.violet,'25%','FAT']].map(([c,p,l]) => (
+              {[
+                [colors.honey,  `${macroPcts.carbs}%`,   'CARBS'],
+                [colors.sky,    `${macroPcts.protein}%`, 'PROTEIN'],
+                [colors.violet, `${macroPcts.fat}%`,     'FAT'],
+              ].map(([c, p, l]) => (
                 <View key={l} style={dp2.legendItem}>
                   <View style={[dp2.legendDot, { backgroundColor: c }]} />
                   <Text style={dp2.legendTxt}>{p} {l}</Text>
@@ -496,13 +507,13 @@ function DailyProgressModal({ visible, onClose, entries }: {
             <Svg width={72} height={72} viewBox="0 0 72 72">
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.line} strokeWidth={10} />
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.honey} strokeWidth={10}
-                strokeDasharray={`${CIRC * 0.45} ${CIRC}`} strokeDashoffset={CIRC * 0.25}
+                strokeDasharray={`${CIRC * cPct} ${CIRC}`} strokeDashoffset={CIRC * carbsOffset}
                 transform="rotate(-90 36 36)" />
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.sky} strokeWidth={10}
-                strokeDasharray={`${CIRC * 0.30} ${CIRC}`} strokeDashoffset={-(CIRC * 0.20)}
+                strokeDasharray={`${CIRC * pPct} ${CIRC}`} strokeDashoffset={CIRC * protOffset}
                 transform="rotate(-90 36 36)" />
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.violet} strokeWidth={10}
-                strokeDasharray={`${CIRC * 0.25} ${CIRC}`} strokeDashoffset={-(CIRC * 0.50)}
+                strokeDasharray={`${CIRC * fPct} ${CIRC}`} strokeDashoffset={CIRC * fatOffset}
                 transform="rotate(-90 36 36)" />
             </Svg>
           </View>
@@ -603,8 +614,8 @@ function InsightDetailModal({ visible, onClose }: { visible: boolean; onClose: (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={ins.safe} edges={['top', 'bottom']}>
         <View style={ins.header}>
-          <TouchableOpacity style={ins.closeBtn} onPress={onClose}>
-            <Ionicons name="close" size={16} color={colors.ink2} />
+          <TouchableOpacity style={ins.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
           <Text style={ins.title}>{INSIGHT_ARTICLE.title}</Text>
           <View style={{ width: 34 }} />
@@ -652,14 +663,15 @@ function generateInsights(
   entries: Record<string, any>,
   calorieGoal: number,
   weightGoal: string,
-  weightHistory: { date: string; kg: number }[]
+  weightHistory: { date: string; kg: number }[],
+  proteinPct: number
 ): Insight[] {
   const insights: Insight[] = [];
   const today = new Date();
 
   const last14 = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today); d.setDate(today.getDate() - (13 - i));
-    const key = d.toISOString().split('T')[0];
+    const key = d.toLocaleDateString('en-CA');
     const foods = entries[key]?.foods ?? [];
     const dow = d.getDay();
     return {
@@ -676,7 +688,7 @@ function generateInsights(
   const logged7  = last7.filter(d => d.kcal > 0);
   if (logged7.length < 2) return [];
 
-  const PROTEIN_GOAL = Math.round(calorieGoal * 0.30 / 4);
+  const PROTEIN_GOAL = Math.round(calorieGoal * (proteinPct / 100) / 4);
   const avg7kcal    = Math.round(logged7.reduce((s, d) => s + d.kcal, 0) / logged7.length);
   const avg7protein = Math.round(logged7.reduce((s, d) => s + d.protein, 0) / logged7.length);
   const kcalDiff    = avg7kcal - calorieGoal;
@@ -787,7 +799,7 @@ interface ProgressPhoto { uri: string; date: string; }
 
 export default function ProgressScreen() {
   const { entries, selectedDate } = useDiaryStore();
-  const { lifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, setMessagesOpen, calorieGoal, weightGoal, hasUnread, addXp, unitSystem } = useAppStore();
+  const { lifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, setMessagesOpen, calorieGoal, weightGoal, hasUnread, addXp, unitSystem, macroPcts } = useAppStore();
   const { email, profile } = useAuthStore();
 
   const [lsVisible, setLsVisible] = useState(false);
@@ -802,7 +814,11 @@ export default function ProgressScreen() {
   const PHOTOS_KEY = `${email ?? 'anon'}_progress_photos`;
 
   useEffect(() => {
-    AsyncStorage.getItem(PHOTOS_KEY).then(raw => { if (raw) setProgressPhotos(JSON.parse(raw)); });
+    AsyncStorage.getItem(PHOTOS_KEY).then(raw => {
+      if (!raw) return;
+      try { setProgressPhotos(JSON.parse(raw)); }
+      catch { AsyncStorage.removeItem(PHOTOS_KEY); }
+    });
   }, [PHOTOS_KEY]);
 
   async function addProgressPhoto() {
@@ -810,7 +826,7 @@ export default function ProgressScreen() {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo library access to add progress photos.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, base64: false });
     if (result.canceled || !result.assets[0]) return;
-    const photo: ProgressPhoto = { uri: result.assets[0].uri, date: new Date().toISOString().split('T')[0] };
+    const photo: ProgressPhoto = { uri: result.assets[0].uri, date: new Date().toLocaleDateString('en-CA') };
     const updated = [photo, ...progressPhotos].slice(0, 20);
     setProgressPhotos(updated);
     AsyncStorage.setItem(PHOTOS_KEY, JSON.stringify(updated));
@@ -847,7 +863,7 @@ export default function ProgressScreen() {
   const totalMacros = totalCarbs + totalProtein + totalFat || 1;
 
   const latestWeight = weightHistory[weightHistory.length - 1]?.kg;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const hasLoggedToday = weightHistory.some(w => w.date === today);
 
   const bmi = useMemo(() => {
@@ -898,8 +914,8 @@ export default function ProgressScreen() {
   });
 
   const insights = useMemo(
-    () => generateInsights(entries, calorieGoal || 2000, weightGoal || 'maintain', weightHistory),
-    [entries, calorieGoal, weightGoal, weightHistory]
+    () => generateInsights(entries, calorieGoal || 2000, weightGoal || 'maintain', weightHistory, macroPcts.protein),
+    [entries, calorieGoal, weightGoal, weightHistory, macroPcts.protein]
   );
 
   return (

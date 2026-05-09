@@ -39,7 +39,7 @@ const VEG_GOAL = 3; const FRUIT_GOAL = 3;
 
 const RING_R = 76; const RING_SW = 12; const RING_CIRC = 2 * Math.PI * RING_R;
 
-function dateStr(d: Date) { return d.toISOString().split('T')[0]; }
+function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 function addDays(date: string, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return dateStr(d); }
 function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)); }
 /** Format a number to at most 2 decimal places, stripping trailing zeros */
@@ -162,8 +162,8 @@ type SleepSaveData = { bedtime: string; waketime: string; quality: number; durat
 /** Format a 24-h "HH:MM" string as "10:30 PM" for display */
 function fmtSleepTime(t: string): string {
   const parts = t.split(':');
-  const h24 = parseInt(parts[0]) || 0;
-  const m   = parseInt(parts[1]) || 0;
+  const h24 = parseInt(parts[0], 10) || 0;
+  const m   = parseInt(parts[1], 10) || 0;
   const suffix = h24 < 12 ? 'AM' : 'PM';
   const h12  = h24 % 12 || 12;
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
@@ -243,13 +243,15 @@ function SleepModal({ visible, onClose, onSave }: {
               <Text style={sl.insightLbl}>✦ Insight</Text>
               <Text style={sl.insightTxt}>On days following 8h+ sleep, your step count is 34% higher. Your mood also improves on average.</Text>
             </View>
-            <TouchableOpacity style={sl.saveBtn} onPress={() => {
+            <TouchableOpacity style={sl.saveBtn} activeOpacity={0.85} onPress={() => {
               const duration = calcDuration();
               if (duration === '—') { Alert.alert('Invalid time', 'Check your times and try again.'); return; }
               onSave({ bedtime, waketime, quality, duration });
               onClose();
             }}>
-              <Text style={sl.saveTxt}>Save Sleep Log</Text>
+              <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sl.saveGrad}>
+                <Text style={sl.saveTxt}>Save Sleep Log</Text>
+              </ExpoLinearGradient>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -366,8 +368,8 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
       <SafeAreaView style={ex.safe} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={ex.header}>
-          <TouchableOpacity onPress={onClose} style={ex.closeBtn}>
-            <Ionicons name="close" size={16} color={colors.ink} />
+          <TouchableOpacity onPress={() => { Keyboard.dismiss(); onClose(); }} style={ex.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
           <Text style={ex.title}>Exercise</Text>
           <TouchableOpacity onPress={() => setTab('calories')}>
@@ -377,7 +379,20 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
         {/* Search */}
         <View style={ex.searchRow}>
           <Ionicons name="search-outline" size={16} color={colors.ink2} />
-          <TextInput style={ex.searchInput} placeholder="Search Exercise" placeholderTextColor={colors.ink3} value={search} onChangeText={setSearch} />
+          <TextInput
+            style={ex.searchInput}
+            placeholder="Search Exercise"
+            placeholderTextColor={colors.ink3}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => { setSearch(''); Keyboard.dismiss(); }} hitSlop={10}>
+              <Ionicons name="close-circle" size={18} color={colors.ink3} />
+            </TouchableOpacity>
+          )}
         </View>
         {/* Tabs */}
         <View style={ex.tabRow}>
@@ -389,7 +404,7 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
         </View>
 
         {tab === 'list' ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Text style={ex.sectionHdr}>All Exercises</Text>
             {filtered.map((e) => (
               <TouchableOpacity key={e.name} style={[ex.exRow, selectedExercise?.name === e.name && ex.exRowSelected]} onPress={() => {
@@ -423,7 +438,7 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
             <View style={{ flex: 1 }} />
             <View style={ex.doneWrap}>
               <TouchableOpacity style={ex.doneBtn} onPress={() => {
-                const k = parseInt(manualKcal);
+                const k = parseInt(manualKcal, 10);
                 if (isNaN(k) || k < 1 || k > 5000) { Alert.alert('Invalid calories', 'Enter a value between 1 and 5000 kcal.'); return; }
                 onAddCalories(k, manualTitle || 'Exercise'); onClose();
               }}>
@@ -441,7 +456,7 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
         </View>
         {/* Duration picker — slides up when an exercise row is tapped */}
         {selectedExercise && tab === 'list' && (() => {
-          const mins = parseInt(duration) || 30;
+          const mins = parseInt(duration, 10) || 30;
           const kcal = Math.round(selectedExercise.kcalPerMin * mins);
           return (
             <Animated.View style={[ex.durPanel, { bottom: kbBottom }]}>
@@ -461,8 +476,10 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
                 <TouchableOpacity style={ex.durCancelBtn} onPress={() => setSelectedExercise(null)}>
                   <Text style={ex.durCancelTxt}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={ex.durLogBtn} onPress={() => { onAddCalories(kcal, selectedExercise.name, selectedExercise.emoji, mins); setSelectedExercise(null); onClose(); }}>
-                  <Text style={ex.durLogTxt}>LOG</Text>
+                <TouchableOpacity style={ex.durLogBtn} activeOpacity={0.85} onPress={() => { onAddCalories(kcal, selectedExercise.name, selectedExercise.emoji, mins); setSelectedExercise(null); onClose(); }}>
+                  <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ex.durLogGrad}>
+                    <Text style={ex.durLogTxt}>LOG</Text>
+                  </ExpoLinearGradient>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -493,8 +510,20 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
               {/* Exercise search */}
               <View style={[ex.searchRow, { marginHorizontal: 0, marginBottom: spacing.xs }]}>
                 <Ionicons name="search-outline" size={14} color={colors.ink3} />
-                <TextInput style={ex.searchInput} placeholder="Add exercise…" placeholderTextColor={colors.ink3}
-                  value={strengthSearch} onChangeText={setStrengthSearch} />
+                <TextInput
+                  style={ex.searchInput}
+                  placeholder="Add exercise…"
+                  placeholderTextColor={colors.ink3}
+                  value={strengthSearch}
+                  onChangeText={setStrengthSearch}
+                  returnKeyType="search"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
+                {strengthSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => { setStrengthSearch(''); Keyboard.dismiss(); }} hitSlop={10}>
+                    <Ionicons name="close-circle" size={18} color={colors.ink3} />
+                  </TouchableOpacity>
+                )}
               </View>
               {strengthSearch.length > 0 && (
                 <View style={{ backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, marginBottom: spacing.sm }}>
@@ -546,8 +575,10 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
               <TouchableOpacity style={ex.durCancelBtn} onPress={() => setStrengthMode(false)}>
                 <Text style={ex.durCancelTxt}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={ex.durLogBtn} onPress={logStrengthWorkout}>
-                <Text style={ex.durLogTxt}>LOG WORKOUT</Text>
+              <TouchableOpacity style={ex.durLogBtn} activeOpacity={0.85} onPress={logStrengthWorkout}>
+                <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ex.durLogGrad}>
+                  <Text style={ex.durLogTxt}>LOG WORKOUT</Text>
+                </ExpoLinearGradient>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -1090,6 +1121,8 @@ export default function DiaryScreen() {
 
   const entry = entries[selectedDate];
   const foods = entry?.foods ?? [];
+  // Fresh account = user has never logged any food across any day
+  const hasEverLoggedFood = Object.values(entries).some((e) => (e?.foods?.length ?? 0) > 0);
   const water = entry?.water ?? 0;
   const veggies = entry?.veggies ?? 0;
   const fruits = entry?.fruits ?? 0;
@@ -1231,10 +1264,13 @@ export default function DiaryScreen() {
   }, [foods.length, isToday]);
 
   useEffect(() => {
-    AsyncStorage.getItem(`dagnara_food_favorites_${email ?? 'anon'}`).then(raw => {
-      if (raw) setFavorites(JSON.parse(raw));
+    const favKey = `dagnara_food_favorites_${email ?? 'anon'}`;
+    AsyncStorage.getItem(favKey).then(raw => {
+      if (!raw) return;
+      try { setFavorites(JSON.parse(raw)); }
+      catch { AsyncStorage.removeItem(favKey); }
     });
-  }, []);
+  }, [email]);
 
   async function saveFavorite(food: FoodItem) {
     const alreadySaved = favorites.some(f => f.name === food.name);
@@ -1611,10 +1647,7 @@ export default function DiaryScreen() {
 
       {/* ── App Header ── */}
       <View style={st.appHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Text style={st.appTitle}>Diary</Text>
-          <Ionicons name="checkmark-circle" size={18} color={colors.green} />
-        </View>
+        <Text style={st.appTitle}>Diary</Text>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
             <Ionicons name="share-outline" size={22} color={colors.ink2} />
@@ -1687,9 +1720,9 @@ export default function DiaryScreen() {
           <View style={st.achieveBadge}>
             <View style={st.xpBadge}><Text style={st.xpBadgeTxt}>{xpInfo.level}</Text></View>
             <View style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <Text style={st.xpName}>{xpInfo.name}</Text>
-                <Text style={st.xpPts}>{xp} XP</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
+                <Text style={st.xpName}>{xp.toLocaleString()}</Text>
+                <Text style={st.xpPts}>/ {xpInfo.nextMin.toLocaleString()} XP</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
             </View>
@@ -1794,20 +1827,20 @@ export default function DiaryScreen() {
           {analyzing && <ActivityIndicator color={colors.lavender} style={{ marginLeft: 4 }} />}
         </View>
 
-        {/* Empty state */}
-        {foods.length === 0 && (
+        {/* Empty state — "first meal" CTA only for brand-new accounts; past days still show a generic empty label */}
+        {foods.length === 0 && isToday && !hasEverLoggedFood && (
           <View style={st.emptyState}>
             <Text style={st.emptyStateIcon}>🍽️</Text>
-            {isToday ? (
-              <>
-                <Text style={st.emptyStateTxt}>Log your first meal</Text>
-                <Text style={st.emptyStateHint}>Tap any meal section below or use the{' '}
-                  <Text style={{ color: colors.purple, fontWeight: '700' }}>+</Text>
-                  {' '}button to add food.</Text>
-              </>
-            ) : (
-              <Text style={st.emptyStateTxt}>Nothing logged on this day</Text>
-            )}
+            <Text style={st.emptyStateTxt}>Log your first meal</Text>
+            <Text style={st.emptyStateHint}>Tap any meal section below or use the{' '}
+              <Text style={{ color: colors.purple, fontWeight: '700' }}>+</Text>
+              {' '}button to add food.</Text>
+          </View>
+        )}
+        {foods.length === 0 && !isToday && (
+          <View style={st.emptyState}>
+            <Text style={st.emptyStateIcon}>🍽️</Text>
+            <Text style={st.emptyStateTxt}>Nothing logged on this day</Text>
           </View>
         )}
 
@@ -1842,7 +1875,7 @@ export default function DiaryScreen() {
                         style={[st.skipBtn, copiedMeal === meal && { backgroundColor: colors.green + '22' }]}
                         onPress={async () => {
                           const d = new Date(); d.setDate(d.getDate() - 1);
-                          const yesterday = d.toISOString().split('T')[0];
+                          const yesterday = d.toLocaleDateString('en-CA');
                           const yFoods = (entries[yesterday]?.foods ?? []).filter(f => f.meal === meal);
                           if (yFoods.length === 0) { Alert.alert('Nothing to copy', `No ${MEAL_LABEL[meal]} logged yesterday.`); return; }
                           for (const f of yFoods) await addFood(selectedDate, { ...f, id: `${Date.now()}_${Math.random()}` });
@@ -2109,6 +2142,8 @@ export default function DiaryScreen() {
                       keyboardType="decimal-pad"
                       placeholder="Custom grams"
                       placeholderTextColor={colors.ink3}
+                      returnKeyType="done"
+                      onSubmitEditing={() => Keyboard.dismiss()}
                     />
                     <Text style={{ color: colors.ink3 }}>g</Text>
                   </View>
@@ -2479,7 +2514,7 @@ export default function DiaryScreen() {
                 style={{ backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: 8 }}
                 onPress={async () => {
                   if (!customFood.name || !customFood.kcal) { Alert.alert('Required', 'Please enter a name and calories.'); return; }
-                  const _kcal    = parseInt(customFood.kcal);
+                  const _kcal    = parseInt(customFood.kcal, 10);
                   const _protein = parseFloat(customFood.protein) || 0;
                   const _carbs   = parseFloat(customFood.carbs) || 0;
                   const _fat     = parseFloat(customFood.fat) || 0;
@@ -2553,7 +2588,7 @@ export default function DiaryScreen() {
           )}
           {/* Quick Add overlay — rendered inside search modal to avoid stacked-modal issues on Android */}
           {quickAddVisible && (() => {
-            const qaKcal = parseInt(quickAddInput) || 0;
+            const qaKcal = parseInt(quickAddInput, 10) || 0;
             const qaProtein = Math.round(qaKcal * 0.20 / 4);
             const qaCarbs   = Math.round(qaKcal * 0.50 / 4);
             const qaFat     = Math.round(qaKcal * 0.30 / 9);
@@ -2713,7 +2748,7 @@ const st = StyleSheet.create({
   ringCenter: { position: 'absolute', alignItems: 'center' },
   ringNum: { fontSize: fontSize['2xl'] - 6, fontWeight: '800', color: colors.ink },
   ringLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  calStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md },
+  calStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.xs },
   calStat: { alignItems: 'center', gap: 2 },
   calStatVal: { fontSize: fontSize.lg, fontWeight: '700' },
   calStatLbl: { fontSize: fontSize.xs, color: colors.ink3 },
@@ -2839,7 +2874,8 @@ const sl = StyleSheet.create({
   insight: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
   insightLbl: { fontSize: fontSize.xs, fontWeight: '700', color: colors.purple2, marginBottom: 6 },
   insightTxt: { fontSize: fontSize.sm, color: colors.ink2, lineHeight: 20 },
-  saveBtn: { backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
+  saveBtn: { borderRadius: radius.md, overflow: 'hidden' },
+  saveGrad: { padding: spacing.md, alignItems: 'center' },
   saveTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
 });
 
@@ -2891,6 +2927,7 @@ const ex = StyleSheet.create({
   durActions: { flexDirection: 'row', gap: spacing.sm },
   durCancelBtn: { flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md },
   durCancelTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink2 },
-  durLogBtn: { flex: 2, paddingVertical: spacing.sm + 2, alignItems: 'center', backgroundColor: colors.purple, borderRadius: radius.md },
+  durLogBtn: { flex: 2, borderRadius: radius.md, overflow: 'hidden' },
+  durLogGrad: { paddingVertical: spacing.sm + 2, alignItems: 'center' },
   durLogTxt: { fontSize: fontSize.sm, fontWeight: '700', color: colors.white, letterSpacing: 0.5 },
 });

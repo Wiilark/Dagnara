@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  Modal, StyleSheet, Alert, ActivityIndicator,
+  Modal, StyleSheet, Alert, Image, Dimensions, type ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,13 +9,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useDiaryStore } from '../../src/store/diaryStore';
-import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { useAppStore } from '../../src/store/appStore';
-import { generateMealPlan } from '../../src/lib/api';
+import { useAuthStore } from '../../src/store/authStore';
 import { FOOD_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
+import { addRecipesToGrocery } from '../../src/lib/grocery';
 
-const DIET_FILTERS = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Quick', 'High Protein', 'Low Carb', 'Vegan', 'Keto', 'Vegetarian', 'Mediterranean'];
+// Map of recipe id → bundled hero photo. Recipes without an entry fall back
+// to the emoji icon. Add more ids here to give any other recipe a photo.
+const RECIPE_PHOTOS: Record<string, ImageSourcePropType> = {
+  '1': require('../../assets/recipes/greek-salad.jpg'),
+};
+
+// Modal hero photo — width is 77% of device width (capped at 300, so iPhone 13/14 hits
+// exactly 300). Height is 75% of the width (classic 4:3 landscape ratio).
+// App is portrait-only so reading Dimensions at module scope is safe.
+const MODAL_PHOTO_WIDTH = Math.min(Math.round(Dimensions.get('window').width * 0.77), 300);
+const MODAL_PHOTO_HEIGHT = Math.round(MODAL_PHOTO_WIDTH * 0.6);
+
+const DIET_FILTERS = ['All', 'For your goal', 'Quick', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'High Protein', 'Low Carb', 'Vegan', 'Keto', 'Vegetarian', 'Mediterranean'];
 
 const MEAL_PICK = [
   { key: 'breakfast' as const, icon: '🍳', label: 'Breakfast', color: colors.honey },
@@ -29,8 +41,8 @@ const RECIPES = [
   { id: '2',  icon: '🍗',  name: 'Grilled Chicken',       diet: 'High Protein', meal: 'Dinner',   kcal: 320, carbs: 2,  protein: 52, fat: 10, time: '25 min', goal: 'muscle_gain',   ingredients: [{ qty: '200g', name: 'Chicken breast' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '½ piece', name: 'Lemon' }, { qty: '2 sprigs', name: 'Rosemary' }], steps: ['Marinate chicken with olive oil, garlic, and lemon.', 'Grill for 12 min each side.', 'Rest 5 min before serving.'] },
   { id: '3',  icon: '🥑',  name: 'Avocado Toast',         diet: 'Vegetarian',  meal: 'Breakfast', kcal: 290, carbs: 28, protein: 8,  fat: 17, time: '8 min',  goal: 'balanced',      ingredients: [{ qty: '2 slices (80g)', name: 'Sourdough bread' }, { qty: '1 medium (150g)', name: 'Avocado' }, { qty: '1 tsp (5ml)', name: 'Lemon juice' }, { qty: '¼ tsp', name: 'Red pepper flakes' }, { qty: '¼ tsp', name: 'Salt' }], steps: ['Toast bread until golden.', 'Mash avocado with lemon juice and salt.', 'Spread on toast, top with pepper flakes.'] },
   { id: '4',  icon: '🐟',  name: 'Salmon Bowl',           diet: 'High Protein', meal: 'Lunch',    kcal: 450, carbs: 32, protein: 44, fat: 16, time: '20 min', goal: 'muscle_gain',   ingredients: [{ qty: '150g', name: 'Salmon fillet' }, { qty: '100g (dry)', name: 'Brown rice' }, { qty: '80g', name: 'Edamame' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp', name: 'Sesame seeds' }, { qty: '60g', name: 'Cucumber' }], steps: ['Cook rice.', 'Pan-sear salmon 4 min each side.', 'Assemble bowl with all ingredients.', 'Drizzle soy sauce and sprinkle sesame seeds.'] },
-  { id: '5',  icon: '🥚',  name: 'Egg White Omelette',    diet: 'Keto',        meal: 'Breakfast', kcal: 180, carbs: 3,  protein: 28, fat: 6,  time: '10 min', goal: 'weight_loss',   ingredients: [{ qty: '4 whites (120ml)', name: 'Egg whites' }, { qty: '50g', name: 'Spinach' }, { qty: '60g', name: 'Bell pepper' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Whisk egg whites with salt.', 'Sauté vegetables 2 min.', 'Pour egg whites over vegetables.', 'Cook until set and fold.'] },
-  { id: '6',  icon: '🍲',  name: 'Lentil Soup',           diet: 'Vegan',       meal: 'Dinner',    kcal: 280, carbs: 42, protein: 16, fat: 4,  time: '35 min', goal: 'balanced',      ingredients: [{ qty: '100g (dry)', name: 'Red lentils' }, { qty: '1 medium (100g)', name: 'Onion' }, { qty: '100g', name: 'Carrots' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '500ml', name: 'Vegetable stock' }, { qty: '½ piece', name: 'Lemon' }], steps: ['Sauté onion and carrots.', 'Add lentils, cumin, and stock.', 'Simmer 25 min.', 'Blend partially and squeeze lemon.'] },
+  { id: '5',  icon: '🥚',  name: 'Egg White Omelette',    diet: 'Keto',        meal: 'Breakfast', kcal: 180, carbs: 3,  protein: 28, fat: 6,  time: '10 min', goal: 'weight_loss',   ingredients: [{ qty: '4 whites (120ml)', name: 'Egg whites' }, { qty: '50g', name: 'Spinach' }, { qty: '60g', name: 'Bell pepper' }, { qty: '1 tsp (5g)', name: 'Butter' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Whisk egg whites with salt.', 'Melt butter and sauté vegetables 2 min.', 'Pour egg whites over vegetables.', 'Cook until set and fold.'] },
+  { id: '6',  icon: '🍲',  name: 'Lentil Soup',           diet: 'Vegan',       meal: 'Dinner',    kcal: 280, carbs: 42, protein: 16, fat: 4,  time: '35 min', goal: 'balanced',      ingredients: [{ qty: '100g (dry)', name: 'Red lentils' }, { qty: '1 medium (100g)', name: 'Onion' }, { qty: '100g', name: 'Carrots' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '500ml', name: 'Vegetable stock' }, { qty: '½ piece', name: 'Lemon' }], steps: ['Sauté onion and carrots in olive oil.', 'Add lentils, cumin, and stock.', 'Simmer 25 min.', 'Blend partially and squeeze lemon.'] },
   { id: '7',  icon: '🥣',  name: 'Overnight Oats',        diet: 'Vegetarian',  meal: 'Breakfast', kcal: 350, carbs: 55, protein: 12, fat: 8,  time: '5 min',  goal: 'balanced',      ingredients: [{ qty: '80g', name: 'Rolled oats' }, { qty: '200ml', name: 'Almond milk' }, { qty: '1 tbsp (10g)', name: 'Chia seeds' }, { qty: '1 medium (120g)', name: 'Banana' }, { qty: '1 tbsp (20ml)', name: 'Honey' }], steps: ['Mix oats, milk and chia seeds.', 'Refrigerate overnight.', 'Top with banana and honey before serving.'] },
   { id: '8',  icon: '🌮',  name: 'Chicken Tacos',         diet: 'High Protein', meal: 'Dinner',   kcal: 420, carbs: 38, protein: 36, fat: 12, time: '20 min', goal: 'muscle_gain',   ingredients: [{ qty: '200g', name: 'Chicken thighs' }, { qty: '3 pieces', name: 'Corn tortillas' }, { qty: '½ piece', name: 'Lime' }, { qty: '10g', name: 'Cilantro' }, { qty: '3 tbsp (45ml)', name: 'Salsa' }, { qty: '½ medium (75g)', name: 'Avocado' }], steps: ['Season and grill chicken.', 'Slice into strips.', 'Warm tortillas and assemble tacos.', 'Top with salsa, avocado, and lime.'] },
   { id: '9',  icon: '🥜',  name: 'Peanut Butter Smoothie', diet: 'High Protein', meal: 'Breakfast', kcal: 380, carbs: 30, protein: 22, fat: 18, time: '5 min', goal: 'muscle_gain', ingredients: [{ qty: '1 medium (120g)', name: 'Banana' }, { qty: '2 tbsp (32g)', name: 'Peanut butter' }, { qty: '1 scoop (30g)', name: 'Protein powder' }, { qty: '250ml', name: 'Oat milk' }, { qty: '1 tsp (7ml)', name: 'Honey' }], steps: ['Add all ingredients to blender.', 'Blend until smooth.', 'Serve immediately.'] },
@@ -50,12 +62,12 @@ const RECIPES = [
   { id: '21', icon: '🍜', name: 'Miso Soup Ramen', diet: 'Vegetarian', meal: 'Lunch', kcal: 360, carbs: 50, protein: 16, fat: 8, time: '20 min', goal: 'balanced', ingredients: [{ qty: '80g (dry)', name: 'Ramen noodles' }, { qty: '1 tbsp (15g)', name: 'Miso paste' }, { qty: '100g', name: 'Tofu' }, { qty: '80g', name: 'Bok choy' }, { qty: '10g', name: 'Green onion' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }], steps: ['Boil noodles per package.', 'Dissolve miso in hot water.', 'Add cubed tofu and bok choy.', 'Top with green onion and sesame oil.'] },
   { id: '22', icon: '🥗', name: 'Quinoa Power Bowl', diet: 'Vegan', meal: 'Lunch', kcal: 400, carbs: 52, protein: 16, fat: 14, time: '25 min', goal: 'balanced', ingredients: [{ qty: '80g (dry)', name: 'Quinoa' }, { qty: '150g', name: 'Roasted sweet potato' }, { qty: '60g', name: 'Spinach' }, { qty: '20g', name: 'Pumpkin seeds' }, { qty: '3 tbsp (45ml)', name: 'Lemon tahini dressing' }, { qty: '½ medium (75g)', name: 'Avocado' }], steps: ['Cook quinoa.', 'Roast sweet potato cubes at 200C.', 'Assemble bowl and drizzle tahini dressing.'] },
   { id: '23', icon: '🍗', name: 'Caesar Salad with Chicken', diet: 'High Protein', meal: 'Lunch', kcal: 430, carbs: 12, protein: 46, fat: 22, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '150g', name: 'Romaine lettuce' }, { qty: '180g', name: 'Grilled chicken' }, { qty: '30g', name: 'Parmesan' }, { qty: '30g', name: 'Croutons' }, { qty: '3 tbsp (45ml)', name: 'Caesar dressing' }, { qty: '½ piece', name: 'Lemon' }], steps: ['Grill chicken and slice.', 'Tear lettuce and toss with dressing.', 'Add chicken and croutons.', 'Top with parmesan and lemon.'] },
-  { id: '24', icon: '🫔', name: 'Veggie Burrito Bowl', diet: 'Vegan', meal: 'Lunch', kcal: 370, carbs: 60, protein: 12, fat: 8, time: '15 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Brown rice' }, { qty: '150g (cooked)', name: 'Black beans' }, { qty: '80g', name: 'Corn' }, { qty: '4 tbsp (60ml)', name: 'Salsa' }, { qty: '80g', name: 'Guacamole' }, { qty: '½ piece', name: 'Lime' }], steps: ['Cook rice.', 'Warm beans with cumin.', 'Assemble bowl with all toppings.', 'Squeeze lime and add salsa.'] },
+  { id: '24', icon: '🫔', name: 'Veggie Burrito Bowl', diet: 'Vegan', meal: 'Lunch', kcal: 370, carbs: 60, protein: 12, fat: 8, time: '15 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Brown rice' }, { qty: '150g (cooked)', name: 'Black beans' }, { qty: '80g', name: 'Corn' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '4 tbsp (60ml)', name: 'Salsa' }, { qty: '80g', name: 'Guacamole' }, { qty: '½ piece', name: 'Lime' }], steps: ['Cook rice.', 'Warm beans with cumin.', 'Assemble bowl with all toppings.', 'Squeeze lime and add salsa.'] },
   // Dinner
   { id: '25', icon: '🥩', name: 'Beef Stir Fry', diet: 'High Protein', meal: 'Dinner', kcal: 480, carbs: 28, protein: 44, fat: 20, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Beef strips' }, { qty: '100g', name: 'Broccoli' }, { qty: '80g', name: 'Bell pepper' }, { qty: '3 tbsp (45ml)', name: 'Soy sauce' }, { qty: '1 tsp (5g)', name: 'Ginger' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '100g (dry)', name: 'Rice' }], steps: ['Cook rice.', 'Stir fry beef in hot wok until brown.', 'Add vegetables and stir fry 3 min.', 'Add soy sauce, ginger, garlic.', 'Serve over rice.'] },
-  { id: '26', icon: '🐠', name: 'Baked Cod', diet: 'High Protein', meal: 'Dinner', kcal: 310, carbs: 8, protein: 46, fat: 10, time: '25 min', goal: 'weight_loss', ingredients: [{ qty: '200g', name: 'Cod fillet' }, { qty: '½ piece', name: 'Lemon' }, { qty: '1 tbsp (15g)', name: 'Capers' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '5g', name: 'Parsley' }], steps: ['Preheat oven to 200C.', 'Place cod in baking dish with olive oil and lemon.', 'Top with capers and garlic.', 'Bake 18 min.', 'Garnish with parsley.'] },
+  { id: '26', icon: '🐟', name: 'Baked Cod', diet: 'High Protein', meal: 'Dinner', kcal: 310, carbs: 8, protein: 46, fat: 10, time: '25 min', goal: 'weight_loss', ingredients: [{ qty: '200g', name: 'Cod fillet' }, { qty: '½ piece', name: 'Lemon' }, { qty: '1 tbsp (15g)', name: 'Capers' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '5g', name: 'Parsley' }], steps: ['Preheat oven to 200C.', 'Place cod in baking dish with olive oil and lemon.', 'Top with capers and garlic.', 'Bake 18 min.', 'Garnish with parsley.'] },
   { id: '27', icon: '🍲', name: 'Chickpea Curry', diet: 'Vegan', meal: 'Dinner', kcal: 380, carbs: 54, protein: 14, fat: 10, time: '30 min', goal: 'balanced', ingredients: [{ qty: '200g (cooked)', name: 'Chickpeas' }, { qty: '200ml', name: 'Coconut milk' }, { qty: '150g', name: 'Tomatoes' }, { qty: '1 tbsp (8g)', name: 'Curry powder' }, { qty: '1 medium (100g)', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '80g (dry)', name: 'Basmati rice' }], steps: ['Saute onion, garlic with curry powder.', 'Add tomatoes and chickpeas.', 'Pour in coconut milk and simmer 20 min.', 'Serve over rice.'] },
-  { id: '28', icon: '🫕', name: 'Turkey Meatballs', diet: 'High Protein', meal: 'Dinner', kcal: 420, carbs: 30, protein: 48, fat: 12, time: '35 min', goal: 'muscle_gain', ingredients: [{ qty: '250g', name: 'Ground turkey' }, { qty: '30g', name: 'Breadcrumbs' }, { qty: '1 piece', name: 'Egg' }, { qty: '20g', name: 'Parmesan' }, { qty: '150ml', name: 'Marinara sauce' }, { qty: '100g (dry)', name: 'Spaghetti' }], steps: ['Mix turkey with breadcrumbs, egg, parmesan.', 'Form into balls.', 'Bake at 190C for 20 min.', 'Simmer in marinara sauce.', 'Serve over pasta.'] },
+  { id: '28', icon: '🍝', name: 'Turkey Meatballs', diet: 'High Protein', meal: 'Dinner', kcal: 420, carbs: 30, protein: 48, fat: 12, time: '35 min', goal: 'muscle_gain', ingredients: [{ qty: '250g', name: 'Ground turkey' }, { qty: '30g', name: 'Breadcrumbs' }, { qty: '1 piece', name: 'Egg' }, { qty: '20g', name: 'Parmesan' }, { qty: '150ml', name: 'Marinara sauce' }, { qty: '100g (dry)', name: 'Spaghetti' }], steps: ['Mix turkey with breadcrumbs, egg, parmesan.', 'Form into balls.', 'Bake at 190C for 20 min.', 'Simmer in marinara sauce.', 'Serve over pasta.'] },
   { id: '29', icon: '🥬', name: 'Stuffed Bell Peppers', diet: 'Vegetarian', meal: 'Dinner', kcal: 320, carbs: 38, protein: 16, fat: 10, time: '40 min', goal: 'balanced', ingredients: [{ qty: '2 pieces', name: 'Bell peppers' }, { qty: '80g (dry)', name: 'Quinoa' }, { qty: '100g (cooked)', name: 'Black beans' }, { qty: '100g', name: 'Tomatoes' }, { qty: '60g', name: 'Corn' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '30g', name: 'Cheese' }], steps: ['Cook quinoa with cumin.', 'Mix with beans, tomatoes, corn.', 'Hollow out peppers and fill.', 'Top with cheese.', 'Bake at 180C for 25 min.'] },
   { id: '30', icon: '🍝', name: 'Pasta Primavera', diet: 'Vegetarian', meal: 'Dinner', kcal: 440, carbs: 68, protein: 14, fat: 12, time: '25 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Penne pasta' }, { qty: '100g', name: 'Cherry tomatoes' }, { qty: '100g', name: 'Zucchini' }, { qty: '80g', name: 'Asparagus' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '30g', name: 'Parmesan' }, { qty: '10g', name: 'Fresh basil' }], steps: ['Cook pasta al dente.', 'Saute vegetables in olive oil.', 'Toss pasta with vegetables.', 'Add parmesan and fresh basil.'] },
   { id: '31', icon: '🍛', name: 'Thai Green Curry', diet: 'High Protein', meal: 'Dinner', kcal: 460, carbs: 38, protein: 36, fat: 18, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Chicken breast' }, { qty: '2 tbsp (30g)', name: 'Green curry paste' }, { qty: '250ml', name: 'Coconut milk' }, { qty: '80g', name: 'Bamboo shoots' }, { qty: '10g', name: 'Fresh basil' }, { qty: '100g (dry)', name: 'Jasmine rice' }], steps: ['Fry curry paste 1 min.', 'Add coconut milk and simmer.', 'Add chicken pieces and cook through.', 'Add bamboo shoots and basil.', 'Serve over jasmine rice.'] },
@@ -70,24 +82,24 @@ const RECIPES = [
   // High Protein extras
   { id: '39', icon: '🥩', name: 'Steak & Roasted Veg', diet: 'High Protein', meal: 'Dinner', kcal: 520, carbs: 20, protein: 52, fat: 26, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '250g', name: 'Sirloin steak' }, { qty: '150g', name: 'Sweet potato' }, { qty: '150g', name: 'Broccoli' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '1 sprig', name: 'Rosemary' }, { qty: '2 cloves', name: 'Garlic' }], steps: ['Roast sweet potato and broccoli at 200C.', 'Season steak and cook to desired doneness.', 'Rest steak 5 min before slicing.', 'Serve with roasted vegetables.'] },
   { id: '40', icon: '🐟', name: 'Tuna Stuffed Avocado', diet: 'Keto', meal: 'Lunch', kcal: 340, carbs: 8, protein: 28, fat: 22, time: '10 min', goal: 'weight_loss', ingredients: [{ qty: '150g', name: 'Canned tuna' }, { qty: '1 medium (200g)', name: 'Avocado' }, { qty: '1 tbsp (15ml)', name: 'Lemon juice' }, { qty: '30g', name: 'Red onion' }, { qty: '40g', name: 'Celery' }, { qty: '1 tsp', name: 'Dijon mustard' }], steps: ['Mix tuna with lemon, onion, celery, mustard.', 'Halve avocado and remove pit.', 'Fill avocado halves with tuna mixture.'] },
-  { id: '41', icon: '🍳', name: 'Shakshuka', diet: 'Vegetarian', meal: 'Breakfast', kcal: 290, carbs: 18, protein: 18, fat: 16, time: '25 min', goal: 'balanced', ingredients: [{ qty: '2 pieces', name: 'Eggs' }, { qty: '200g', name: 'Canned tomatoes' }, { qty: '80g', name: 'Bell pepper' }, { qty: '60g', name: 'Onion' }, { qty: '½ tsp', name: 'Cumin' }, { qty: '½ tsp', name: 'Paprika' }, { qty: '30g', name: 'Feta' }], steps: ['Saute onion and pepper.', 'Add spices and tomatoes, simmer 10 min.', 'Make wells and crack eggs in.', 'Cover and cook until whites set.', 'Top with feta.'] },
+  { id: '41', icon: '🍳', name: 'Shakshuka', diet: 'Vegetarian', meal: 'Breakfast', kcal: 290, carbs: 18, protein: 18, fat: 16, time: '25 min', goal: 'balanced', ingredients: [{ qty: '2 pieces', name: 'Eggs' }, { qty: '200g', name: 'Canned tomatoes' }, { qty: '80g', name: 'Bell pepper' }, { qty: '60g', name: 'Onion' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '½ tsp', name: 'Cumin' }, { qty: '½ tsp', name: 'Paprika' }, { qty: '30g', name: 'Feta' }], steps: ['Saute onion and pepper in olive oil.', 'Add spices and tomatoes, simmer 10 min.', 'Make wells and crack eggs in.', 'Cover and cook until whites set.', 'Top with feta.'] },
   { id: '42', icon: '🥗', name: 'Edamame Salad', diet: 'Vegan', meal: 'Lunch', kcal: 310, carbs: 28, protein: 18, fat: 14, time: '10 min', goal: 'balanced', ingredients: [{ qty: '120g', name: 'Edamame' }, { qty: '100g', name: 'Red cabbage' }, { qty: '80g', name: 'Mango' }, { qty: '10g', name: 'Cilantro' }, { qty: '2 tbsp (30ml)', name: 'Sesame dressing' }, { qty: '1 tsp', name: 'Sesame seeds' }], steps: ['Cook edamame and cool.', 'Shred cabbage and cube mango.', 'Toss with cilantro and sesame dressing.', 'Top with sesame seeds.'] },
   { id: '43', icon: '🍗', name: 'Chicken Shawarma Bowl', diet: 'High Protein', meal: 'Dinner', kcal: 490, carbs: 42, protein: 48, fat: 14, time: '35 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Chicken thighs' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '½ tsp', name: 'Turmeric' }, { qty: '1 tsp', name: 'Paprika' }, { qty: '1 piece (75g)', name: 'Pita' }, { qty: '2 tbsp (30ml)', name: 'Tahini' }, { qty: '100g', name: 'Tomato' }, { qty: '10g', name: 'Parsley' }], steps: ['Marinate chicken with spices overnight.', 'Grill or pan cook chicken.', 'Slice and serve in bowl with pita.', 'Drizzle tahini and add tomato and parsley.'] },
-  { id: '44', icon: '🫙', name: 'White Bean Soup', diet: 'Vegan', meal: 'Dinner', kcal: 290, carbs: 44, protein: 14, fat: 6, time: '30 min', goal: 'balanced', ingredients: [{ qty: '200g (cooked)', name: 'White beans' }, { qty: '60g', name: 'Kale' }, { qty: '80g', name: 'Carrots' }, { qty: '60g', name: 'Celery' }, { qty: '3 cloves', name: 'Garlic' }, { qty: '500ml', name: 'Vegetable broth' }, { qty: '1 sprig', name: 'Rosemary' }], steps: ['Saute carrots, celery, garlic.', 'Add beans, broth, rosemary.', 'Simmer 20 min.', 'Add kale and cook 5 min more.'] },
+  { id: '44', icon: '🍲', name: 'White Bean Soup', diet: 'Vegan', meal: 'Dinner', kcal: 290, carbs: 44, protein: 14, fat: 6, time: '30 min', goal: 'balanced', ingredients: [{ qty: '200g (cooked)', name: 'White beans' }, { qty: '60g', name: 'Kale' }, { qty: '80g', name: 'Carrots' }, { qty: '60g', name: 'Celery' }, { qty: '3 cloves', name: 'Garlic' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '500ml', name: 'Vegetable broth' }, { qty: '1 sprig', name: 'Rosemary' }], steps: ['Saute carrots, celery, garlic in olive oil.', 'Add beans, broth, rosemary.', 'Simmer 20 min.', 'Add kale and cook 5 min more.'] },
   { id: '45', icon: '🥑', name: 'Keto Avocado Salad', diet: 'Keto', meal: 'Lunch', kcal: 360, carbs: 10, protein: 14, fat: 30, time: '10 min', goal: 'weight_loss', ingredients: [{ qty: '1 medium (200g)', name: 'Avocado' }, { qty: '100g', name: 'Cherry tomatoes' }, { qty: '100g', name: 'Cucumber' }, { qty: '50g', name: 'Feta' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '½ piece', name: 'Lemon' }, { qty: '5g', name: 'Fresh basil' }], steps: ['Cube avocado and combine with tomatoes.', 'Add cucumber and feta.', 'Dress with olive oil and lemon.', 'Top with fresh basil.'] },
-  { id: '46', icon: '🐚', name: 'Shrimp Tacos', diet: 'High Protein', meal: 'Dinner', kcal: 400, carbs: 36, protein: 38, fat: 12, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Shrimp' }, { qty: '3 pieces', name: 'Corn tortillas' }, { qty: '80g', name: 'Cabbage slaw' }, { qty: '½ piece', name: 'Lime' }, { qty: '10g', name: 'Cilantro' }, { qty: '2 tbsp (30ml)', name: 'Sriracha mayo' }], steps: ['Season and saute shrimp 2 min each side.', 'Warm tortillas.', 'Fill with shrimp and cabbage slaw.', 'Drizzle with sriracha mayo and lime juice.'] },
-  { id: '47', icon: '🫑', name: 'Stuffed Zucchini Boats', diet: 'Low Carb', meal: 'Dinner', kcal: 310, carbs: 14, protein: 28, fat: 16, time: '35 min', goal: 'weight_loss', ingredients: [{ qty: '2 medium (400g)', name: 'Zucchini' }, { qty: '150g', name: 'Ground beef' }, { qty: '100ml', name: 'Tomato sauce' }, { qty: '40g', name: 'Mozzarella' }, { qty: '60g', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }], steps: ['Halve zucchini and scoop centers.', 'Brown beef with onion and garlic.', 'Add tomato sauce and fill zucchini.', 'Top with mozzarella.', 'Bake at 190C for 20 min.'] },
-  { id: '48', icon: '🥘', name: 'Paella de Verduras', diet: 'Vegan', meal: 'Dinner', kcal: 410, carbs: 72, protein: 10, fat: 8, time: '40 min', goal: 'balanced', ingredients: [{ qty: '150g (dry)', name: 'Bomba rice' }, { qty: '150g', name: 'Bell peppers' }, { qty: '100g', name: 'Artichokes' }, { qty: '150g', name: 'Tomatoes' }, { qty: '0.5g', name: 'Saffron' }, { qty: '1 tsp', name: 'Smoked paprika' }, { qty: '400ml', name: 'Vegetable broth' }], steps: ['Fry peppers and tomatoes in wide pan.', 'Add rice and spices, stir.', 'Pour broth over and simmer until absorbed (no stirring).', 'Let rest 5 min before serving.'] },
+  { id: '46', icon: '🦐', name: 'Shrimp Tacos', diet: 'High Protein', meal: 'Dinner', kcal: 400, carbs: 36, protein: 38, fat: 12, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Shrimp' }, { qty: '3 pieces', name: 'Corn tortillas' }, { qty: '80g', name: 'Cabbage slaw' }, { qty: '½ piece', name: 'Lime' }, { qty: '10g', name: 'Cilantro' }, { qty: '2 tbsp (30ml)', name: 'Sriracha mayo' }], steps: ['Season and saute shrimp 2 min each side.', 'Warm tortillas.', 'Fill with shrimp and cabbage slaw.', 'Drizzle with sriracha mayo and lime juice.'] },
+  { id: '47', icon: '🥒', name: 'Stuffed Zucchini Boats', diet: 'Low Carb', meal: 'Dinner', kcal: 310, carbs: 14, protein: 28, fat: 16, time: '35 min', goal: 'weight_loss', ingredients: [{ qty: '2 medium (400g)', name: 'Zucchini' }, { qty: '150g', name: 'Ground beef' }, { qty: '100ml', name: 'Tomato sauce' }, { qty: '40g', name: 'Mozzarella' }, { qty: '60g', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }], steps: ['Halve zucchini and scoop centers.', 'Brown beef with onion and garlic.', 'Add tomato sauce and fill zucchini.', 'Top with mozzarella.', 'Bake at 190C for 20 min.'] },
+  { id: '48', icon: '🥘', name: 'Paella de Verduras', diet: 'Vegan', meal: 'Dinner', kcal: 410, carbs: 72, protein: 10, fat: 8, time: '40 min', goal: 'balanced', ingredients: [{ qty: '150g (dry)', name: 'Bomba rice' }, { qty: '150g', name: 'Bell peppers' }, { qty: '100g', name: 'Artichokes' }, { qty: '150g', name: 'Tomatoes' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '0.5g', name: 'Saffron' }, { qty: '1 tsp', name: 'Smoked paprika' }, { qty: '400ml', name: 'Vegetable broth' }], steps: ['Fry peppers, tomatoes, and artichokes in olive oil in a wide pan.', 'Add rice and spices, stir.', 'Pour broth over and simmer until absorbed (no stirring).', 'Let rest 5 min before serving.'] },
   { id: '49', icon: '🥗', name: 'Spinach Lentil Salad', diet: 'Vegan', meal: 'Lunch', kcal: 340, carbs: 44, protein: 18, fat: 10, time: '20 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Green lentils' }, { qty: '80g', name: 'Spinach' }, { qty: '40g', name: 'Red onion' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '1 piece', name: 'Lemon' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '½ tsp', name: 'Cumin' }], steps: ['Cook lentils until tender.', 'Cool slightly.', 'Toss with spinach, tomatoes, red onion.', 'Dress with lemon, olive oil, cumin.'] },
   { id: '50', icon: '🍣', name: 'Sushi Bowl', diet: 'High Protein', meal: 'Dinner', kcal: 470, carbs: 58, protein: 34, fat: 10, time: '20 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Sushi rice' }, { qty: '150g', name: 'Salmon' }, { qty: '½ medium (75g)', name: 'Avocado' }, { qty: '80g', name: 'Cucumber' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tbsp (15ml)', name: 'Rice vinegar' }, { qty: '1 tsp', name: 'Sesame seeds' }, { qty: '1 sheet', name: 'Nori' }], steps: ['Cook sushi rice with rice vinegar.', 'Slice salmon.', 'Assemble bowl with rice, salmon, avocado, cucumber.', 'Drizzle soy sauce and add sesame seeds.', 'Shred nori on top.'] },
   { id: '51', icon: '🫛', name: 'Edamame & Brown Rice', diet: 'Vegan', meal: 'Lunch', kcal: 330, carbs: 54, protein: 14, fat: 6, time: '20 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Brown rice' }, { qty: '100g', name: 'Edamame' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }, { qty: '10g', name: 'Green onion' }, { qty: '1 tsp (5g)', name: 'Ginger' }], steps: ['Cook brown rice.', 'Steam edamame.', 'Mix rice with soy sauce, sesame oil, ginger.', 'Top with edamame and green onion.'] },
   { id: '52', icon: '🍔', name: 'Turkey Burger (No Bun)', diet: 'Low Carb', meal: 'Dinner', kcal: 380, carbs: 8, protein: 44, fat: 18, time: '20 min', goal: 'weight_loss', ingredients: [{ qty: '200g', name: 'Ground turkey' }, { qty: '2 leaves', name: 'Lettuce wrap' }, { qty: '1 medium (120g)', name: 'Tomato' }, { qty: '40g', name: 'Onion' }, { qty: '1 tsp', name: 'Mustard' }, { qty: '½ medium (75g)', name: 'Avocado' }], steps: ['Season turkey and form into patty.', 'Cook in pan 5 min each side.', 'Serve in lettuce wrap with toppings.'] },
-  { id: '53', icon: '🥦', name: 'Broccoli Cheddar Frittata', diet: 'Keto', meal: 'Breakfast', kcal: 300, carbs: 4, protein: 24, fat: 22, time: '20 min', goal: 'weight_loss', ingredients: [{ qty: '3 pieces', name: 'Eggs' }, { qty: '150g', name: 'Broccoli florets' }, { qty: '40g', name: 'Cheddar cheese' }, { qty: '30ml', name: 'Cream' }, { qty: '60g', name: 'Onion' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Blanch broccoli.', 'Saute onion, add broccoli.', 'Pour whisked eggs and cream over.', 'Top with cheddar.', 'Bake at 180C for 15 min.'] },
-  { id: '54', icon: '🧆', name: 'Cauliflower Rice Bowl', diet: 'Keto', meal: 'Lunch', kcal: 290, carbs: 12, protein: 20, fat: 18, time: '15 min', goal: 'weight_loss', ingredients: [{ qty: '250g', name: 'Cauliflower' }, { qty: '150g', name: 'Ground beef' }, { qty: '60g', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }, { qty: '10g', name: 'Green onion' }], steps: ['Pulse cauliflower into rice-sized pieces.', 'Fry beef with onion and garlic.', 'Add cauliflower rice and stir fry.', 'Season with soy sauce and sesame oil.'] },
+  { id: '53', icon: '🥦', name: 'Broccoli Cheddar Frittata', diet: 'Keto', meal: 'Breakfast', kcal: 300, carbs: 4, protein: 24, fat: 22, time: '20 min', goal: 'weight_loss', ingredients: [{ qty: '3 pieces', name: 'Eggs' }, { qty: '150g', name: 'Broccoli florets' }, { qty: '40g', name: 'Cheddar cheese' }, { qty: '30ml', name: 'Cream' }, { qty: '60g', name: 'Onion' }, { qty: '1 tbsp (14g)', name: 'Butter' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Blanch broccoli.', 'Melt butter and saute onion, add broccoli.', 'Pour whisked eggs and cream over.', 'Top with cheddar.', 'Bake at 180C for 15 min.'] },
+  { id: '54', icon: '🥦', name: 'Cauliflower Rice Bowl', diet: 'Keto', meal: 'Lunch', kcal: 290, carbs: 12, protein: 20, fat: 18, time: '15 min', goal: 'weight_loss', ingredients: [{ qty: '250g', name: 'Cauliflower' }, { qty: '150g', name: 'Ground beef' }, { qty: '60g', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }, { qty: '10g', name: 'Green onion' }], steps: ['Pulse cauliflower into rice-sized pieces.', 'Fry beef with onion and garlic.', 'Add cauliflower rice and stir fry.', 'Season with soy sauce and sesame oil.'] },
   { id: '55', icon: '🥝', name: 'Green Detox Smoothie', diet: 'Vegan', meal: 'Breakfast', kcal: 220, carbs: 42, protein: 6, fat: 4, time: '5 min', goal: 'weight_loss', ingredients: [{ qty: '60g', name: 'Spinach' }, { qty: '1 medium (80g)', name: 'Kiwi' }, { qty: '1 medium (180g)', name: 'Apple' }, { qty: '80g', name: 'Cucumber' }, { qty: '½ piece (30ml)', name: 'Lemon juice' }, { qty: '1 tsp (5g)', name: 'Ginger' }, { qty: '200ml', name: 'Water' }], steps: ['Add all ingredients to blender.', 'Blend until smooth.', 'Add more water for desired consistency.', 'Serve immediately.'] },
   { id: '56', icon: '🍠', name: 'Sweet Potato Hash', diet: 'Vegetarian', meal: 'Breakfast', kcal: 330, carbs: 50, protein: 10, fat: 10, time: '20 min', goal: 'balanced', ingredients: [{ qty: '1 large (300g)', name: 'Sweet potato' }, { qty: '2 pieces', name: 'Eggs' }, { qty: '80g', name: 'Bell pepper' }, { qty: '60g', name: 'Onion' }, { qty: '1 tsp', name: 'Smoked paprika' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }], steps: ['Dice and cook sweet potato until tender.', 'Add onion and peppers.', 'Make wells and add eggs.', 'Cover and cook until eggs set.'] },
   { id: '57', icon: '🍤', name: 'Garlic Butter Shrimp', diet: 'High Protein', meal: 'Dinner', kcal: 320, carbs: 4, protein: 42, fat: 14, time: '15 min', goal: 'weight_loss', ingredients: [{ qty: '200g', name: 'Shrimp' }, { qty: '1 tbsp (14g)', name: 'Butter' }, { qty: '3 cloves', name: 'Garlic' }, { qty: '½ piece (30ml)', name: 'Lemon juice' }, { qty: '10g', name: 'Parsley' }, { qty: '¼ tsp', name: 'Red pepper flakes' }], steps: ['Melt butter in pan over high heat.', 'Add garlic and pepper flakes.', 'Add shrimp and cook 1-2 min per side.', 'Squeeze lemon and add parsley.'] },
-  { id: '58', icon: '🫕', name: 'Veggie Soup', diet: 'Vegan', meal: 'Lunch', kcal: 180, carbs: 30, protein: 6, fat: 4, time: '30 min', goal: 'weight_loss', ingredients: [{ qty: '500ml', name: 'Vegetable broth' }, { qty: '100g', name: 'Carrots' }, { qty: '80g', name: 'Celery' }, { qty: '100g', name: 'Zucchini' }, { qty: '100g', name: 'Tomatoes' }, { qty: '1 medium (100g)', name: 'Onion' }, { qty: '1 tsp', name: 'Thyme' }, { qty: '1 piece', name: 'Bay leaf' }], steps: ['Saute onion, carrots, celery.', 'Add broth, tomatoes, zucchini.', 'Add thyme and bay leaf.', 'Simmer 20 min.'] },
+  { id: '58', icon: '🫕', name: 'Veggie Soup', diet: 'Vegan', meal: 'Lunch', kcal: 180, carbs: 30, protein: 6, fat: 4, time: '30 min', goal: 'weight_loss', ingredients: [{ qty: '500ml', name: 'Vegetable broth' }, { qty: '100g', name: 'Carrots' }, { qty: '80g', name: 'Celery' }, { qty: '100g', name: 'Zucchini' }, { qty: '100g', name: 'Tomatoes' }, { qty: '1 medium (100g)', name: 'Onion' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '1 tsp', name: 'Thyme' }, { qty: '1 piece', name: 'Bay leaf' }], steps: ['Saute onion, carrots, celery in olive oil.', 'Add broth, tomatoes, zucchini.', 'Add thyme and bay leaf.', 'Simmer 20 min.'] },
   { id: '59', icon: '🥗', name: 'Watermelon Feta Salad', diet: 'Vegetarian', meal: 'Snack', kcal: 180, carbs: 22, protein: 6, fat: 8, time: '5 min', goal: 'balanced', ingredients: [{ qty: '300g', name: 'Watermelon' }, { qty: '50g', name: 'Feta cheese' }, { qty: '5g', name: 'Fresh mint' }, { qty: '30g', name: 'Red onion' }, { qty: '½ piece', name: 'Lime' }, { qty: '¼ tsp', name: 'Black pepper' }], steps: ['Cube watermelon.', 'Crumble feta over top.', 'Add thinly sliced red onion.', 'Squeeze lime and add mint leaves.'] },
   { id: '60', icon: '🥙', name: 'Mediterranean Plate', diet: 'Mediterranean', meal: 'Lunch', kcal: 450, carbs: 38, protein: 18, fat: 24, time: '10 min', goal: 'balanced', ingredients: [{ qty: '1 piece (75g)', name: 'Pita bread' }, { qty: '4 tbsp (80g)', name: 'Hummus' }, { qty: '80g', name: 'Tabbouleh' }, { qty: '30g', name: 'Olives' }, { qty: '3 pieces', name: 'Dolmades' }, { qty: '80g', name: 'Cucumber' }, { qty: '40g', name: 'Feta' }], steps: ['Warm pita bread.', 'Arrange hummus, tabbouleh, olives, and dolmades.', 'Add cucumber and feta.', 'Serve immediately.'] },
 
@@ -95,7 +107,7 @@ const RECIPES = [
   { id: '61', icon: '🥣', name: 'Bircher Muesli', diet: 'Vegetarian', meal: 'Breakfast', kcal: 360, carbs: 58, protein: 12, fat: 9, time: '5 min', goal: 'balanced', ingredients: [{ qty: '80g', name: 'Rolled oats' }, { qty: '200ml', name: 'Milk' }, { qty: '1 medium (120g)', name: 'Apple (grated)' }, { qty: '1 tbsp (15g)', name: 'Honey' }, { qty: '30g', name: 'Mixed nuts' }, { qty: '80g', name: 'Mixed berries' }], steps: ['Soak oats in milk overnight in fridge.', 'In the morning, grate apple into oats.', 'Add honey and stir well.', 'Top with nuts and berries.'] },
   { id: '62', icon: '🍞', name: 'French Toast', diet: 'Vegetarian', meal: 'Breakfast', kcal: 320, carbs: 40, protein: 16, fat: 10, time: '12 min', goal: 'balanced', ingredients: [{ qty: '2 slices (80g)', name: 'Brioche bread' }, { qty: '2 pieces', name: 'Eggs' }, { qty: '60ml', name: 'Milk' }, { qty: '½ tsp', name: 'Cinnamon' }, { qty: '1 tsp', name: 'Vanilla extract' }, { qty: '1 tsp (5g)', name: 'Butter' }, { qty: '1 tbsp (20ml)', name: 'Maple syrup' }], steps: ['Whisk eggs with milk, cinnamon, and vanilla.', 'Dip bread slices in egg mixture.', 'Melt butter in pan over medium heat.', 'Cook 2–3 min each side until golden.', 'Serve with maple syrup.'] },
   { id: '63', icon: '🍵', name: 'Vanilla Chia Pudding', diet: 'Vegan', meal: 'Breakfast', kcal: 280, carbs: 32, protein: 8, fat: 12, time: '5 min', goal: 'balanced', ingredients: [{ qty: '3 tbsp (30g)', name: 'Chia seeds' }, { qty: '250ml', name: 'Coconut milk' }, { qty: '1 tsp', name: 'Vanilla extract' }, { qty: '1 tbsp (15ml)', name: 'Maple syrup' }, { qty: '100g', name: 'Mango chunks' }, { qty: '20g', name: 'Toasted coconut flakes' }], steps: ['Mix chia seeds with coconut milk, vanilla, and maple syrup.', 'Stir well and refrigerate overnight.', 'Top with mango and toasted coconut.'] },
-  { id: '64', icon: '🥓', name: 'Keto Breakfast Plate', diet: 'Keto', meal: 'Breakfast', kcal: 420, carbs: 4, protein: 30, fat: 32, time: '15 min', goal: 'weight_loss', ingredients: [{ qty: '3 pieces', name: 'Eggs' }, { qty: '80g', name: 'Bacon' }, { qty: '½ medium (75g)', name: 'Avocado' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '1 tbsp (15g)', name: 'Butter' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Fry bacon until crispy and set aside.', 'Fry eggs in bacon fat to desired doneness.', 'Serve with sliced avocado and cherry tomatoes.', 'Season with salt and pepper.'] },
+  { id: '64', icon: '🥓', name: 'Keto Breakfast Plate', diet: 'Keto', meal: 'Breakfast', kcal: 420, carbs: 4, protein: 30, fat: 32, time: '15 min', goal: 'weight_loss', ingredients: [{ qty: '3 pieces', name: 'Eggs' }, { qty: '80g', name: 'Bacon' }, { qty: '½ medium (75g)', name: 'Avocado' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Fry bacon until crispy and set aside.', 'Fry eggs in bacon fat to desired doneness.', 'Serve with sliced avocado and cherry tomatoes.', 'Season with salt and pepper.'] },
   { id: '65', icon: '🫙', name: 'Açaí Bowl', diet: 'Vegan', meal: 'Breakfast', kcal: 340, carbs: 52, protein: 7, fat: 12, time: '5 min', goal: 'balanced', ingredients: [{ qty: '100g', name: 'Frozen açaí puree' }, { qty: '1 medium (120g)', name: 'Banana' }, { qty: '80ml', name: 'Almond milk' }, { qty: '30g', name: 'Granola' }, { qty: '60g', name: 'Strawberries' }, { qty: '1 tsp (7ml)', name: 'Honey' }, { qty: '1 tbsp (10g)', name: 'Chia seeds' }], steps: ['Blend açaí, banana, and almond milk until thick.', 'Pour into bowl.', 'Top with granola, strawberries, chia seeds.', 'Drizzle with honey.'] },
   { id: '66', icon: '🥞', name: 'Banana Oat Pancakes', diet: 'Vegan', meal: 'Breakfast', kcal: 290, carbs: 52, protein: 8, fat: 6, time: '15 min', goal: 'balanced', ingredients: [{ qty: '1 large (140g)', name: 'Ripe banana' }, { qty: '80g', name: 'Rolled oats (blended)' }, { qty: '150ml', name: 'Oat milk' }, { qty: '1 tsp', name: 'Baking powder' }, { qty: '1 tsp', name: 'Cinnamon' }, { qty: '80g', name: 'Mixed berries' }], steps: ['Mash banana thoroughly.', 'Mix in blended oats, milk, baking powder, and cinnamon.', 'Cook in non-stick pan 2–3 min each side.', 'Top with berries.'] },
   { id: '67', icon: '🧇', name: 'Protein Waffles', diet: 'High Protein', meal: 'Breakfast', kcal: 380, carbs: 36, protein: 32, fat: 12, time: '15 min', goal: 'muscle_gain', ingredients: [{ qty: '1 scoop (30g)', name: 'Vanilla protein powder' }, { qty: '80g', name: 'Oat flour' }, { qty: '2 pieces', name: 'Eggs' }, { qty: '150ml', name: 'Almond milk' }, { qty: '1 tsp', name: 'Baking powder' }, { qty: '1 tbsp (20ml)', name: 'Honey' }, { qty: '100g', name: 'Greek yogurt (side)' }], steps: ['Mix protein powder, oat flour, and baking powder.', 'Add eggs, milk, and honey; stir until smooth.', 'Cook in preheated waffle maker.', 'Serve with Greek yogurt.'] },
@@ -104,7 +116,7 @@ const RECIPES = [
   { id: '70', icon: '🥥', name: 'Coconut Yogurt Bowl', diet: 'Vegan', meal: 'Breakfast', kcal: 310, carbs: 42, protein: 6, fat: 14, time: '5 min', goal: 'balanced', ingredients: [{ qty: '200g', name: 'Coconut yogurt' }, { qty: '40g', name: 'Granola' }, { qty: '80g', name: 'Passion fruit pulp' }, { qty: '60g', name: 'Pineapple chunks' }, { qty: '1 tbsp (15ml)', name: 'Honey' }, { qty: '20g', name: 'Toasted coconut flakes' }], steps: ['Spoon yogurt into a bowl.', 'Top with granola, passion fruit, and pineapple.', 'Drizzle with honey and scatter coconut flakes.'] },
 
   // ── Lunch extras ────────────────────────────────────────────────────────────
-  { id: '71', icon: '🌮', name: 'Fish Tacos', diet: 'High Protein', meal: 'Lunch', kcal: 400, carbs: 36, protein: 36, fat: 14, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'White fish fillet' }, { qty: '3 pieces', name: 'Corn tortillas' }, { qty: '80g', name: 'Red cabbage slaw' }, { qty: '3 tbsp (45ml)', name: 'Chipotle mayo' }, { qty: '½ piece', name: 'Lime' }, { qty: '10g', name: 'Cilantro' }, { qty: '1 tsp', name: 'Cumin' }], steps: ['Season fish with cumin, salt, pepper.', 'Pan-fry 3–4 min each side.', 'Flake fish and fill warmed tortillas.', 'Top with slaw, chipotle mayo, lime, and cilantro.'] },
+  { id: '71', icon: '🌮', name: 'Fish Tacos', diet: 'High Protein', meal: 'Lunch', kcal: 400, carbs: 36, protein: 36, fat: 14, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'White fish fillet' }, { qty: '3 pieces', name: 'Corn tortillas' }, { qty: '80g', name: 'Red cabbage slaw' }, { qty: '3 tbsp (45ml)', name: 'Chipotle mayo' }, { qty: '½ piece', name: 'Lime' }, { qty: '10g', name: 'Cilantro' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }], steps: ['Season fish with cumin, salt, pepper.', 'Pan-fry 3–4 min each side.', 'Flake fish and fill warmed tortillas.', 'Top with slaw, chipotle mayo, lime, and cilantro.'] },
   { id: '72', icon: '🍅', name: 'Caprese Salad', diet: 'Vegetarian', meal: 'Lunch', kcal: 280, carbs: 10, protein: 14, fat: 22, time: '5 min', goal: 'balanced', ingredients: [{ qty: '250g', name: 'Heirloom tomatoes' }, { qty: '150g', name: 'Fresh mozzarella' }, { qty: '10g', name: 'Fresh basil' }, { qty: '3 tbsp (45ml)', name: 'Extra virgin olive oil' }, { qty: '1 tbsp (15ml)', name: 'Balsamic glaze' }, { qty: '¼ tsp', name: 'Sea salt' }], steps: ['Slice tomatoes and mozzarella to similar thickness.', 'Alternate layers on a plate.', 'Tuck basil between layers.', 'Drizzle with olive oil and balsamic glaze.', 'Season and serve immediately.'] },
   { id: '73', icon: '🍣', name: 'Poke Bowl', diet: 'High Protein', meal: 'Lunch', kcal: 480, carbs: 54, protein: 36, fat: 14, time: '15 min', goal: 'muscle_gain', ingredients: [{ qty: '150g', name: 'Sushi-grade tuna' }, { qty: '100g (dry)', name: 'Sushi rice' }, { qty: '½ medium (75g)', name: 'Avocado' }, { qty: '80g', name: 'Edamame' }, { qty: '60g', name: 'Cucumber' }, { qty: '3 tbsp (45ml)', name: 'Ponzu sauce' }, { qty: '1 tsp', name: 'Sesame seeds' }], steps: ['Cook and season sushi rice.', 'Cube tuna and marinate briefly in ponzu.', 'Build bowl with rice, tuna, avocado, edamame.', 'Add cucumber and sprinkle sesame seeds.'] },
   { id: '74', icon: '🍜', name: 'Pad Thai', diet: 'High Protein', meal: 'Lunch', kcal: 460, carbs: 56, protein: 28, fat: 14, time: '20 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Rice noodles' }, { qty: '150g', name: 'Chicken or tofu' }, { qty: '2 pieces', name: 'Eggs' }, { qty: '80g', name: 'Bean sprouts' }, { qty: '3 tbsp (45ml)', name: 'Pad Thai sauce' }, { qty: '20g', name: 'Peanuts (crushed)' }, { qty: '½ piece', name: 'Lime' }], steps: ['Soak noodles in hot water 8 min, drain.', 'Stir-fry protein in hot wok.', 'Push aside, scramble eggs in.', 'Add noodles and pad thai sauce; toss.', 'Top with sprouts, peanuts, and lime.'] },
@@ -119,10 +131,10 @@ const RECIPES = [
   { id: '81', icon: '🍝', name: 'Pesto Pasta', diet: 'Vegetarian', meal: 'Dinner', kcal: 480, carbs: 62, protein: 16, fat: 20, time: '20 min', goal: 'balanced', ingredients: [{ qty: '100g (dry)', name: 'Penne' }, { qty: '4 tbsp (80g)', name: 'Basil pesto' }, { qty: '100g', name: 'Cherry tomatoes' }, { qty: '30g', name: 'Pine nuts (toasted)' }, { qty: '30g', name: 'Parmesan shavings' }, { qty: '10g', name: 'Fresh basil' }], steps: ['Cook pasta al dente; reserve ¼ cup pasta water.', 'Toss pasta with pesto and a splash of pasta water.', 'Add cherry tomatoes and pine nuts.', 'Top with parmesan and fresh basil.'] },
   { id: '82', icon: '🐟', name: 'Teriyaki Salmon', diet: 'High Protein', meal: 'Dinner', kcal: 450, carbs: 26, protein: 42, fat: 18, time: '20 min', goal: 'muscle_gain', ingredients: [{ qty: '180g', name: 'Salmon fillet' }, { qty: '3 tbsp (45ml)', name: 'Teriyaki sauce' }, { qty: '100g (dry)', name: 'Brown rice' }, { qty: '80g', name: 'Bok choy' }, { qty: '1 tsp', name: 'Sesame seeds' }, { qty: '10g', name: 'Green onion' }], steps: ['Marinate salmon in teriyaki sauce 10 min.', 'Cook rice.', 'Pan-sear salmon 4 min each side, basting with sauce.', 'Steam bok choy 3 min.', 'Serve over rice, top with sesame seeds and green onion.'] },
   { id: '83', icon: '🍆', name: 'Eggplant Parmesan', diet: 'Vegetarian', meal: 'Dinner', kcal: 380, carbs: 34, protein: 18, fat: 18, time: '45 min', goal: 'balanced', ingredients: [{ qty: '1 large (400g)', name: 'Eggplant' }, { qty: '150ml', name: 'Marinara sauce' }, { qty: '80g', name: 'Mozzarella' }, { qty: '30g', name: 'Parmesan' }, { qty: '50g', name: 'Breadcrumbs' }, { qty: '1 piece', name: 'Egg' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }], steps: ['Slice eggplant and salt for 15 min; pat dry.', 'Dip in egg, then breadcrumbs; pan-fry golden.', 'Layer in baking dish with marinara and cheese.', 'Bake at 190°C for 20 min.'] },
-  { id: '84', icon: '🥘', name: 'Korean Bibimbap', diet: 'High Protein', meal: 'Dinner', kcal: 510, carbs: 62, protein: 32, fat: 14, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '100g (dry)', name: 'Short grain rice' }, { qty: '150g', name: 'Beef mince' }, { qty: '60g', name: 'Spinach' }, { qty: '80g', name: 'Bean sprouts' }, { qty: '80g', name: 'Carrots (julienned)' }, { qty: '1 piece', name: 'Egg (fried)' }, { qty: '2 tbsp (30ml)', name: 'Gochujang sauce' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }], steps: ['Cook rice.', 'Sauté each vegetable separately with sesame oil.', 'Brown beef with soy sauce.', 'Build bowl: rice, arrange toppings in sections.', 'Add fried egg on top and drizzle gochujang.'] },
+  { id: '84', icon: '🥘', name: 'Korean Bibimbap', diet: 'High Protein', meal: 'Dinner', kcal: 510, carbs: 62, protein: 32, fat: 14, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '100g (dry)', name: 'Short grain rice' }, { qty: '150g', name: 'Beef mince' }, { qty: '60g', name: 'Spinach' }, { qty: '80g', name: 'Bean sprouts' }, { qty: '80g', name: 'Carrots (julienned)' }, { qty: '1 piece', name: 'Egg (fried)' }, { qty: '2 tbsp (30ml)', name: 'Gochujang sauce' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp (5ml)', name: 'Sesame oil' }], steps: ['Cook rice.', 'Sauté each vegetable separately with sesame oil.', 'Brown beef with soy sauce.', 'Build bowl: rice, arrange toppings in sections.', 'Add fried egg on top and drizzle gochujang.'] },
   { id: '85', icon: '🥦', name: 'Cauliflower Steak', diet: 'Vegan', meal: 'Dinner', kcal: 240, carbs: 22, protein: 8, fat: 14, time: '25 min', goal: 'weight_loss', ingredients: [{ qty: '1 large head (500g)', name: 'Cauliflower' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }, { qty: '1 tsp', name: 'Smoked paprika' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '3 tbsp (45g)', name: 'Tahini sauce' }, { qty: '½ piece', name: 'Lemon' }], steps: ['Cut cauliflower into 2cm steaks.', 'Rub with olive oil, paprika, cumin, garlic.', 'Sear in pan 3 min each side.', 'Finish in oven at 200°C for 15 min.', 'Drizzle with tahini and lemon.'] },
   { id: '86', icon: '🍝', name: 'Zucchini Bolognese', diet: 'Low Carb', meal: 'Dinner', kcal: 340, carbs: 12, protein: 36, fat: 16, time: '25 min', goal: 'weight_loss', ingredients: [{ qty: '2 medium (400g)', name: 'Zucchini (spiralized)' }, { qty: '200g', name: 'Beef mince' }, { qty: '200g', name: 'Tomato passata' }, { qty: '60g', name: 'Onion' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '1 tsp', name: 'Dried oregano' }, { qty: '20g', name: 'Parmesan' }], steps: ['Brown beef with onion and garlic.', 'Add passata and oregano; simmer 15 min.', 'Sauté zucchini noodles 2 min.', 'Top with bolognese and parmesan.'] },
-  { id: '87', icon: '🫔', name: 'Lamb Kofta Bowl', diet: 'Mediterranean', meal: 'Dinner', kcal: 500, carbs: 38, protein: 44, fat: 18, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Ground lamb' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '1 tsp', name: 'Coriander' }, { qty: '80g (dry)', name: 'Couscous' }, { qty: '3 tbsp (60g)', name: 'Tzatziki' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '10g', name: 'Fresh mint' }], steps: ['Mix lamb with spices, salt, pepper.', 'Shape into oval koftas.', 'Grill 4 min each side.', 'Cook couscous with boiling water.', 'Serve over couscous with tzatziki, tomatoes, and mint.'] },
+  { id: '87', icon: '🫔', name: 'Lamb Kofta Bowl', diet: 'Mediterranean', meal: 'Dinner', kcal: 500, carbs: 38, protein: 44, fat: 18, time: '30 min', goal: 'muscle_gain', ingredients: [{ qty: '200g', name: 'Ground lamb' }, { qty: '1 tsp', name: 'Cumin' }, { qty: '1 tsp', name: 'Coriander' }, { qty: '¼ tsp', name: 'Salt' }, { qty: '¼ tsp', name: 'Pepper' }, { qty: '80g (dry)', name: 'Couscous' }, { qty: '3 tbsp (60g)', name: 'Tzatziki' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '10g', name: 'Fresh mint' }], steps: ['Mix lamb with spices, salt, pepper.', 'Shape into oval koftas.', 'Grill 4 min each side.', 'Cook couscous with boiling water.', 'Serve over couscous with tzatziki, tomatoes, and mint.'] },
   { id: '88', icon: '🧆', name: 'Falafel Buddha Bowl', diet: 'Vegan', meal: 'Dinner', kcal: 430, carbs: 58, protein: 16, fat: 16, time: '25 min', goal: 'balanced', ingredients: [{ qty: '6 pieces (180g)', name: 'Falafel' }, { qty: '80g (dry)', name: 'Quinoa' }, { qty: '80g', name: 'Cucumber' }, { qty: '80g', name: 'Cherry tomatoes' }, { qty: '40g', name: 'Red cabbage (shredded)' }, { qty: '3 tbsp (45ml)', name: 'Tahini dressing' }, { qty: '5g', name: 'Fresh parsley' }], steps: ['Cook quinoa.', 'Bake or heat falafel.', 'Build bowl with quinoa base.', 'Add falafel and vegetables.', 'Drizzle tahini dressing and top with parsley.'] },
   { id: '89', icon: '🥗', name: 'Panzanella', diet: 'Vegan', meal: 'Dinner', kcal: 340, carbs: 46, protein: 8, fat: 14, time: '15 min', goal: 'balanced', ingredients: [{ qty: '150g', name: 'Sourdough (cubed, day-old)' }, { qty: '300g', name: 'Ripe tomatoes' }, { qty: '80g', name: 'Cucumber' }, { qty: '40g', name: 'Red onion' }, { qty: '10g', name: 'Fresh basil' }, { qty: '3 tbsp (45ml)', name: 'Olive oil' }, { qty: '2 tbsp (30ml)', name: 'Red wine vinegar' }], steps: ['Toast bread cubes in olive oil until golden.', 'Chop tomatoes, cucumber, and onion.', 'Toss with bread and basil.', 'Dress with olive oil and red wine vinegar.', 'Rest 10 min so bread absorbs juices.'] },
   { id: '90', icon: '🍕', name: 'Cauliflower Crust Pizza', diet: 'Keto', meal: 'Dinner', kcal: 360, carbs: 14, protein: 26, fat: 22, time: '40 min', goal: 'weight_loss', ingredients: [{ qty: '300g', name: 'Cauliflower (riced)' }, { qty: '1 piece', name: 'Egg' }, { qty: '60g', name: 'Mozzarella (base)' }, { qty: '4 tbsp (60ml)', name: 'Tomato sauce' }, { qty: '60g', name: 'Mozzarella (topping)' }, { qty: '80g', name: 'Pepperoni or veggies' }, { qty: '5g', name: 'Fresh basil' }], steps: ['Microwave riced cauliflower 5 min; squeeze out all moisture.', 'Mix with egg and mozzarella for base.', 'Spread thin on baking sheet and bake 200°C for 20 min.', 'Add toppings and bake 10 min more.', 'Top with fresh basil.'] },
@@ -178,208 +190,67 @@ function getFoodCategory(food: LocalFood): string {
   return 'Other';
 }
 
-// ── Meal Plan Modal ───────────────────────────────────────────────────────────
-const DIET_PREFS = ['None', 'Vegan', 'Vegetarian', 'Keto', 'Low Carb', 'Mediterranean', 'High Protein'];
-const ALLERGY_OPTIONS = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Shellfish', 'Soy'];
-const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-interface MealPlanDay {
-  day: string;
-  meals: { breakfast: MealEntry; lunch: MealEntry; dinner: MealEntry; snack: MealEntry };
-  totalKcal: number;
-}
-interface MealEntry { name: string; kcal: number; icon: string; description: string }
-
-function MealPlanModal({ visible, onClose, calorieGoal, weightGoal, recentFoods, email }: {
-  visible: boolean;
-  onClose: () => void;
-  calorieGoal: number;
-  weightGoal: string;
-  recentFoods: string[];
-  email: string | null;
+function RecipeCard({ recipe, onPress, selectMode, selected }: {
+  recipe: typeof RECIPES[0];
+  onPress: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
 }) {
-  const [dietPref, setDietPref] = useState('None');
-  const [allergies, setAllergies] = useState<string[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [plan, setPlan] = useState<{ days: MealPlanDay[]; tips: string[] } | null>(null);
-  const [selectedDay, setSelectedDay] = useState(0);
+  const photo = RECIPE_PHOTOS[recipe.id];
 
-  function toggleAllergy(a: string) {
-    setAllergies(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
-  }
-
-  async function handleGenerate() {
-    setGenerating(true);
-    setPlan(null);
-    try {
-      const result = await generateMealPlan({
-        calorieGoal, weightGoal, email: email ?? undefined,
-        dietPreference: dietPref !== 'None' ? dietPref : undefined,
-        allergies: allergies.length > 0 ? allergies : undefined,
-        days: 7,
-        recentFoods: recentFoods.slice(0, 20),
-      });
-      if (result?.days?.length > 0) {
-        setPlan(result);
-        setSelectedDay(0);
-      } else {
-        Alert.alert('Generation failed', 'Could not create a meal plan. Try again.');
-      }
-    } catch (err: any) {
-      if (err?.message === 'SETUP_REQUIRED') {
-        Alert.alert('Not set up', 'Meal planning requires a deployed server. Set EXPO_PUBLIC_API_URL in .env.');
-      } else if (err?.message?.includes('limit')) {
-        Alert.alert('Rate limited', 'Please wait 5 minutes before generating a new plan.');
-      } else {
-        Alert.alert('Generation failed', err?.message ?? 'Please try again.');
-      }
-    } finally { setGenerating(false); }
-  }
-
-  const day = plan?.days[selectedDay];
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.line }}>
-          <TouchableOpacity onPress={onClose} style={{ width: spacing.xl, height: spacing.xl, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.layer2, borderRadius: radius.pill }}>
-            <Ionicons name="close" size={fontSize.base} color={colors.ink2} />
-          </TouchableOpacity>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ color: colors.ink, fontSize: fontSize.md, fontWeight: '700' }}>AI Meal Planner</Text>
-            <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{calorieGoal} kcal goal</Text>
+  // Photo-hero variant — Mob Kitchen style. Image fills the card; the bottom
+  // fades into the page bg via a LinearGradient, and the recipe name sits on
+  // the dark area where the photo "ends".
+  if (photo) {
+    return (
+      <TouchableOpacity
+        style={[styles.recipeCardPhoto, selectMode && selected && styles.recipeCardSelected]}
+        onPress={onPress}
+        activeOpacity={0.85}
+      >
+        <Image source={photo} style={styles.recipeCardPhotoImg} resizeMode="cover" />
+        {/* Bottom fade — transparent → colors.bg so the photo melts into the page */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(12,8,24,0)', 'rgba(12,8,24,0.65)', colors.bg]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0.35 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {selectMode && (
+          <View style={[styles.selectBadge, selected && styles.selectBadgeOn]}>
+            {selected && <Ionicons name="checkmark" size={14} color={colors.white} />}
           </View>
-          <View style={{ width: spacing.xl }} />
+        )}
+        {/* Top-left diet pill, overlaid on the photo */}
+        <View style={styles.recipePhotoDietBadge}>
+          <Text style={styles.recipePhotoDietTxt}>{recipe.diet}</Text>
         </View>
+        {/* Bottom — name + meta sit on the dark gradient area */}
+        <View style={styles.recipePhotoFooter}>
+          <Text style={styles.recipePhotoName} numberOfLines={2}>{recipe.name}</Text>
+          <View style={styles.recipePhotoMetaRow}>
+            <Text style={styles.recipePhotoMeta}>⏱ {recipe.time}</Text>
+            <Text style={styles.recipePhotoKcal}>{recipe.kcal} kcal</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
-          {!plan ? (
-            <>
-              {/* Diet preference */}
-              <View style={{ gap: spacing.xs }}>
-                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' }}>Diet Preference</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
-                  {DIET_PREFS.map(d => (
-                    <TouchableOpacity key={d} onPress={() => setDietPref(d)}
-                      style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, borderWidth: 1.5,
-                        borderColor: dietPref === d ? colors.purple : colors.line2,
-                        backgroundColor: dietPref === d ? colors.purpleTint : colors.layer2 }}>
-                      <Text style={{ color: dietPref === d ? colors.lavender : colors.ink2, fontSize: fontSize.sm, fontWeight: '600' }}>{d}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Allergies */}
-              <View style={{ gap: spacing.xs }}>
-                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' }}>Avoid / Allergies</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                  {ALLERGY_OPTIONS.map(a => (
-                    <TouchableOpacity key={a} onPress={() => toggleAllergy(a)}
-                      style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, borderWidth: 1.5,
-                        borderColor: allergies.includes(a) ? colors.rose : colors.line2,
-                        backgroundColor: allergies.includes(a) ? colors.rose + '18' : colors.layer2 }}>
-                      <Text style={{ color: allergies.includes(a) ? colors.rose : colors.ink2, fontSize: fontSize.sm, fontWeight: '600' }}>{a}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Goal context */}
-              <View style={{ backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, gap: spacing.xs }}>
-                <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>Using your profile:</Text>
-                <Text style={{ color: colors.ink2, fontSize: fontSize.sm }}>🎯 {calorieGoal} kcal/day · {weightGoal || 'maintain'}</Text>
-                {recentFoods.length > 0 && <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>Based on {recentFoods.length} recent foods</Text>}
-              </View>
-
-              <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-                <LinearGradient colors={generating ? [colors.line2, colors.line2] : [colors.purple, colors.purpleGlow]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ paddingVertical: spacing.md, alignItems: 'center', gap: spacing.xs }}>
-                  <TouchableOpacity onPress={handleGenerate} disabled={generating} style={{ width: '100%', alignItems: 'center', gap: spacing.xs }}>
-                    {generating ? (
-                      <>
-                        <ActivityIndicator size="small" color={colors.ink} />
-                        <Text style={{ color: colors.ink2, fontSize: fontSize.sm }}>Creating your 7-day plan…</Text>
-                      </>
-                    ) : (
-                      <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '800', letterSpacing: 0.5 }}>GENERATE 7-DAY PLAN</Text>
-                    )}
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
-            </>
-          ) : (
-            <>
-              {/* Day tabs */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
-                {plan.days.map((d, i) => (
-                  <TouchableOpacity key={i} onPress={() => setSelectedDay(i)}
-                    style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill, borderWidth: 1.5,
-                      borderColor: selectedDay === i ? colors.purple : colors.line2,
-                      backgroundColor: selectedDay === i ? colors.purpleTint : colors.layer2 }}>
-                    <Text style={{ color: selectedDay === i ? colors.lavender : colors.ink2, fontSize: fontSize.xs, fontWeight: '700' }}>{(d.day ?? WEEK_DAYS[i]).slice(0, 3).toUpperCase()}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Day header */}
-              {day && (
-                <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, gap: spacing.md }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={{ color: colors.ink, fontSize: fontSize.md, fontWeight: '700' }}>{day.day ?? WEEK_DAYS[selectedDay]}</Text>
-                    <View style={{ backgroundColor: colors.purpleTint, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
-                      <Text style={{ color: colors.lavender, fontSize: fontSize.sm, fontWeight: '700' }}>{day.totalKcal ?? 0} kcal</Text>
-                    </View>
-                  </View>
-                  {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(mealKey => {
-                    const m = day.meals?.[mealKey];
-                    if (!m) return null;
-                    return (
-                      <View key={mealKey} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line }}>
-                        <Text style={{ fontSize: fontSize.lg }}>{m.icon ?? '🍽️'}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{mealKey}</Text>
-                          <Text style={{ color: colors.ink, fontSize: fontSize.sm, fontWeight: '600' }}>{m.name}</Text>
-                          {m.description ? <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{m.description}</Text> : null}
-                        </View>
-                        <Text style={{ color: colors.lavender, fontSize: fontSize.sm, fontWeight: '700' }}>{m.kcal} kcal</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
-              {/* Tips */}
-              {plan.tips?.length > 0 && (
-                <View style={{ backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, gap: spacing.sm }}>
-                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' }}>AI Tips</Text>
-                  {plan.tips.slice(0, 3).map((tip, i) => (
-                    <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
-                      <Text style={{ color: colors.purple, fontSize: fontSize.sm }}>✦</Text>
-                      <Text style={{ flex: 1, color: colors.ink2, fontSize: fontSize.sm }}>{tip}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Regenerate */}
-              <TouchableOpacity onPress={() => setPlan(null)}
-                style={{ borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' }}>
-                <Text style={{ color: colors.ink2, fontSize: fontSize.sm, fontWeight: '600' }}>← New Plan</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-function RecipeCard({ recipe, onPress }: { recipe: typeof RECIPES[0]; onPress: () => void }) {
+  // Fallback — emoji-icon card for recipes without a hero photo.
   return (
-    <TouchableOpacity style={styles.recipeCard} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={[styles.recipeCard, selectMode && selected && styles.recipeCardSelected]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {selectMode && (
+        <View style={[styles.selectBadge, selected && styles.selectBadgeOn]}>
+          {selected && <Ionicons name="checkmark" size={14} color={colors.white} />}
+        </View>
+      )}
       <Text style={styles.recipeIcon}>{recipe.icon}</Text>
       <View style={styles.dietBadge}>
         <Text style={styles.dietBadgeText}>{recipe.diet}</Text>
@@ -419,53 +290,82 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
 export default function RecipesScreen() {
   const { entries, addFood, loadEntry } = useDiaryStore();
   const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak } = useAppStore();
-  const { email } = useAuthStore();
+  const email = useAuthStore(s => s.email);
   const [recipeSearch, setRecipeSearch] = useState('');
   const [foodSearch, setFoodSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [selected, setSelected] = useState<typeof RECIPES[0] | null>(null);
-  const [planVisible, setPlanVisible] = useState(false);
+  const [mealPickerOpen, setMealPickerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'recipes' | 'foods'>('recipes');
+
+  // Auto-close the bottom meal-picker sheet whenever the recipe modal closes
+  // so it doesn't reappear stale on the next recipe tap.
+  useEffect(() => { if (!selected) setMealPickerOpen(false); }, [selected]);
   const [foodFilter, setFoodFilter] = useState('All');
   const [selectedFood, setSelectedFood] = useState<LocalFood | null>(null);
 
+  // Multi-recipe Plan-Shopping mode: tap recipe cards to toggle selection,
+  // then "Create Grocery List" merges all picked recipes' ingredients into
+  // the grocery list (deduped + qty merged across recipes).
+  const [planMode, setPlanMode] = useState(false);
+  const [planSelected, setPlanSelected] = useState<Set<string>>(new Set());
+
   // Recipes always log to today — never to a past date the user was browsing in diary
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
+
+  // Toggle a recipe's pick state in plan mode
+  const togglePlanRecipe = (id: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPlanSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Merge all picked recipes' ingredients into the grocery list and exit plan mode
+  const submitPlan = async () => {
+    if (planSelected.size === 0) return;
+    const picked = RECIPES.filter(r => planSelected.has(r.id)).map(r => ({
+      id: r.id, name: r.name, ingredients: r.ingredients,
+    }));
+    const result = await addRecipesToGrocery(email, picked);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'Grocery list updated ✓',
+      `${result.added} added · ${result.merged} merged into existing items\nfrom ${picked.length} recipe${picked.length > 1 ? 's' : ''}`,
+    );
+    setPlanSelected(new Set());
+    setPlanMode(false);
+  };
+
+  // Add a single recipe's ingredients to the grocery list (used from detail modal)
+  const addOneToGrocery = async (recipe: typeof RECIPES[0]) => {
+    const result = await addRecipesToGrocery(email, [{ id: recipe.id, name: recipe.name, ingredients: recipe.ingredients }]);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'Added to grocery list ✓',
+      `${result.added} added · ${result.merged} merged into existing items`,
+    );
+  };
 
   // Ensure today's entry is loaded into the store
-  useEffect(() => { loadEntry(today); }, []);
+  useEffect(() => { loadEntry(today); }, [loadEntry, today]);
 
   const entry = entries[today];
   const totalKcal = (entry?.foods ?? []).reduce((s, f) => s + f.kcal, 0);
   const remaining = Math.max(0, calorieGoal - totalKcal);
 
-  // Collect unique food names from recent diary entries for AI context
-  const recentFoods = (() => {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const e of Object.values(entries)) {
-      for (const f of (e?.foods ?? [])) {
-        if (!seen.has(f.name)) { seen.add(f.name); result.push(f.name); }
-        if (result.length >= 30) return result;
-      }
-    }
-    return result;
-  })();
-
   const filtered = RECIPES.filter((r) => {
     const matchSearch = r.name.toLowerCase().includes(recipeSearch.toLowerCase());
     if (!matchSearch) return false;
     if (filter === 'All') return true;
+    if (filter === 'For your goal') return remaining > 0 && r.kcal <= remaining;
     if (['Breakfast', 'Lunch', 'Dinner', 'Snack'].includes(filter)) return r.meal === filter;
-    if (filter === 'Quick') return parseInt(r.time) <= 15;
+    if (filter === 'Quick') return parseInt(r.time, 10) <= 15;
     return r.diet === filter;
   });
-
-  // Goal-based section: recipes that fit remaining kcal budget
-  const forGoal = RECIPES.filter(r => r.kcal <= remaining && remaining > 0).slice(0, 4);
-
-  // Quick meals strip: recipes ready in 15 min or less
-  const quickMeals = RECIPES.filter(r => parseInt(r.time) <= 15).slice(0, 8);
 
   const filteredFoods = FOOD_DATABASE.filter(f => {
     if (foodSearch) return f.name.toLowerCase().includes(foodSearch.toLowerCase()); // global search ignores category
@@ -479,14 +379,24 @@ export default function RecipesScreen() {
         <View style={styles.appHeader}>
           <Text style={styles.heading}>Recipes</Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setPlanVisible(true)}
-              style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                <Text style={{ fontSize: fontSize.sm }}>✨</Text>
-                <Text style={{ color: colors.ink, fontSize: fontSize.xs, fontWeight: '800' }}>AI Plan</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            {/* Plan Shopping toggle — only visible in Recipes view */}
+            {viewMode === 'recipes' && (
+              <TouchableOpacity
+                style={[styles.profileBtn, planMode && styles.profileBtnActive]}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (planMode) setPlanSelected(new Set());
+                  setPlanMode(m => !m);
+                }}
+              >
+                <Ionicons name="cart-outline" size={22} color={planMode ? colors.lavender : colors.ink2} />
+                {planMode && planSelected.size > 0 && (
+                  <View style={styles.planCountBadge}>
+                    <Text style={styles.planCountTxt}>{planSelected.size}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.profileBtn} onPress={() => setMessagesOpen(true)}>
               <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
               {hasUnread && <View style={styles.notifDot} />}
@@ -497,6 +407,16 @@ export default function RecipesScreen() {
           </View>
         </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Plan Shopping banner */}
+        {planMode && (
+          <View style={styles.planBanner}>
+            <Ionicons name="cart" size={16} color={colors.lavender} />
+            <Text style={styles.planBannerTxt}>
+              Tap recipes to build a grocery list
+            </Text>
+          </View>
+        )}
 
         {/* Calorie budget banner */}
         {remaining > 0 && (
@@ -524,7 +444,7 @@ export default function RecipesScreen() {
             style={[styles.tabBtn, viewMode === 'foods' && styles.tabBtnActive]}
             onPress={() => { setViewMode('foods'); setFoodSearch(''); setFoodFilter('All'); }}
           >
-            <Text style={[styles.tabBtnTxt, viewMode === 'foods' && styles.tabBtnTxtActive]}>Foods</Text>
+            <Text style={[styles.tabBtnTxt, viewMode === 'foods' && styles.tabBtnTxtActive]}>Ingredients</Text>
           </TouchableOpacity>
         </View>
 
@@ -533,7 +453,7 @@ export default function RecipesScreen() {
           <Ionicons name="search-outline" size={16} color={colors.ink3} style={styles.searchIcon} />
           <TextInput
             style={styles.search}
-            placeholder={viewMode === 'recipes' ? 'Search recipes...' : 'Search foods...'}
+            placeholder={viewMode === 'recipes' ? 'Search recipes...' : 'Search ingredients...'}
             placeholderTextColor={colors.ink3}
             value={viewMode === 'recipes' ? recipeSearch : foodSearch}
             onChangeText={viewMode === 'recipes' ? setRecipeSearch : setFoodSearch}
@@ -575,45 +495,23 @@ export default function RecipesScreen() {
 
         {viewMode === 'recipes' ? (
           <>
-            {/* For your goal section */}
-            {filter === 'All' && !recipeSearch && forGoal.length > 0 && (
-              <>
-                <Text style={styles.sectionHdr}>For your goal</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.md }}>
-                  {forGoal.map((r) => (
-                    <TouchableOpacity key={r.id} style={styles.goalCard} onPress={() => setSelected(r)} activeOpacity={0.8}>
-                      <Text style={styles.goalIcon}>{r.icon}</Text>
-                      <Text style={styles.goalCardName}>{r.name}</Text>
-                      <Text style={styles.goalCardKcal}>{r.kcal} kcal</Text>
-                      <Text style={[styles.goalCardFits, { color: colors.green }]}>✓ Fits budget</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-
-            {/* Quick meals strip */}
-            {filter === 'All' && !recipeSearch && quickMeals.length > 0 && (
-              <>
-                <Text style={styles.sectionHdr}>⚡ Quick · Under 15 min</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.md }}>
-                  {quickMeals.map((r) => (
-                    <TouchableOpacity key={r.id} style={styles.goalCard} onPress={() => setSelected(r)} activeOpacity={0.8}>
-                      <Text style={styles.goalIcon}>{r.icon}</Text>
-                      <Text style={styles.goalCardName}>{r.name}</Text>
-                      <Text style={styles.goalCardKcal}>{r.kcal} kcal</Text>
-                      <Text style={[styles.goalCardFits, { color: colors.sky }]}>⏱ {r.time}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-
-            {/* Recipe grid */}
-            <Text style={styles.sectionHdr}>{filter === 'All' && !recipeSearch ? 'All Recipes' : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}</Text>
+            {/* Recipe grid — header reflects active filter */}
+            <Text style={styles.sectionHdr}>
+              {filter === 'All' && !recipeSearch
+                ? 'All Recipes'
+                : filter === 'For your goal'
+                  ? `Fits your remaining ${remaining} kcal · ${filtered.length} recipe${filtered.length !== 1 ? 's' : ''}`
+                  : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
+            </Text>
             <View style={styles.grid}>
               {filtered.map((recipe) => (
-                <RecipeCard key={recipe.id} recipe={recipe} onPress={() => setSelected(recipe)} />
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  selectMode={planMode}
+                  selected={planSelected.has(recipe.id)}
+                  onPress={() => planMode ? togglePlanRecipe(recipe.id) : setSelected(recipe)}
+                />
               ))}
               {filtered.length === 0 && (
                 <View style={styles.emptyState}>
@@ -634,7 +532,7 @@ export default function RecipesScreen() {
               {filteredFoods.length === 0 && (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>🔍</Text>
-                  <Text style={styles.emptyTxt}>No foods found</Text>
+                  <Text style={styles.emptyTxt}>No ingredients found</Text>
                 </View>
               )}
             </View>
@@ -658,7 +556,7 @@ export default function RecipesScreen() {
                       <Text style={styles.catCardEmoji}>{meta.icon}</Text>
                     </View>
                     <Text style={styles.catCardName}>{cat}</Text>
-                    <Text style={[styles.catCardCount, { color: meta.color }]}>{count} foods</Text>
+                    <Text style={[styles.catCardCount, { color: meta.color }]}>{count} ingredients</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -667,7 +565,7 @@ export default function RecipesScreen() {
         ) : (
           /* Category drill-down: food grid */
           <>
-            <Text style={styles.sectionHdr}>{filteredFoods.length} foods · per 100g</Text>
+            <Text style={styles.sectionHdr}>{filteredFoods.length} ingredients · per 100g</Text>
             <View style={styles.grid}>
               {filteredFoods.map(food => (
                 <FoodCard key={food.id} food={food} onPress={() => setSelectedFood(food)} />
@@ -676,16 +574,6 @@ export default function RecipesScreen() {
           </>
         )}
       </ScrollView>
-
-      {/* AI Meal Planner */}
-      <MealPlanModal
-        visible={planVisible}
-        onClose={() => setPlanVisible(false)}
-        calorieGoal={calorieGoal || 2000}
-        weightGoal=""
-        recentFoods={recentFoods}
-        email={email}
-      />
 
       {/* Food detail modal */}
       <Modal visible={!!selectedFood} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedFood(null)}>
@@ -708,8 +596,10 @@ export default function RecipesScreen() {
                 await addXp(10);
                 Alert.alert('Added to diary ✓', `${selectedFood.name} logged (100g). +10 XP`);
                 setSelectedFood(null);
-              }} style={styles.addBtn}>
-                <Text style={styles.addBtnTxt}>+ Add</Text>
+              }} activeOpacity={0.85} style={styles.addBtn}>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addBtnGrad}>
+                  <Text style={styles.addBtnTxt}>+ Add</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={styles.modalScroll}>
@@ -745,7 +635,7 @@ export default function RecipesScreen() {
                 ))}
               </View>
 
-              <TouchableOpacity style={styles.logBtn} onPress={async () => {
+              <TouchableOpacity style={styles.logBtn} activeOpacity={0.85} onPress={async () => {
                 await addFood(today, {
                   id: `${Date.now()}`, icon: selectedFood.icon, name: selectedFood.name,
                   kcal: selectedFood.kcal, carbs: selectedFood.carbs,
@@ -758,7 +648,9 @@ export default function RecipesScreen() {
                 Alert.alert('Food logged ✓', `${selectedFood.name} added to your diary. +10 XP`);
                 setSelectedFood(null);
               }}>
-                <Text style={styles.logBtnTxt}>Log 100g to diary</Text>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logBtnGrad}>
+                  <Text style={styles.logBtnTxt}>Log 100g to diary</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </SafeAreaView>
@@ -774,10 +666,50 @@ export default function RecipesScreen() {
                 <Ionicons name="close" size={22} color={colors.ink2} />
               </TouchableOpacity>
               <Text style={styles.modalMeal}>{selected.meal}</Text>
-              <View style={{ width: 36 }} />
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  style={styles.addDiaryHeaderBtn}
+                  activeOpacity={0.78}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setMealPickerOpen(true);
+                  }}
+                >
+                  <Ionicons name="add" size={14} color={colors.lavender} />
+                  <Ionicons name="journal-outline" size={18} color={colors.lavender} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addGroceryHeaderBtn}
+                  activeOpacity={0.78}
+                  onPress={async () => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    await addOneToGrocery(selected);
+                    setSelected(null);
+                  }}
+                >
+                  <Ionicons name="add" size={14} color={colors.lavender} />
+                  <Ionicons name="cart-outline" size={18} color={colors.lavender} />
+                </TouchableOpacity>
+              </View>
             </View>
             <ScrollView contentContainerStyle={styles.modalScroll}>
-              <Text style={styles.modalIcon}>{selected.icon}</Text>
+              {(() => {
+                const photo = RECIPE_PHOTOS[selected.id];
+                return photo ? (
+                  <View style={styles.modalPhotoWrap}>
+                    <Image source={photo} style={styles.modalPhoto} resizeMode="cover" />
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={['rgba(12,8,24,0)', colors.bg]}
+                      start={{ x: 0.5, y: 0.65 }}
+                      end={{ x: 0.5, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.modalIcon}>{selected.icon}</Text>
+                );
+              })()}
               <Text style={styles.modalTitle}>{selected.name}</Text>
               <Text style={styles.modalTime}>⏱ {selected.time}</Text>
 
@@ -804,50 +736,116 @@ export default function RecipesScreen() {
                 </View>
               )}
 
-              <Text style={styles.modalSection}>Ingredients</Text>
-              {selected.ingredients.map((ing, i) => (
-                <View key={i} style={styles.ingredientRow}>
-                  <Text style={styles.ingredientQty}>{ing.qty}</Text>
-                  <Text style={styles.ingredientTxt}>{ing.name}</Text>
+              <View style={styles.ingredientsTable}>
+                <View style={styles.ingredientHeaderRow}>
+                  <Text style={styles.ingredientHeaderQty}>Amount</Text>
+                  <View style={styles.ingredientColSep} />
+                  <Text style={styles.ingredientHeaderName}>Ingredient</Text>
                 </View>
-              ))}
+                {selected.ingredients.map((ing, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.ingredientRow,
+                      i < selected.ingredients.length - 1 && styles.ingredientRowDivided,
+                    ]}
+                  >
+                    <Text style={styles.ingredientQty}>{ing.qty}</Text>
+                    <View style={styles.ingredientColSep} />
+                    <Text style={styles.ingredientTxt}>{ing.name}</Text>
+                  </View>
+                ))}
+              </View>
 
               <Text style={styles.modalSection}>Instructions</Text>
-              {selected.steps.map((step, i) => (
-                <View key={i} style={styles.stepRow}>
-                  <View style={styles.stepNum}><Text style={styles.stepNumTxt}>{i + 1}</Text></View>
-                  <Text style={styles.stepTxt}>{step}</Text>
-                </View>
-              ))}
-
-              <View style={styles.mealPickSection}>
-                <Text style={styles.mealPickHdr}>Log to today</Text>
-                <View style={styles.mealPickGrid}>
-                  {MEAL_PICK.map(({ key, icon, label, color }) => (
-                    <TouchableOpacity
-                      key={key}
-                      style={[styles.mealPickBtn, { borderColor: color + '55', backgroundColor: color + '14' }]}
-                      activeOpacity={0.72}
-                      onPress={async () => {
-                        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        await addFood(today, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal: key });
-                        await checkAndUpdateStreak(today);
-                        await addXp(10);
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert('Logged ✓', `${selected.name} added to ${label}. +10 XP`);
-                        setSelected(null);
-                      }}
-                    >
-                      <Text style={styles.mealPickIcon}>{icon}</Text>
-                      <Text style={[styles.mealPickLabel, { color }]}>{label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              <View style={styles.stepsCard}>
+                {selected.steps.map((step, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.stepRow,
+                      i < selected.steps.length - 1 && styles.stepRowDivided,
+                    ]}
+                  >
+                    <View style={styles.stepNum}>
+                      <Text style={styles.stepNumTxt}>{i + 1}</Text>
+                    </View>
+                    <Text style={styles.stepTxt}>{step}</Text>
+                  </View>
+                ))}
               </View>
             </ScrollView>
+
+            {/* Bottom-sheet meal picker — opened by the "+ diary" header button. */}
+            {mealPickerOpen && (
+              <View style={styles.mealPickerOverlay}>
+                <TouchableOpacity
+                  style={StyleSheet.absoluteFillObject}
+                  activeOpacity={1}
+                  onPress={() => setMealPickerOpen(false)}
+                />
+                <View style={styles.mealPickerSheet}>
+                  <View style={styles.mealPickerHandle} />
+                  <Text style={styles.mealPickerTitle}>Log to which meal?</Text>
+                  <View style={styles.mealPickGrid}>
+                    {MEAL_PICK.map(({ key, icon, label, color }) => (
+                      <TouchableOpacity
+                        key={key}
+                        style={[styles.mealPickBtn, { borderColor: color + '55', backgroundColor: color + '14' }]}
+                        activeOpacity={0.72}
+                        onPress={async () => {
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          await addFood(today, { id: `${Date.now()}`, icon: selected.icon, name: selected.name, kcal: selected.kcal, carbs: selected.carbs, protein: selected.protein, fat: selected.fat, unit: 'serving', meal: key });
+                          await checkAndUpdateStreak(today);
+                          await addXp(10);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                          Alert.alert('Logged ✓', `${selected.name} added to ${label}. +10 XP`);
+                          setMealPickerOpen(false);
+                          setSelected(null);
+                        }}
+                      >
+                        <Text style={styles.mealPickIcon}>{icon}</Text>
+                        <Text style={[styles.mealPickLabel, { color }]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
           </SafeAreaView>
         )}
       </Modal>
+
+      {/* Floating Plan-Shopping CTA — visible when plan mode is on and at least one recipe is picked */}
+      {planMode && planSelected.size > 0 && (
+        <View style={styles.planFloatBar}>
+          <TouchableOpacity
+            style={styles.planCancelBtn}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setPlanSelected(new Set());
+              setPlanMode(false);
+            }}
+          >
+            <Text style={styles.planCancelTxt}>Cancel</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
+            <TouchableOpacity activeOpacity={0.85} onPress={submitPlan}>
+              <LinearGradient
+                colors={[colors.purple, colors.purpleGlow]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.planConfirmBtn}
+              >
+                <Ionicons name="cart" size={16} color={colors.white} />
+                <Text style={styles.planConfirmTxt}>
+                  Create Grocery List · {planSelected.size}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -885,15 +883,63 @@ const styles = StyleSheet.create({
 
   sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3 },
 
-  // Goal cards (horizontal)
-  goalCard: { width: 130, backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: 4, alignItems: 'center' },
-  goalCardName: { fontSize: fontSize.xs + 1, fontWeight: '600', color: colors.ink, textAlign: 'center' },
-  goalCardKcal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
-  goalCardFits: { fontSize: fontSize.xs, fontWeight: '600' },
-
   // Recipe grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   recipeCard: { width: '47%', backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
+  // Photo-hero variant (Mob Kitchen style) — square cube, photo fills,
+  // bottom fades to page bg, title overlaid where photo "ends".
+  recipeCardPhoto: {
+    width: '47%',
+    aspectRatio: 1,               // square cube — equal width and height
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    overflow: 'hidden',
+    backgroundColor: colors.layer1,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  recipeCardPhotoImg: { width: '100%', height: '100%' },
+  recipePhotoDietBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: colors.purple + 'CC',   // purple @ 80% — readable over any photo
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  recipePhotoDietTxt: {
+    color: colors.white,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  recipePhotoFooter: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    left: spacing.sm,
+    right: spacing.sm,
+    gap: 4,
+  },
+  recipePhotoName: {
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    lineHeight: fontSize.md + 4,
+  },
+  recipePhotoMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  recipePhotoMeta: { color: colors.ink2, fontSize: fontSize.xs, fontWeight: '600' },
+  recipePhotoKcal: { color: colors.lavender, fontSize: fontSize.sm, fontWeight: '800' },
   recipeIcon: { fontSize: fontSize['2xl'] - 2, textAlign: 'center', marginBottom: spacing.xs },
   dietBadge: { alignSelf: 'flex-start', backgroundColor: colors.purple + '22', borderRadius: radius.xl, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   dietBadgeText: { color: colors.lavender, fontSize: fontSize.xs },
@@ -912,10 +958,29 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   closeBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   modalMeal: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.ink3 },
-  addBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, backgroundColor: colors.purple, borderRadius: radius.md },
+  addBtn: { borderRadius: radius.md, overflow: 'hidden' },
+  addBtnGrad: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   addBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
-  modalScroll: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xl + spacing.md - 2 },
+  modalScroll: { padding: spacing.lg, gap: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.lg },
   modalIcon: { fontSize: fontSize['2xl'] + 26, textAlign: 'center', marginBottom: spacing.sm },
+  // Responsive hero — 300×180 on iPhone 13/14 (77% of width, 0.6 aspect).
+  // Wrapper holds the sizing, rounded-corner clip, and background; the bottom-
+  // fading LinearGradient inside melts the image edge into the page bg.
+  // (Border + shadow dropped — overflow:hidden would clip the shadow on iOS
+  // anyway, and the gradient handles the soft transition.)
+  modalPhotoWrap: {
+    width: MODAL_PHOTO_WIDTH,
+    height: MODAL_PHOTO_HEIGHT,
+    alignSelf: 'center',
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+    backgroundColor: colors.layer2,
+  },
+  modalPhoto: {
+    width: MODAL_PHOTO_WIDTH,
+    height: MODAL_PHOTO_HEIGHT,
+  },
   modalTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   modalTime: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center' },
   modalMacros: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md },
@@ -924,20 +989,114 @@ const styles = StyleSheet.create({
   modalMacroLabel: { color: colors.ink3, fontSize: fontSize.xs },
   fitsBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.green + '11', borderWidth: 1, borderColor: colors.green + '44', borderRadius: radius.md, padding: spacing.sm },
   fitsTxt: { fontSize: fontSize.sm, color: colors.green, fontWeight: '500' },
-  modalSection: { color: colors.ink, fontSize: fontSize.base, fontWeight: '700', marginTop: spacing.md },
-  ingredientRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 3 },
-  ingredientQty: { width: 110, fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
-  ingredientTxt: { flex: 1, color: colors.ink2, fontSize: fontSize.sm },
-  stepRow: { flexDirection: 'row', gap: spacing.sm + 2, paddingVertical: 4 },
-  stepNum: { width: spacing.lg, height: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.purple + '33', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  stepNumTxt: { fontSize: fontSize.xs + 1, fontWeight: '700', color: colors.lavender },
-  stepTxt: { flex: 1, color: colors.ink2, fontSize: fontSize.sm, lineHeight: 20 },
-  logBtn: { backgroundColor: colors.purple, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.md },
+  modalSection: {
+    color: colors.ink,
+    fontSize: fontSize.base,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    textAlign: 'center',
+  },
+  // Two-column ingredients table — Amount | Ingredient with vertical divider.
+  ingredientsTable: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    borderRadius: radius.md,
+    backgroundColor: colors.layer1,
+    overflow: 'hidden',
+  },
+  ingredientHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.layer2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line2,
+  },
+  ingredientHeaderQty: {
+    width: 110,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.base,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  ingredientHeaderName: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.base,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  ingredientRow: { flexDirection: 'row', alignItems: 'center' },
+  ingredientRowDivided: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  ingredientColSep: { width: 1, alignSelf: 'stretch', backgroundColor: colors.line },
+  ingredientQty: {
+    width: 110,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.lavender,
+    textAlign: 'center',
+  },
+  ingredientTxt: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    color: colors.ink2,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+  },
+  // Instructions — card matching the ingredients table, with bolder numbered chips.
+  stepsCard: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    borderRadius: radius.md,
+    backgroundColor: colors.layer1,
+    overflow: 'hidden',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.sm + 2,
+  },
+  stepRowDivided: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  stepNum: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  stepNumTxt: { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink2 },
+  stepTxt: {
+    flex: 1,
+    color: colors.ink2,
+    fontSize: fontSize.sm + 1,
+    lineHeight: 22,
+    marginTop: 3,
+  },
+  logBtn: { borderRadius: radius.md, marginTop: spacing.md, overflow: 'hidden' },
+  logBtnGrad: { padding: spacing.md, alignItems: 'center' },
   logBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
 
-  // Meal picker (recipe log)
-  mealPickSection: { marginTop: spacing.lg },
-  mealPickHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm },
+  // Meal picker grid — used inside the bottom-sheet meal picker.
   mealPickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   mealPickBtn: { width: '47%', borderWidth: 1, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', gap: spacing.xs },
   mealPickIcon: { fontSize: fontSize.xl },
@@ -957,9 +1116,6 @@ const styles = StyleSheet.create({
   foodCatText: { color: colors.teal, fontSize: fontSize.xs },
   foodName: { color: colors.ink, fontSize: fontSize.sm, fontWeight: '600' },
   foodKcal: { color: colors.lavender, fontSize: fontSize.sm, fontWeight: '700' },
-
-  // Goal icon (token instead of hardcoded)
-  goalIcon: { fontSize: fontSize['2xl'], textAlign: 'center' },
 
   // Empty state
   emptyState: { width: '100%', alignItems: 'center', paddingVertical: spacing.xl },
@@ -985,4 +1141,166 @@ const styles = StyleSheet.create({
   microPill: { alignItems: 'center', gap: 3 },
   microVal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink2 },
   microLabel: { color: colors.ink3, fontSize: fontSize.xs },
+
+  // ── Plan Shopping (multi-recipe → grocery list) ─────────────────────────────
+  // Header cart button shows purpleTint background while plan mode is active
+  profileBtnActive: {
+    backgroundColor: colors.purpleTint,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line3,
+  },
+  // Pick-count badge that floats top-right of the cart icon
+  planCountBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planCountTxt: { color: colors.white, fontSize: fontSize.xs - 1, fontWeight: '800' },
+
+  // Banner shown above the recipe list while plan mode is on
+  planBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.purpleTint,
+    borderWidth: 1,
+    borderColor: colors.line3,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  planBannerTxt: { color: colors.lavender, fontSize: fontSize.sm, fontWeight: '600' },
+
+  // Selected card highlight (used by recipeCard variants)
+  recipeCardSelected: {
+    backgroundColor: colors.purpleTint,
+    borderColor: colors.line3,
+  },
+  // Empty circle in top-right of card while in plan mode (filled when picked)
+  selectBadge: {
+    position: 'absolute',
+    top: spacing.xs + 2,
+    right: spacing.xs + 2,
+    width: 22,
+    height: 22,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.line3,
+    backgroundColor: colors.layer2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  selectBadgeOn: {
+    backgroundColor: colors.purple,
+    borderColor: colors.purple,
+  },
+
+  // Floating action bar — Cancel + Create Grocery List
+  planFloatBar: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.layer1,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  planCancelBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.line2,
+    borderRadius: radius.md,
+    backgroundColor: colors.layer2,
+  },
+  planCancelTxt: { color: colors.ink3, fontSize: fontSize.sm, fontWeight: '600' },
+  planConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+  },
+  planConfirmTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '800' },
+
+  // Compact action pills in recipe detail modal header — opposite the X.
+  // The "+ diary" pill opens the meal-picker sheet; the "+ cart" pill adds
+  // ingredients to the grocery list.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  addDiaryHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 36,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.purpleTint,
+    borderWidth: 1,
+    borderColor: colors.line3,
+  },
+  addGroceryHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 36,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.purpleTint,
+    borderWidth: 1,
+    borderColor: colors.line3,
+  },
+
+  // Bottom-sheet meal picker overlay — slides up from the bottom of the recipe
+  // detail modal when the "+ diary" header button is tapped. Tapping the dim
+  // backdrop closes the sheet.
+  mealPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.dim,
+    justifyContent: 'flex-end',
+  },
+  mealPickerSheet: {
+    backgroundColor: colors.layer1,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
+    borderColor: colors.line2,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg + spacing.md,
+    gap: spacing.sm,
+  },
+  mealPickerHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.line3,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+  },
+  mealPickerTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
 });
