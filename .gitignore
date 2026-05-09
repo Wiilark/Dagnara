@@ -1,2 +1,12 @@
 .env
 node_modules/
+
+# Claude Code local state — never commit
+.claude/backups/
+.claude/recovery/
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# Local scratch / screenshots — never commit
+Screenshots/
+test_off.json
