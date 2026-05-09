@@ -5,109 +5,78 @@
 // Until deployed, food photo analysis will show a "not available" message.
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 
+// Default timeout for AI calls — long enough for Claude responses, short enough
+// that users don't stare at spinners forever when the backend is hung.
+const DEFAULT_TIMEOUT_MS = 35_000;
 
-export async function importRecipe(url: string): Promise<any> {
+// Client-side cap on image payload size (base64). Server enforces its own limit,
+// but catching early saves bandwidth and gives a clearer error.
+const MAX_IMAGE_BASE64 = 12_000_000; // ~9 MB binary
+
+/**
+ * fetch with AbortController timeout + safe JSON parsing.
+ * Always throws a short, user-friendly Error code:
+ *   NETWORK_ERROR  — connection failed or aborted
+ *   TIMEOUT        — request exceeded timeoutMs
+ *   SERVER_ERROR   — non-2xx response or malformed body
+ *   SETUP_REQUIRED — API_BASE not configured
+ */
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   if (!API_BASE) throw new Error('SETUP_REQUIRED');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/import-recipe`, {
+    res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(body),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (e: any) {
+    clearTimeout(timer);
+    if (e?.name === 'AbortError') throw new Error('TIMEOUT');
     throw new Error('NETWORK_ERROR');
   }
+  clearTimeout(timer);
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message ?? 'SERVER_ERROR');
   }
-  return res.json();
+
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new Error('SERVER_ERROR');
+  }
+}
+
+export async function importRecipe(url: string): Promise<any> {
+  return postJson('/api/import-recipe', { url });
 }
 
 export async function analyzeFood(imageData: string, mediaType: string): Promise<any> {
-  if (!API_BASE) {
-    throw new Error('SETUP_REQUIRED');
+  if (imageData.length > MAX_IMAGE_BASE64) {
+    throw new Error('IMAGE_TOO_LARGE');
   }
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/api/analyze-food`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageData, mediaType }),
-    });
-  } catch {
-    throw new Error('NETWORK_ERROR');
-  }
-  if (!res.ok) throw new Error('SERVER_ERROR');
-  return res.json();
+  return postJson('/api/analyze-food', { imageData, mediaType }, 45_000);
 }
 
 export async function estimateNutrition(description: string): Promise<any> {
-  if (!API_BASE) throw new Error('SETUP_REQUIRED');
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/api/estimate-nutrition`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description }),
-    });
-  } catch {
-    throw new Error('NETWORK_ERROR');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? 'SERVER_ERROR');
-  }
-  return res.json();
-}
-
-export async function generateMealPlan(params: {
-  calorieGoal: number;
-  weightGoal?: string;
-  dietPreference?: string;
-  allergies?: string[];
-  days?: number;
-  recentFoods?: string[];
-  email?: string;
-}): Promise<any> {
-  if (!API_BASE) throw new Error('SETUP_REQUIRED');
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/api/meal-plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-  } catch {
-    throw new Error('NETWORK_ERROR');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message ?? 'SERVER_ERROR');
-  }
-  return res.json();
+  return postJson('/api/estimate-nutrition', { description });
 }
 
 export async function coachMessage(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   context?: string,
-  email?: string
+  email?: string,
 ): Promise<{ reply: string }> {
-  if (!API_BASE) throw new Error('SETUP_REQUIRED');
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/api/coach`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, context, email }),
-    });
-  } catch {
-    throw new Error('NETWORK_ERROR');
-  }
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody?.error?.message ?? 'SERVER_ERROR');
-  }
-  return res.json();
+  return postJson<{ reply: string }>('/api/coach', { messages, context, email });
 }

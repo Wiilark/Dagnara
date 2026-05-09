@@ -158,12 +158,22 @@ export async function cancelAllNotifications() {
 // ── Pill reminder notifications ───────────────────────────────────────────────
 
 /**
- * Re-schedule daily notifications for every medication × time.
+ * Re-schedule notifications for every medication × time.
  * Call this whenever the medication list changes (add / edit / delete).
  * Clears all existing pill_ notifications first so there are no stale ones.
+ *
+ * `daysOfWeek` is Apple-style (0=Mon … 6=Sun). When null/undefined the medication
+ * fires every day (DAILY trigger). When set, one WEEKLY trigger is scheduled per
+ * active day so users on a Mon/Wed/Fri schedule don't get notifications on Tue/Thu.
  */
 export async function schedulePillReminders(
-  meds: Array<{ id: string; name: string; dosage: string; times: string[] }>,
+  meds: Array<{
+    id: string;
+    name: string;
+    dosage: string;
+    times: string[];
+    daysOfWeek?: number[] | null;
+  }>,
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 
@@ -180,23 +190,46 @@ export async function schedulePillReminders(
   const granted = await requestNotificationPermission();
   if (!granted) return;
 
+  // Convert Apple-style weekday (0=Mon..6=Sun) → Expo weekly weekday (1=Sun..7=Sat).
+  const toExpoWeekday = (appleDay: number): number => ((appleDay + 1) % 7) + 1;
+
   for (const med of meds) {
+    const everyDay = !med.daysOfWeek || med.daysOfWeek.length === 0 || med.daysOfWeek.length === 7;
     for (const t of med.times) {
       const parts = t.split(':');
-      const hour   = parseInt(parts[0]) || 0;
-      const minute = parseInt(parts[1]) || 0;
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `💊 ${med.name}`,
-          body:  `Time to take ${med.dosage}`,
-          data:  { tag: `pill_${med.id}_${t}` },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour,
-          minute,
-        },
-      });
+      const hour   = parseInt(parts[0], 10) || 0;
+      const minute = parseInt(parts[1], 10) || 0;
+
+      if (everyDay) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `💊 ${med.name}`,
+            body:  `Time to take ${med.dosage}`,
+            data:  { tag: `pill_${med.id}_${t}` },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour,
+            minute,
+          },
+        });
+      } else {
+        for (const appleDay of med.daysOfWeek!) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: `💊 ${med.name}`,
+              body:  `Time to take ${med.dosage}`,
+              data:  { tag: `pill_${med.id}_${t}_${appleDay}` },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+              weekday: toExpoWeekday(appleDay),
+              hour,
+              minute,
+            },
+          });
+        }
+      }
     }
   }
 }

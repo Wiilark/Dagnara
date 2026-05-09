@@ -85,7 +85,9 @@ interface AppState extends PersistedData {
   reset: () => void;
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// Local (not UTC) YYYY-MM-DD — a user logging at 11pm PST must count as that
+// day, not the next UTC day. 'en-CA' locale guarantees YYYY-MM-DD formatting.
+function todayStr() { return new Date().toLocaleDateString('en-CA'); }
 
 function pick(s: AppState): PersistedData {
   return {
@@ -114,7 +116,17 @@ async function persist(data: PersistedData, email: string | null) {
       { email, state_data: data, updated_at: new Date().toISOString() },
       { onConflict: 'email' }
     );
-    void (async () => { try { await push(); } catch { try { await new Promise(r => setTimeout(r, 4000)); await push(); } catch {} } })();
+    void (async () => {
+      try { await push(); } catch (e1: any) {
+        try {
+          await new Promise(r => setTimeout(r, 4000));
+          await push();
+        } catch (e2: any) {
+          // eslint-disable-next-line no-console
+          console.error('[appStore.persist] cloud sync failed after retry:', e2?.message ?? e1?.message ?? 'unknown');
+        }
+      }
+    })();
   }
 }
 
@@ -148,7 +160,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 1. Local restore (scoped to this user)
     const localKey = email ? `app_store_${email}` : 'app_store_anon';
     const raw = await AsyncStorage.getItem(localKey);
-    const local: Partial<PersistedData> = raw ? JSON.parse(raw) : {};
+    let local: Partial<PersistedData> = {};
+    if (raw) {
+      try { local = JSON.parse(raw); }
+      catch { await AsyncStorage.removeItem(localKey); }
+    }
 
     // 2. Cloud restore
     if (email) {
@@ -204,7 +220,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (lastLoggedDate === date) return;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA');
     const newStreak = lastLoggedDate === yesterdayStr ? streak + 1 : 1;
     const update = { streak: newStreak, lastLoggedDate: date };
     set(update);

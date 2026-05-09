@@ -11,7 +11,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView,
-  Platform, NativeScrollEvent, NativeSyntheticEvent,
+  Platform, NativeScrollEvent, NativeSyntheticEvent, Animated,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, fontSize, radius } from '../theme';
@@ -43,68 +43,92 @@ function DrumColumn({
   onSelect: (i: number) => void;
   width: number;
 }) {
-  const ref  = useRef<ScrollView>(null);
-  const prog = useRef(false); // true while a programmatic scrollTo is in flight
+  const ref        = useRef<ScrollView>(null);
+  const scrollY    = useRef(new Animated.Value(selected * ITEM_H)).current;
+  const lastIdx    = useRef(selected);
+  const didMount   = useRef(false);
 
-  // Sync scroll position whenever `selected` changes
+  // Seed the drum to the correct item ONLY when `selected` is changed externally
+  // (parent reseeds on modal open). We skip on mount — initialValue already handles it.
   useEffect(() => {
-    prog.current = true;
+    if (!didMount.current) { didMount.current = true; return; }
+    if (selected === lastIdx.current) return;      // our own scroll — don't bounce
+    lastIdx.current = selected;
     ref.current?.scrollTo({ y: selected * ITEM_H, animated: false });
-    const t = setTimeout(() => { prog.current = false; }, 80);
-    return () => clearTimeout(t);
-  }, [selected]);
+    scrollY.setValue(selected * ITEM_H);
+  }, [selected, scrollY]);
 
   function handleEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    if (prog.current) return;
     const y   = e.nativeEvent.contentOffset.y;
     const idx = clamp(Math.round(y / ITEM_H), 0, items.length - 1);
-    if (idx !== selected) {
+    if (idx !== lastIdx.current) {
+      lastIdx.current = idx;
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onSelect(idx);
     }
   }
 
   return (
-    <ScrollView
+    <Animated.ScrollView
       ref={ref}
       style={{ width, height: DRUM_H }}
       contentContainerStyle={{ paddingVertical: PAD }}
       snapToInterval={ITEM_H}
-      decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.9}
+      decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.985}
       showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={Animated.event(
+        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+        { useNativeDriver: true },
+      )}
       onMomentumScrollEnd={handleEnd}
-      // On Android momentum may not fire after a slow careful drag
       onScrollEndDrag={Platform.OS === 'android' ? handleEnd : undefined}
+      overScrollMode="never"
+      bounces
       nestedScrollEnabled
+      removeClippedSubviews={false}
     >
       {items.map((item, i) => {
-        const dist = Math.abs(i - selected);
+        const center = i * ITEM_H;
+        const input  = [center - ITEM_H * 2, center - ITEM_H, center, center + ITEM_H, center + ITEM_H * 2];
+        const opacity = scrollY.interpolate({
+          inputRange: input,
+          outputRange: [0.3, 0.7, 1, 0.7, 0.3],
+          extrapolate: 'clamp',
+        });
+        const scale = scrollY.interpolate({
+          inputRange: input,
+          outputRange: [0.72, 0.88, 1.05, 0.88, 0.72],
+          extrapolate: 'clamp',
+        });
         return (
           <TouchableOpacity
             key={i}
             style={[dp.item, { width }]}
             onPress={() => {
-              onSelect(i);
+              lastIdx.current = i;
               ref.current?.scrollTo({ y: i * ITEM_H, animated: true });
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(i);
             }}
             activeOpacity={0.6}
           >
-            <Text
+            <Animated.Text
               style={{
-                fontSize:   dist === 0 ? fontSize.xl  : dist === 1 ? fontSize.base : fontSize.sm,
-                fontWeight: dist === 0 ? '800'         : dist === 1 ? '500'         : '400',
-                color:      dist === 0 ? colors.ink    : dist === 1 ? colors.ink2   : colors.ink3,
-                opacity:    dist >= 3  ? 0.3           : 1,
+                fontSize:   fontSize.xl,
+                fontWeight: '700',
+                color:      colors.ink,
                 textAlign:  'center',
+                opacity,
+                transform:  [{ scale }],
               }}
             >
               {item}
-            </Text>
+            </Animated.Text>
           </TouchableOpacity>
         );
       })}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
@@ -132,8 +156,8 @@ export function ClockPickerModal({
   useEffect(() => {
     if (!visible) return;
     const parts = initial.split(':');
-    const h24   = parseInt(parts[0]) || 8;
-    const m     = clamp(parseInt(parts[1]) || 0, 0, 59);
+    const h24   = parseInt(parts[0], 10) || 8;
+    const m     = clamp(parseInt(parts[1], 10) || 0, 0, 59);
     const h12   = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
     setHourIdx(h12 - 1);    // HOURS is '1'..'12', so h12=8 → idx=7
     setMinIdx(m);
@@ -141,7 +165,7 @@ export function ClockPickerModal({
   }, [visible, initial]);
 
   function confirm() {
-    const h12  = parseInt(HOURS[hourIdx]);
+    const h12  = parseInt(HOURS[hourIdx], 10);
     const isAm = amIdx === 0;
     const h24  = isAm
       ? (h12 === 12 ? 0 : h12)

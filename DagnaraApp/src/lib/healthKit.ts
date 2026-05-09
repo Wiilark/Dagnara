@@ -14,6 +14,14 @@ export function healthPlatformName(): string {
   return Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
 }
 
+// Build ISO strings for [start-of-local-day, end-of-local-day] for the given YYYY-MM-DD.
+// Parsing `${date}T00:00:00` (no `Z`) yields local midnight; toISOString() converts to UTC.
+function localDayRangeIso(date: string): { startDate: string; endDate: string } {
+  const start = new Date(`${date}T00:00:00`);
+  const end = new Date(`${date}T23:59:59.999`);
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
 // ── iOS HealthKit ─────────────────────────────────────────────────────────────
 async function iosRequestPermissions(): Promise<boolean> {
   try {
@@ -30,7 +38,8 @@ async function iosRequestPermissions(): Promise<boolean> {
         (err: unknown) => resolve(!err),
       );
     });
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] iosRequestPermissions failed:', e);
     return false;
   }
 }
@@ -38,8 +47,7 @@ async function iosRequestPermissions(): Promise<boolean> {
 async function iosReadData(date: string): Promise<HealthSyncData> {
   try {
     const AppleHealthKit = require('react-native-health').default;
-    const startDate = `${date}T00:00:00.000Z`;
-    const endDate = `${date}T23:59:59.000Z`;
+    const { startDate, endDate } = localDayRangeIso(date);
 
     const steps = await new Promise<number>((resolve) => {
       AppleHealthKit.getStepCount({ date: startDate }, (_: unknown, r: { value?: number }) =>
@@ -71,7 +79,8 @@ async function iosReadData(date: string): Promise<HealthSyncData> {
     });
 
     return { steps, activeCalories: Math.round(kcal), sleepMinutes: sleepMins };
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] iosReadData failed:', e);
     return { steps: 0, activeCalories: 0, sleepMinutes: 0 };
   }
 }
@@ -94,7 +103,9 @@ async function iosWriteWorkout(params: {
       },
       () => {},
     );
-  } catch {}
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] iosWriteWorkout failed:', e);
+  }
 }
 
 // ── Android Health Connect ────────────────────────────────────────────────────
@@ -110,7 +121,8 @@ async function androidRequestPermissions(): Promise<boolean> {
       { accessType: 'write', recordType: 'ExerciseSession' },
     ]);
     return granted.length > 0;
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] androidRequestPermissions failed:', e);
     return false;
   }
 }
@@ -118,8 +130,7 @@ async function androidRequestPermissions(): Promise<boolean> {
 async function androidReadData(date: string): Promise<HealthSyncData> {
   try {
     const HC = require('react-native-health-connect');
-    const startTime = `${date}T00:00:00.000Z`;
-    const endTime = `${date}T23:59:59.000Z`;
+    const { startDate: startTime, endDate: endTime } = localDayRangeIso(date);
     const filter = { timeRangeFilter: { operator: 'between', startTime, endTime } };
 
     const [stepsRes, kcalRes, sleepRes] = await Promise.all([
@@ -140,7 +151,8 @@ async function androidReadData(date: string): Promise<HealthSyncData> {
     );
 
     return { steps, activeCalories: Math.round(kcal), sleepMinutes: Math.round(sleepMins) };
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] androidReadData failed:', e);
     return { steps: 0, activeCalories: 0, sleepMinutes: 0 };
   }
 }
@@ -161,7 +173,9 @@ async function androidWriteWorkout(params: {
         exerciseType: 'STRENGTH_TRAINING',
       },
     ]);
-  } catch {}
+  } catch (e) {
+    if (__DEV__) console.warn('[healthKit] androidWriteWorkout failed:', e);
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

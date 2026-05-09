@@ -98,7 +98,9 @@ interface DiaryState {
   reset: () => void;
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// Local YYYY-MM-DD — see appStore for rationale. Diary days must align with
+// the user's clock, not UTC, or late-evening logs land on the wrong day.
+function todayStr() { return new Date().toLocaleDateString('en-CA'); }
 function emptyEntry(date: string): DiaryEntry {
   return { date, foods: [], water: 0, calories_burned: 0 };
 }
@@ -113,7 +115,17 @@ async function saveEntry(date: string, entry: DiaryEntry, email: string | null) 
       { email, date, entry_data: stamped, updated_at: stamped._savedAt },
       { onConflict: 'email,date' }
     );
-    void (async () => { try { await push(); } catch { try { await new Promise(r => setTimeout(r, 4000)); await push(); } catch {} } })();
+    void (async () => {
+      try { await push(); } catch (e1: any) {
+        try {
+          await new Promise(r => setTimeout(r, 4000));
+          await push();
+        } catch (e2: any) {
+          // eslint-disable-next-line no-console
+          console.error('[diaryStore.saveEntry] cloud sync failed after retry:', e2?.message ?? e1?.message ?? 'unknown');
+        }
+      }
+    })();
   }
 }
 
@@ -147,7 +159,11 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const email = getEmail();
     const key = email ? `diary_${email}_${date}` : `diary_anon_${date}`;
     const raw = await AsyncStorage.getItem(key);
-    const local: DiaryEntry = raw ? JSON.parse(raw) : emptyEntry(date);
+    let local: DiaryEntry = emptyEntry(date);
+    if (raw) {
+      try { local = JSON.parse(raw); }
+      catch { await AsyncStorage.removeItem(key); }
+    }
     // Show local immediately for instant UI, cloud may overwrite below
     set((s) => ({ entries: pruneEntries({ ...s.entries, [date]: local }) }));
 
@@ -345,7 +361,12 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
       const localMap: Record<string, DiaryEntry> = {};
       for (const [key, raw] of localPairs) {
         const date = key.replace(`diary_${email}_`, '');
-        localMap[date] = raw ? JSON.parse(raw) : emptyEntry(date);
+        if (raw) {
+          try { localMap[date] = JSON.parse(raw); }
+          catch { localMap[date] = emptyEntry(date); }
+        } else {
+          localMap[date] = emptyEntry(date);
+        }
       }
 
       const restored: Record<string, DiaryEntry> = {};

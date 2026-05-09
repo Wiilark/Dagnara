@@ -43,7 +43,7 @@ export const FOOD_DATABASE: LocalFood[] = [
   { id: 'v025', name: 'Artichoke',         icon: '🥦', kcal: 47,  protein: 3.3, carbs: 11.0, fat: 0.2, fiber: 5.4, sugar: 1.0,  sodium: 94  },
   { id: 'v026', name: 'Brussels Sprouts',  icon: '🥦', kcal: 43,  protein: 3.4, carbs: 9.0,  fat: 0.3, fiber: 3.8, sugar: 2.2,  sodium: 25  },
   { id: 'v027', name: 'Leek',              icon: '🧅', kcal: 61,  protein: 1.5, carbs: 14.0, fat: 0.3, fiber: 1.8, sugar: 3.9,  sodium: 20  },
-  { id: 'v028', name: 'Radish',            icon: '🌶️', kcal: 16,  protein: 0.7, carbs: 3.4,  fat: 0.1, fiber: 1.6, sugar: 1.9,  sodium: 39  },
+  { id: 'v028', name: 'Radish',            icon: '🫜', kcal: 16,  protein: 0.7, carbs: 3.4,  fat: 0.1, fiber: 1.6, sugar: 1.9,  sodium: 39  },
 
   // ── Fruits ────────────────────────────────────────────────────────────────
   { id: 'f001', name: 'Apple',             icon: '🍎', kcal: 52,  protein: 0.3, carbs: 14.0, fat: 0.2, fiber: 2.4, sugar: 10.0, sodium: 1   },
@@ -61,10 +61,10 @@ export const FOOD_DATABASE: LocalFood[] = [
   { id: 'f013', name: 'Kiwi',              icon: '🥝', kcal: 61,  protein: 1.1, carbs: 15.0, fat: 0.5, fiber: 3.0, sugar: 9.0,  sodium: 3   },
   { id: 'f014', name: 'Lemon',             icon: '🍋', kcal: 29,  protein: 1.1, carbs: 9.0,  fat: 0.3, fiber: 2.8, sugar: 2.5,  sodium: 2   },
   { id: 'f015', name: 'Avocado',           icon: '🥑', kcal: 160, protein: 2.0, carbs: 9.0,  fat: 15.0, fiber: 6.7, sugar: 0.7, sodium: 7   },
-  { id: 'f016', name: 'Raspberry',         icon: '🫐', kcal: 52,  protein: 1.2, carbs: 12.0, fat: 0.7, fiber: 6.5, sugar: 4.4,  sodium: 1   },
+  { id: 'f016', name: 'Raspberry',         icon: '🍓', kcal: 52,  protein: 1.2, carbs: 12.0, fat: 0.7, fiber: 6.5, sugar: 4.4,  sodium: 1   },
   { id: 'f017', name: 'Blackberry',        icon: '🫐', kcal: 43,  protein: 1.4, carbs: 10.0, fat: 0.5, fiber: 5.3, sugar: 4.9,  sodium: 1   },
   { id: 'f018', name: 'Pomegranate',       icon: '🍎', kcal: 83,  protein: 1.7, carbs: 19.0, fat: 1.2, fiber: 4.0, sugar: 14.0, sodium: 3   },
-  { id: 'f019', name: 'Plum',              icon: '🍑', kcal: 46,  protein: 0.7, carbs: 11.0, fat: 0.3, fiber: 1.4, sugar: 9.9,  sodium: 0   },
+  { id: 'f019', name: 'Plum',              icon: '🍇', kcal: 46,  protein: 0.7, carbs: 11.0, fat: 0.3, fiber: 1.4, sugar: 9.9,  sodium: 0   },
   { id: 'f020', name: 'Apricot',           icon: '🍑', kcal: 48,  protein: 1.4, carbs: 11.0, fat: 0.4, fiber: 2.0, sugar: 9.2,  sodium: 1   },
   { id: 'f021', name: 'Coconut',           icon: '🥥', kcal: 354, protein: 3.3, carbs: 15.0, fat: 33.0, fiber: 9.0, sugar: 6.2, sodium: 20  },
   { id: 'f022', name: 'Melon',             icon: '🍈', kcal: 34,  protein: 0.8, carbs: 8.2,  fat: 0.2, fiber: 0.9, sugar: 7.9,  sodium: 16  },
@@ -84,7 +84,7 @@ export const FOOD_DATABASE: LocalFood[] = [
   { id: 'm010', name: 'Ham',               icon: '🥩', kcal: 163, protein: 17.0, carbs: 1.5, fat: 10.0, fiber: 0, sugar: 1.4, sodium: 1300},
   { id: 'm011', name: 'Sausage',           icon: '🌭', kcal: 301, protein: 12.0, carbs: 4.0, fat: 27.0, fiber: 0, sugar: 0, sodium: 748 },
   { id: 'm012', name: 'Hot Dog',           icon: '🌭', kcal: 290, protein: 11.0, carbs: 2.3, fat: 26.0, fiber: 0, sugar: 1.1, sodium: 860 },
-  { id: 'm013', name: 'Pepperoni',         icon: '🍕', kcal: 494, protein: 21.0, carbs: 2.0, fat: 44.0, fiber: 0, sugar: 0, sodium: 1750},
+  { id: 'm013', name: 'Pepperoni',         icon: '🍖', kcal: 494, protein: 21.0, carbs: 2.0, fat: 44.0, fiber: 0, sugar: 0, sodium: 1750},
   { id: 'm014', name: 'Beef Burger Patty', icon: '🍔', kcal: 285, protein: 21.0, carbs: 0,   fat: 22.0, fiber: 0, sugar: 0, sodium: 79  },
 
   // ── Seafood ───────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ export const FOOD_DATABASE: LocalFood[] = [
   { id: 'b007', name: 'Red Wine',          icon: '🍷', kcal: 85,  protein: 0.1,  carbs: 2.6,  fat: 0,   fiber: 0, sugar: 0.6, sodium: 4   },
   { id: 'b008', name: 'Coconut Water',     icon: '🥥', kcal: 19,  protein: 0.7,  carbs: 3.7,  fat: 0.2, fiber: 1.0, sugar: 2.6, sodium: 105 },
   { id: 'b009', name: 'Almond Milk',       icon: '🥛', kcal: 17,  protein: 0.6,  carbs: 1.4,  fat: 1.2, fiber: 0.3, sugar: 0.8, sodium: 73  },
-  { id: 'b010', name: 'Protein Shake',     icon: '💪', kcal: 120, protein: 25.0, carbs: 5.0,  fat: 2.0, fiber: 1.0, sugar: 3.0, sodium: 150 },
+  { id: 'b010', name: 'Protein Shake',     icon: '🥤', kcal: 120, protein: 25.0, carbs: 5.0,  fat: 2.0, fiber: 1.0, sugar: 3.0, sodium: 150 },
 
   // ── Snacks & Sweets ───────────────────────────────────────────────────────
   { id: 'sn01', name: 'Potato Chips',      icon: '🥔', kcal: 536, protein: 7.0,  carbs: 53.0, fat: 35.0, fiber: 4.4, sugar: 0.4, sodium: 525},
@@ -222,12 +222,12 @@ export const FOOD_DATABASE: LocalFood[] = [
   { id: 'p010', name: 'Fried Chicken',     icon: '🍗', kcal: 246, protein: 32.0, carbs: 8.7,  fat: 9.7, fiber: 0.3, sugar: 0.2, sodium: 513},
   { id: 'p011', name: 'Pancakes',          icon: '🥞', kcal: 227, protein: 6.0,  carbs: 38.0, fat: 6.5, fiber: 1.5, sugar: 7.0, sodium: 479},
   { id: 'p012', name: 'Waffles',           icon: '🧇', kcal: 291, protein: 7.9,  carbs: 42.0, fat: 10.0, fiber: 1.5, sugar: 6.5, sodium: 612},
-  { id: 'p013', name: 'Fried Rice',        icon: '🍳', kcal: 163, protein: 4.5,  carbs: 26.0, fat: 4.8, fiber: 1.0, sugar: 1.5, sodium: 570},
+  { id: 'p013', name: 'Fried Rice',        icon: '🍚', kcal: 163, protein: 4.5,  carbs: 26.0, fat: 4.8, fiber: 1.0, sugar: 1.5, sodium: 570},
   { id: 'p014', name: 'Grilled Salmon',    icon: '🐟', kcal: 208, protein: 28.0, carbs: 0,    fat: 10.0, fiber: 0, sugar: 0,   sodium: 68  },
   { id: 'p015', name: 'Chicken Soup',      icon: '🍲', kcal: 53,  protein: 4.6,  carbs: 6.0,  fat: 1.4, fiber: 0.5, sugar: 1.2, sodium: 400},
   { id: 'p016', name: 'Beef Stew',         icon: '🍲', kcal: 104, protein: 8.0,  carbs: 9.0,  fat: 4.0, fiber: 1.5, sugar: 2.0, sodium: 360},
-  { id: 'p017', name: 'Sushi (rice roll)', icon: '🍱', kcal: 150, protein: 6.0,  carbs: 27.0, fat: 2.0, fiber: 1.0, sugar: 3.0, sodium: 270},
-  { id: 'p018', name: 'Nachos',            icon: '🫔', kcal: 346, protein: 8.0,  carbs: 45.0, fat: 16.0, fiber: 3.5, sugar: 1.5, sodium: 460},
+  { id: 'p017', name: 'Sushi (rice roll)', icon: '🍣', kcal: 150, protein: 6.0,  carbs: 27.0, fat: 2.0, fiber: 1.0, sugar: 3.0, sodium: 270},
+  { id: 'p018', name: 'Nachos',            icon: '🧀', kcal: 346, protein: 8.0,  carbs: 45.0, fat: 16.0, fiber: 3.5, sugar: 1.5, sodium: 460},
 ];
 
 // ── Recipes ───────────────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ export const FOOD_DATABASE: LocalFood[] = [
 export const RECIPE_DATABASE: LocalFood[] = [
   { id: 'r001', name: 'Greek Salad',        icon: '🥗', kcal: 120, protein: 3.5,  carbs: 6.0,  fat: 9.0,  fiber: 1.5, sugar: 3.8,  sodium: 320 },
   { id: 'r002', name: 'Caesar Salad',        icon: '🥗', kcal: 155, protein: 7.0,  carbs: 8.0,  fat: 11.0, fiber: 1.2, sugar: 1.5,  sodium: 390 },
-  { id: 'r003', name: 'Chicken Stir Fry',    icon: '🍳', kcal: 130, protein: 14.0, carbs: 8.0,  fat: 5.0,  fiber: 1.5, sugar: 3.0,  sodium: 450 },
+  { id: 'r003', name: 'Chicken Stir Fry',    icon: '🥘', kcal: 130, protein: 14.0, carbs: 8.0,  fat: 5.0,  fiber: 1.5, sugar: 3.0,  sodium: 450 },
   { id: 'r004', name: 'Beef Bolognese',      icon: '🍝', kcal: 175, protein: 12.0, carbs: 14.0, fat: 8.0,  fiber: 1.5, sugar: 3.5,  sodium: 380 },
   { id: 'r005', name: 'Vegetable Soup',      icon: '🍲', kcal: 50,  protein: 2.5,  carbs: 8.0,  fat: 1.2,  fiber: 2.5, sugar: 3.0,  sodium: 350 },
   { id: 'r006', name: 'Avocado Toast',       icon: '🥑', kcal: 195, protein: 5.5,  carbs: 20.0, fat: 11.0, fiber: 4.5, sugar: 1.5,  sodium: 310 },

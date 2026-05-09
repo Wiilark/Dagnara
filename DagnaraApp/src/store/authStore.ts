@@ -38,12 +38,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const email = get().email;
     if (email) {
       try {
-        await supabase.from('dagnara_profiles').upsert(
+        const { error } = await supabase.from('dagnara_profiles').upsert(
           { email, profile_data: profile, updated_at: new Date().toISOString() },
           { onConflict: 'email' }
         );
-      } catch {
-        // Local update committed — cloud will sync on next save
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error('[authStore.setProfile] supabase upsert failed:', error.message);
+        }
+      } catch (e: any) {
+        // eslint-disable-next-line no-console
+        console.error('[authStore.setProfile] network error:', e?.message ?? e);
       }
     }
   },
@@ -106,12 +111,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (error) throw error;
 
     try {
-      await supabase.from('dagnara_profiles').upsert(
+      const { error: upErr } = await supabase.from('dagnara_profiles').upsert(
         { email, profile_data: profile, updated_at: new Date().toISOString() },
         { onConflict: 'email' }
       );
-    } catch {
-      // Auth account created — profile will be saved on next write
+      if (upErr) {
+        // eslint-disable-next-line no-console
+        console.error('[authStore.register] profile upsert failed:', upErr.message);
+      }
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error('[authStore.register] profile upsert network error:', e?.message ?? e);
     }
     set({ email, profile });
   },
