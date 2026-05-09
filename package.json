@@ -4,7 +4,8 @@
   "description": "Dagnara health tracker",
   "main": "server.js",
   "scripts": {
-    "start": "PORT=3000 node server.js"
+    "dev": "cross-env PORT=3001 node server.js",
+    "start": "cross-env PORT=3000 node server.js"
   },
   "engines": {
     "node": ">=18"
@@ -17,5 +18,7 @@
     "helmet": "^8.1.0",
     "stripe": "^22.0.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "cross-env": "^10.1.0"
+  }
 }

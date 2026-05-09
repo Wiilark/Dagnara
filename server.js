@@ -293,7 +293,15 @@ app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
       signal: controller.signal,
     });
     clearTimeout(t);
-    const html = await pageRes.text();
+
+    // Guard against malicious/massive pages: cap at 2 MB. Content-Length is
+    // advisory (some servers omit or lie), so we also truncate post-read.
+    const contentLength = Number(pageRes.headers.get('content-length') ?? 0);
+    if (contentLength && contentLength > 2_000_000) {
+      return res.status(413).json({ error: { message: 'Recipe page too large' } });
+    }
+    const htmlRaw = await pageRes.text();
+    const html = htmlRaw.length > 2_000_000 ? htmlRaw.slice(0, 2_000_000) : htmlRaw;
 
     // Extract structured recipe data first (JSON-LD), fall back to stripped text
     let recipeText = '';
@@ -402,64 +410,6 @@ app.post('/api/estimate-nutrition', estimateLimiter, async (req, res) => {
   } catch (err) {
     console.error('[estimate-nutrition]', err.message);
     const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
-    res.status(500).json({ error: { message: msg } });
-  }
-});
-
-// ── AI meal planner ───────────────────────────────────────────────────────────
-const mealPlanLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip),
-  message: { error: { message: 'Meal plan limit reached — please wait 5 minutes.' } }
-});
-
-app.post('/api/meal-plan', mealPlanLimiter, async (req, res) => {
-  const { calorieGoal, weightGoal, dietPreference, allergies, days = 7, recentFoods = [] } = req.body ?? {};
-  if (!calorieGoal || typeof calorieGoal !== 'number') {
-    return res.status(400).json({ error: { message: 'calorieGoal is required' } });
-  }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: { message: 'Meal planning not configured on this server' } });
-  }
-
-  const context = [
-    `Calorie goal: ${calorieGoal} kcal/day`,
-    weightGoal ? `Weight goal: ${weightGoal}` : null,
-    dietPreference ? `Diet preference: ${dietPreference}` : null,
-    (Array.isArray(allergies) && allergies.length > 0) ? `Allergies/avoid: ${allergies.join(', ')}` : null,
-    (Array.isArray(recentFoods) && recentFoods.length > 0) ? `Foods user has recently logged: ${recentFoods.slice(0, 20).join(', ')}` : null,
-  ].filter(Boolean).join('\n');
-
-  try {
-    const response = await callAnthropic({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      temperature: 0.7,
-      system: [{
-        type: 'text',
-        text: 'You are a meal planning assistant. Return ONLY valid JSON — no prose, no markdown. Create a meal plan with this structure:\n{"days":[{"day":"Monday","meals":{"breakfast":{"name":"meal name","kcal":number,"icon":"emoji","description":"brief description"},"lunch":{same},"dinner":{same},"snack":{same}},"totalKcal":number}],"tips":["tip1","tip2","tip3"]}\nMake realistic, varied, nutritious meals. Match the calorie goal closely.',
-        cache_control: { type: 'ephemeral' }
-      }],
-      messages: [{ role: 'user', content: `Create a ${days}-day meal plan:\n${context}` }]
-    });
-
-    const data = await response.json();
-    if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
-    const text = data?.content?.[0]?.text ?? '';
-    let plan = { days: [], tips: [] };
-    try {
-      // Strip markdown code fences if present
-      const clean = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
-      const p = JSON.parse(clean);
-      if (p && typeof p === 'object' && !Array.isArray(p)) plan = p;
-    } catch {}
-    res.json(plan);
-  } catch (err) {
-    console.error('[meal-plan]', err.message);
-    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to generate meal plan';
     res.status(500).json({ error: { message: msg } });
   }
 });
