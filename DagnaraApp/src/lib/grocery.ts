@@ -30,6 +30,62 @@ export function groceryKey(email: string | null | undefined): string {
   return `dagnara_grocery_${email ?? 'anon'}`;
 }
 
+// ── Purchase history ──────────────────────────────────────────────────────────
+// Tracks what the user actually buys (not just what they list) so the modal can
+// surface frequent / recent items as one-tap quick-adds. Research: 90% of
+// shoppers use digital saved-lists/favorites; 78% of additions are "ran out"
+// re-buys — both are well served by a frequent-items quick-add panel.
+export interface GroceryHistoryItem {
+  name: string;
+  category: string;
+  count: number;       // total times purchased
+  lastUsedAt: number;  // ms epoch
+}
+export type GroceryHistory = Record<string, GroceryHistoryItem>;
+
+export function groceryHistoryKey(email: string | null | undefined): string {
+  return `dagnara_grocery_history_${email ?? 'anon'}`;
+}
+
+export async function loadGroceryHistory(
+  email: string | null | undefined,
+): Promise<GroceryHistory> {
+  const raw = await AsyncStorage.getItem(groceryHistoryKey(email));
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch { return {}; }
+}
+
+/** Records that the user bought this item. Idempotent on lowercase name. */
+export async function recordGroceryPurchase(
+  email: string | null | undefined,
+  name: string,
+  category: string,
+): Promise<GroceryHistory> {
+  const trimmed = name.trim();
+  if (!trimmed) return loadGroceryHistory(email);
+  const k = trimmed.toLowerCase();
+  const history = await loadGroceryHistory(email);
+  const prev = history[k];
+  history[k] = {
+    name: prev?.name ?? trimmed,
+    category: category || prev?.category || 'other',
+    count: (prev?.count ?? 0) + 1,
+    lastUsedAt: Date.now(),
+  };
+  await AsyncStorage.setItem(groceryHistoryKey(email), JSON.stringify(history));
+  return history;
+}
+
+/** Top-N frequent items (by count, recency tiebreak). */
+export function pickFrequentItems(history: GroceryHistory, limit = 8): GroceryHistoryItem[] {
+  return Object.values(history)
+    .sort((a, b) => (b.count - a.count) || (b.lastUsedAt - a.lastUsedAt))
+    .slice(0, limit);
+}
+
 // ── Category keywords ─────────────────────────────────────────────────────────
 // Order matters — earlier entries win on first substring match.
 const CATEGORY_KEYWORDS: Array<{ id: string; keywords: string[] }> = [

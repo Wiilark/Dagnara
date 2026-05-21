@@ -14,7 +14,9 @@ import { useAppStore, getXpLevel, calcTDEE } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, requestNotificationPermission } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
+import { COUNTRIES, getCountry } from '../../src/lib/currency';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
 import { useDiaryStore } from '../../src/store/diaryStore';
 
@@ -24,7 +26,7 @@ const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts } = useAppStore();
+  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts, country, setCountry } = useAppStore();
   const xpInfo = getXpLevel(xp);
 
   const [editing, setEditing] = useState(false);
@@ -33,7 +35,7 @@ export default function ProfileScreen() {
   const [macrosModal, setMacrosModal] = useState(false);
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
-  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'notifications' | 'subscription' | 'health'>('');
+  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health'>('');
   const [language, setLanguage] = useState('English');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
   const [acFirstName, setAcFirstName] = useState('');
@@ -317,7 +319,7 @@ export default function ProfileScreen() {
         <View style={styles.headerRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={20} color={colors.ink2} />
+              <BackChevron size={22} />
             </TouchableOpacity>
             <Text style={styles.heading}>Profile</Text>
           </View>
@@ -580,7 +582,7 @@ export default function ProfileScreen() {
               : <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
             }
             <Text style={styles.modalTitle}>
-              {settingsPage === 'account' ? 'Account Settings' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Manage Subscriptions' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+              {settingsPage === 'account' ? 'Account Settings' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Manage Subscriptions' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             </Text>
             {settingsPage === 'account'
               ? <TouchableOpacity onPress={handleSaveAccount}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
@@ -633,6 +635,7 @@ export default function ProfileScreen() {
             <View style={sst.card}>
               {[
                 { icon: 'scale-outline', label: 'Unit System', value: unitSystem, color: colors.sky, onPress: () => setSettingsPage('unitSystem') },
+                { icon: 'globe-outline', label: 'Country', value: `${getCountry(country).flag}  ${getCountry(country).name}`, color: colors.honey, onPress: () => setSettingsPage('country') },
                 { icon: 'language-outline', label: 'Language', value: language, color: colors.green, onPress: () => setSettingsPage('language') },
               ].map(({ icon, label, value, color, onPress }, i, arr) => (
                 <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
@@ -701,6 +704,24 @@ export default function ProfileScreen() {
                     onPress={() => { setLanguage(lang); AsyncStorage.setItem(`${p}_language`, lang); setSettingsPage('account'); }}>
                     <Text style={[sst.label, { flex: 1 }]}>{lang}</Text>
                     {language === lang && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : settingsPage === 'country' ? (
+              /* ── Country page — drives money formatting (Programs / Quit Smoking / Quit Drinking) ── */
+              <View style={sst.card}>
+                {COUNTRIES.map((c, i, arr) => (
+                  <TouchableOpacity
+                    key={c.code}
+                    style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() => { void setCountry(c.code); setSettingsPage('account'); }}
+                  >
+                    <Text style={{ fontSize: fontSize.lg, marginRight: spacing.sm }}>{c.flag}</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={sst.label}>{c.name}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>{c.currency} · {c.symbol}</Text>
+                    </View>
+                    {country === c.code && <Ionicons name="checkmark" size={18} color={colors.purple} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -972,7 +993,7 @@ export default function ProfileScreen() {
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
           <View style={dp.header}>
             <TouchableOpacity onPress={() => setDietaryModal(false)} style={dp.backBtn}>
-              <Ionicons name="chevron-back" size={18} color={colors.ink} />
+              <BackChevron size={20} />
             </TouchableOpacity>
             <Text style={dp.title}>Food Preferences</Text>
             <View style={{ width: 36 }} />

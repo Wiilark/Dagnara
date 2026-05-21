@@ -5,17 +5,19 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../src/store/authStore';
 import { useAppStore, calcTDEE } from '../src/store/appStore';
 import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput, type UnitSystem } from '../src/lib/units';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, scheduleDailySummaryReminder } from '../src/lib/notifications';
+import { COUNTRIES, getCountry } from '../src/lib/currency';
 import { colors, spacing, fontSize, radius } from '../src/theme';
 
 const { width } = Dimensions.get('window');
 
-const STEPS = 5;
+const STEPS = 6;
 
 type Goal = 'lose' | 'maintain' | 'gain';
 type Activity = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
@@ -38,7 +40,7 @@ const ACTIVITIES: { key: Activity; label: string; desc: string }[] = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const { email, profile, setProfile } = useAuthStore();
-  const { setGoals, unitSystem, setUnitSystem } = useAppStore();
+  const { setGoals, unitSystem, setUnitSystem, country: persistedCountry, setCountry } = useAppStore();
 
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState<Goal>('maintain');
@@ -48,6 +50,8 @@ export default function OnboardingScreen() {
   const [weight, setWeight] = useState(profile.weight ?? '');
   const [height, setHeight] = useState(profile.height ?? '');
   const [targetWeight, setTargetWeight] = useState('');
+  const [country, setCountryState] = useState(persistedCountry || 'US');
+  const [countrySearch, setCountrySearch] = useState('');
   const [saving, setSaving] = useState(false);
   // `saving` state updates async — a ref blocks synchronous double-taps between
   // the press handler and the next render.
@@ -76,6 +80,8 @@ export default function OnboardingScreen() {
 
     try {
       await setGoals(activity, goal, calorieGoal);
+      // Persist country selection — drives currency in Programs (money saved, etc.)
+      await setCountry(country);
       // Update profile with body stats — always stored in metric (kg, cm)
       if (age || weight || height || targetWeight) {
         await setProfile({
@@ -135,7 +141,7 @@ export default function OnboardingScreen() {
     : null;
 
   const canAdvance = () => {
-    if (step === 3) {
+    if (step === 4) {
       if (!age || !weight || !height) return false;
       if (isNaN(ageNum) || ageNum < 16 || ageNum > 100) return false;
       if (!wKg || wKg < 30 || wKg > 300) return false;
@@ -194,7 +200,7 @@ export default function OnboardingScreen() {
         {/* Step 1: Goal */}
         {step === 1 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 1 OF 4</Text>
+            <Text style={s.stepLabel}>STEP 1 OF 5</Text>
             <Text style={s.heading}>What's your main goal?</Text>
             <Text style={s.body}>This sets your daily calorie target.</Text>
             <View style={s.optionList}>
@@ -220,7 +226,7 @@ export default function OnboardingScreen() {
         {/* Step 2: Activity */}
         {step === 2 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 2 OF 4</Text>
+            <Text style={s.stepLabel}>STEP 2 OF 5</Text>
             <Text style={s.heading}>How active are you?</Text>
             <Text style={s.body}>Used to calculate your energy expenditure.</Text>
             <View style={s.optionList}>
@@ -242,10 +248,77 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* Step 3: Body stats */}
+        {/* Step 3: Country (drives currency + locale across the app) */}
         {step === 3 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 3 OF 4</Text>
+            <Text style={s.stepLabel}>STEP 3 OF 5</Text>
+            <Text style={s.heading}>Where are you based?</Text>
+            <Text style={s.body}>
+              Sets your currency in Programs (e.g. money saved when quitting smoking). You can change it any time in Preferences.
+            </Text>
+
+            {/* Current selection preview — confirms what was tapped */}
+            <View style={s.countryPreview}>
+              <Text style={{ fontSize: fontSize.xl }}>{getCountry(country).flag}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.countryPreviewName}>{getCountry(country).name}</Text>
+                <Text style={s.countryPreviewCur}>
+                  {getCountry(country).currency} · {getCountry(country).symbol}
+                </Text>
+              </View>
+            </View>
+
+            {/* Search field — filters by country name */}
+            <View style={s.searchWrap}>
+              <Ionicons name="search" size={16} color={colors.ink3} />
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search country…"
+                placeholderTextColor={colors.ink3}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+              {countrySearch ? (
+                <TouchableOpacity onPress={() => setCountrySearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={16} color={colors.ink3} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Country rows — flag · name · currency · checkmark when selected */}
+            <View style={s.countryList}>
+              {(() => {
+                const q = countrySearch.trim().toLowerCase();
+                const list = q ? COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)) : COUNTRIES;
+                if (list.length === 0) {
+                  return <Text style={s.countryEmpty}>No matches.</Text>;
+                }
+                return list.map((c, i, arr) => (
+                  <TouchableOpacity
+                    key={c.code}
+                    style={[s.countryRow, i === arr.length - 1 && { borderBottomWidth: 0 }, country === c.code && s.countryRowSelected]}
+                    onPress={() => setCountryState(c.code)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.countryFlag}>{c.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.countryName}>{c.name}</Text>
+                      <Text style={s.countryCurrency}>{c.currency} · {c.symbol}</Text>
+                    </View>
+                    {country === c.code && <Ionicons name="checkmark" size={18} color={colors.purple} />}
+                  </TouchableOpacity>
+                ));
+              })()}
+            </View>
+          </View>
+        )}
+
+        {/* Step 4: Body stats */}
+        {step === 4 && (
+          <View style={s.section}>
+            <Text style={s.stepLabel}>STEP 4 OF 5</Text>
             <Text style={s.heading}>Your body stats</Text>
             <Text style={s.body}>Used in the Harris-Benedict formula to calculate your BMR.</Text>
 
@@ -329,10 +402,10 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* Step 4: Summary */}
-        {step === 4 && (
+        {/* Step 5: Summary */}
+        {step === 5 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 4 OF 4</Text>
+            <Text style={s.stepLabel}>STEP 5 OF 5</Text>
             <Text style={s.heading}>Your personal plan</Text>
             <Text style={s.body}>Based on your stats, here's what we recommend:</Text>
 
@@ -363,6 +436,7 @@ export default function OnboardingScreen() {
               {([
                 ['🎯 Goal',          GOALS.find(g => g.key === goal)?.label ?? goal],
                 ['⚡ Activity',      ACTIVITIES.find(a => a.key === activity)?.label ?? activity],
+                ['🌍 Country',       `${getCountry(country).flag}  ${getCountry(country).name} · ${getCountry(country).currency}`],
                 ['👤 Sex',           sex === 'male' ? 'Male' : 'Female'],
                 ['📅 Age',           age ? `${age} years` : '—'],
                 ['⚖️ Weight',        wKg > 0 ? formatWeight(wKg, unitSystem) : '—'],
@@ -474,6 +548,44 @@ const s = StyleSheet.create({
   sexBtnTxt: { fontSize: fontSize.base, fontWeight: '600', color: colors.ink2 },
   sexBtnTxtSelected: { color: colors.lavender },
   sexHint: { fontSize: fontSize.xs, color: colors.ink3, marginTop: -2, lineHeight: 16 },
+
+  // Country picker — flag · name · currency, with search filter above
+  countryPreview: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.purpleTint,
+    borderWidth: 1, borderColor: colors.line3,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    marginTop: spacing.xs,
+  },
+  countryPreviewName: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  countryPreviewCur:  { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
+
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.layer2,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  searchInput: { flex: 1, color: colors.ink, fontSize: fontSize.base, paddingVertical: 0 },
+
+  countryList: {
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  countryRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  countryRowSelected: { backgroundColor: colors.purpleTint },
+  countryFlag: { fontSize: fontSize.lg },
+  countryName: { fontSize: fontSize.base, color: colors.ink, fontWeight: '600' },
+  countryCurrency: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
+  countryEmpty: { textAlign: 'center', color: colors.ink3, fontSize: fontSize.sm, padding: spacing.lg },
 
   inputWrap: { gap: 6 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

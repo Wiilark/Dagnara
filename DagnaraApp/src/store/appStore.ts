@@ -60,6 +60,7 @@ interface PersistedData {
   unitSystem: 'Metric' | 'Imperial (US)' | 'UK' | 'US Customary';
   macroPcts: { carbs: number; protein: number; fat: number };
   savedRecipes: LocalFood[];
+  country: string;  // ISO 3166-1 alpha-2 (e.g. 'US', 'SE'). Drives currency in Programs / money widgets.
 }
 
 interface AppState extends PersistedData {
@@ -77,6 +78,7 @@ interface AppState extends PersistedData {
   loadApp: (email?: string) => Promise<void>;
   setGoals: (activityLevel: AppState['activityLevel'], weightGoal: AppState['weightGoal'], calorieGoal: number) => Promise<void>;
   setUnitSystem: (system: AppState['unitSystem']) => Promise<void>;
+  setCountry: (code: string) => Promise<void>;
   setMacroPcts: (pcts: { carbs: number; protein: number; fat: number }) => Promise<void>;
   saveRecipe: (recipe: LocalFood) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
@@ -104,6 +106,7 @@ function pick(s: AppState): PersistedData {
     unitSystem: s.unitSystem,
     macroPcts: s.macroPcts,
     savedRecipes: s.savedRecipes,
+    country: s.country,
   };
 }
 
@@ -144,6 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   unitSystem: 'Metric',
   macroPcts: { carbs: 45, protein: 30, fat: 25 },
   savedRecipes: [],
+  country: 'US',
   userEmail: null,
   messagesOpen: false,
   hasUnread: false,
@@ -194,6 +198,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             unitSystem: cloud.unitSystem ?? local.unitSystem ?? 'Metric',
             macroPcts: cloud.macroPcts ?? local.macroPcts ?? { carbs: 45, protein: 30, fat: 25 },
             savedRecipes: cloud.savedRecipes?.length ? cloud.savedRecipes : (local.savedRecipes ?? []),
+            country: cloud.country ?? local.country ?? 'US',
           };
           set(merged);
           await AsyncStorage.setItem(localKey, JSON.stringify(merged));
@@ -258,6 +263,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     await persist(pick({ ...get(), unitSystem: system }), get().userEmail);
   },
 
+  setCountry: async (code) => {
+    set({ country: code });
+    await persist(pick({ ...get(), country: code }), get().userEmail);
+  },
+
   setMacroPcts: async (pcts) => {
     set({ macroPcts: pcts });
     await persist(pick({ ...get(), macroPcts: pcts }), get().userEmail);
@@ -278,7 +288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () => set({
     lifeScore: null, lifeScoreDate: null, streak: 0, lastLoggedDate: null,
     programs: { nutrition: true, hydration: true, movement: false, sleep: false, stress: false, quit_smoking: false, quit_drinking: false, pill_reminder: false },
-    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], userEmail: null, messagesOpen: false,
+    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', userEmail: null, messagesOpen: false,
   }),
 }));
 

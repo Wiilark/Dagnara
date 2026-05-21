@@ -23,6 +23,7 @@ import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/resta
 import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
 import { ClockPickerModal } from '../../src/components/ClockPickerModal';
+import { BackChevron } from '../../src/components/BackChevron';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
@@ -200,7 +201,7 @@ function SleepModal({ visible, onClose, onSave }: {
         <SafeAreaView style={sl.safe} edges={['bottom']}>
           <View style={sl.header}>
             <TouchableOpacity onPress={onClose} style={sl.backBtn}>
-              <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+              <BackChevron size={20} />
             </TouchableOpacity>
             <Text style={sl.title}>Log Sleep</Text>
             <View style={{ width: 34 }} />
@@ -298,7 +299,17 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
   const [strengthMode, setStrengthMode] = useState(false);
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
   const [strengthSearch, setStrengthSearch] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  // Default the kg/lbs toggle to match the user's global unit system.
+  // Metric → kg, anything else (Imperial / UK / US Customary) → lbs.
+  const unitSystem = useAppStore(s => s.unitSystem);
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(unitSystem === 'Metric' ? 'kg' : 'lbs');
+  // Keep the toggle in sync if the user changes their unit system from Profile while
+  // the modal is mounted but no exercises have been added yet.
+  useEffect(() => {
+    if (strengthExercises.length === 0) {
+      setWeightUnit(unitSystem === 'Metric' ? 'kg' : 'lbs');
+    }
+  }, [unitSystem, strengthExercises.length]);
 
   // Keyboard tracking — animate durPanel bottom to match keyboard height
   const kbBottom = useRef(new Animated.Value(0)).current;
@@ -698,7 +709,7 @@ function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; 
       {activeExercise && <BreathingGuideModal exercise={activeExercise} onClose={() => setActiveExercise(null)} />}
       <SafeAreaView style={sbst.safe} edges={['bottom']}>
         <View style={sbst.header}>
-          <TouchableOpacity onPress={onClose} style={sbst.backBtn}><Ionicons name="chevron-back" size={18} color={colors.ink2} /></TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={sbst.backBtn}><BackChevron size={20} /></TouchableOpacity>
           <Text style={sbst.title}>Stress & Breathing</Text>
           <View style={{ width: 34 }} />
         </View>
@@ -762,7 +773,7 @@ function MoodModal({ visible, onClose, onSave }: { visible: boolean; onClose: ()
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={moodst.safe} edges={['bottom']}>
         <View style={moodst.header}>
-          <TouchableOpacity onPress={onClose} style={moodst.backBtn}><Ionicons name="chevron-back" size={18} color={colors.ink2} /></TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={moodst.backBtn}><BackChevron size={20} /></TouchableOpacity>
           <Text style={moodst.title}>Log Mood</Text>
           <View style={{ width: 34 }} />
         </View>
@@ -2664,7 +2675,7 @@ const st = StyleSheet.create({
   // Header
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, letterSpacing: -0.03 * 28 },
+  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
   upgradeBadge: { backgroundColor: colors.purple + '2e', borderWidth: 1, borderColor: colors.purple + '66', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
   upgradeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -378,7 +378,7 @@ const st = StyleSheet.create({
 
   card: {
     backgroundColor: colors.layer1,
-    borderWidth: 1, borderColor: colors.line2,
+    borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.sm,

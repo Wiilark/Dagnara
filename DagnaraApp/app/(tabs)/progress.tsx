@@ -12,6 +12,7 @@ import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { BackChevron } from '../../src/components/BackChevron';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
 const LS_QUESTIONS = [
@@ -294,7 +295,7 @@ function StatisticsModal({ visible, onClose, entries }: {
       <SafeAreaView style={stat.safe} edges={['top', 'bottom']}>
         <View style={stat.header}>
           <TouchableOpacity onPress={onClose} style={stat.backBtn}>
-            <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+            <BackChevron size={20} />
           </TouchableOpacity>
           <Text style={stat.title}>Statistics</Text>
           <View style={{ width: 34 }} />
@@ -924,14 +925,14 @@ export default function ProgressScreen() {
         <View style={st.appHeader}>
           <Text style={st.heading}>Progress</Text>
           <View style={{ flexDirection: 'row', gap: 4 }}>
-            <TouchableOpacity style={st.profileBtn} onPress={() => setStatsVisible(true)}>
+            <TouchableOpacity style={st.iconBtn} onPress={() => setStatsVisible(true)}>
               <Ionicons name="stats-chart-outline" size={22} color={colors.ink2} />
             </TouchableOpacity>
-            <TouchableOpacity style={st.profileBtn} onPress={() => setMessagesOpen(true)}>
+            <TouchableOpacity style={st.iconBtn} onPress={() => setMessagesOpen(true)}>
               <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
               {hasUnread && <View style={st.notifDot} />}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.profileBtn}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.iconBtn}>
               <Ionicons name="person-outline" size={22} color={colors.ink2} />
             </TouchableOpacity>
           </View>
@@ -1282,9 +1283,9 @@ export default function ProgressScreen() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.md, gap: spacing.sm, paddingBottom: 24 },
+  scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  profileBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
   card: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md },

@@ -23,7 +23,9 @@ export interface FoodItem {
 
 export interface StrengthSet {
   reps: number;
-  weight: number;  // always stored in kg internally
+  // Stored verbatim in whatever unit the user logged with — `unit` is the source of
+  // truth. Conversion to kg happens at read time (see estimateStrengthKcal).
+  weight: number;
   unit: 'kg' | 'lbs';
 }
 

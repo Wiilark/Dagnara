@@ -8,6 +8,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight } from '../../src/lib/units';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
@@ -280,7 +281,7 @@ function SleepLogger({ visible, onClose }: { visible: boolean; onClose: () => vo
           <View style={sl.handle} />
           <View style={sl.header}>
             <TouchableOpacity onPress={onClose} style={sl.backBtn}>
-              <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+              <BackChevron size={20} />
             </TouchableOpacity>
             <Text style={sl.title}>Log Sleep</Text>
             <View style={{ width: 34 }} />
@@ -483,7 +484,7 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
           <View style={al.handle} />
           <View style={al.header}>
             <TouchableOpacity onPress={onClose} style={al.closeBtn}>
-              <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+              <BackChevron size={20} />
             </TouchableOpacity>
             <Text style={al.title}>Daily Steps</Text>
             <View style={{ width: 34 }} />

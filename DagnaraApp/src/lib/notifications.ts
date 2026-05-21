@@ -155,6 +155,57 @@ export async function cancelAllNotifications() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
+// ── Quit program milestone notifications ──────────────────────────────────────
+
+// Key milestones to push — subset of the 82 achievements, chosen for WHO health events.
+const QS_MILESTONES_NOTIFY = [
+  { hours: 0.33, title: '🫧 First 20 minutes smoke-free', body: 'Blood pressure is already normalizing.' },
+  { hours: 8,    title: '🩸 8 hours smoke-free',          body: 'CO and nicotine cut in half — blood oxygen rising.' },
+  { hours: 12,   title: '💨 12 hours smoke-free',         body: 'Carbon monoxide cleared from your blood.' },
+  { hours: 24,   title: '📅 One full day!',               body: 'Heart attack risk has already dropped. Keep going!' },
+  { hours: 48,   title: '👃 Two days smoke-free!',        body: 'Taste and smell are coming back.' },
+  { hours: 72,   title: '🫁 Three days!',                 body: 'Nicotine is fully gone. Physical dependence broken.' },
+  { hours: 168,  title: '🏃 One week smoke-free!',        body: 'Lungs rebuilding. Circulation improving daily.' },
+  { hours: 336,  title: '💪 Two weeks!',                  body: 'Lung function improving. Less coughing every day.' },
+  { hours: 720,  title: '🏆 One month smoke-free!',       body: 'Blood pressure and circulation back to normal.' },
+  { hours: 2160, title: '🌟 Three months!',               body: 'Lung capacity up ~30%. Infection risk dropping.' },
+  { hours: 4380, title: '🎉 Six months smoke-free!',      body: 'Congestion and shortness of breath greatly reduced.' },
+  { hours: 8760, title: '🥇 ONE YEAR SMOKE-FREE!',        body: 'Heart disease risk is now half that of a smoker!' },
+];
+
+export async function scheduleQsNotifications(quitDate: Date): Promise<void> {
+  if (Platform.OS === 'web') return;
+  // Cancel all existing qs milestone notifications
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    const tag = String((n.content.data as Record<string, unknown>)?.tag ?? '');
+    if (tag.startsWith('qs_milestone_') || tag === 'qs_daily') {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+  const now = Date.now();
+  for (const ms of QS_MILESTONES_NOTIFY) {
+    const fireAt = new Date(quitDate.getTime() + ms.hours * 3600_000);
+    if (fireAt.getTime() <= now) continue; // milestone already passed
+    await Notifications.scheduleNotificationAsync({
+      content: { title: ms.title, body: ms.body, data: { tag: `qs_milestone_${ms.hours}` } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    });
+  }
+}
+
+export async function cancelQsNotifications(): Promise<void> {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    const tag = String((n.content.data as Record<string, unknown>)?.tag ?? '');
+    if (tag.startsWith('qs_milestone_') || tag === 'qs_daily') {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+}
+
 // ── Pill reminder notifications ───────────────────────────────────────────────
 
 /**

@@ -73,10 +73,3 @@ export async function estimateNutrition(description: string): Promise<any> {
   return postJson('/api/estimate-nutrition', { description });
 }
 
-export async function coachMessage(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  context?: string,
-  email?: string,
-): Promise<{ reply: string }> {
-  return postJson<{ reply: string }>('/api/coach', { messages, context, email });
-}
