@@ -58,7 +58,29 @@ def parse_jsonl_transcript(transcript_path: Path) -> list:
     return messages
 
 
-def format_for_summary(messages: list, keep_last: int = 20) -> str:
+def get_git_context(project_dir: Path) -> str:
+    """Get current git branch and modified files for summary context."""
+    try:
+        branch = subprocess.run(
+            ["git", "branch", "--show-current"], capture_output=True, text=True, timeout=5, cwd=str(project_dir)
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--short", "--", "DagnaraApp/"], capture_output=True, text=True, timeout=5, cwd=str(project_dir)
+        ).stdout.strip()
+        recent = subprocess.run(
+            ["git", "log", "--oneline", "-3"], capture_output=True, text=True, timeout=5, cwd=str(project_dir)
+        ).stdout.strip()
+        parts = [f"Branch: {branch or 'unknown'}"]
+        if recent:
+            parts.append(f"Recent commits:\n{recent}")
+        if status:
+            parts.append(f"Uncommitted changes:\n{status}")
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+def format_for_summary(messages: list, keep_last: int = 30) -> str:
     """Take last N messages and format as readable conversation."""
     recent = messages[-keep_last:] if len(messages) > keep_last else messages
     parts = []
@@ -70,14 +92,15 @@ def format_for_summary(messages: list, keep_last: int = 20) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def generate_summary(conversation_text: str, meta: dict) -> str | None:
+def generate_summary(conversation_text: str, meta: dict, git_context: str = "") -> str | None:
     """Call claude CLI with Haiku to generate a compact summary."""
+    git_section = f"\nGit state at compaction:\n{git_context}\n" if git_context else ""
     prompt = f"""Summarize this Claude Code development session in under 3000 characters.
 
 Session info:
 - Branch: {meta.get('git_branch', 'unknown')}
 - Working dir: {meta.get('cwd', 'unknown')}
-
+{git_section}
 Format exactly as:
 # Session Summary ({datetime.now().strftime('%Y-%m-%d %H:%M')})
 
@@ -202,9 +225,10 @@ def main():
     # Generate summary
     summary = None
     if messages:
-        conversation_text = format_for_summary(messages, keep_last=20)
+        conversation_text = format_for_summary(messages, keep_last=30)
+        git_ctx = get_git_context(PROJECT_DIR)
         print("[auto_compact] Generating summary with Claude Haiku...", file=sys.stderr)
-        summary = generate_summary(conversation_text, meta)
+        summary = generate_summary(conversation_text, meta, git_ctx)
         if summary:
             print(f"[auto_compact] Summary generated ({len(summary)} chars)", file=sys.stderr)
         else:

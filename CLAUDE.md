@@ -51,10 +51,20 @@ The mobile app communicates with two backends:
 - `app/onboarding.tsx` — 5-step wizard (goals, body metrics, activity level)
 - `app/(tabs)/` — Main tab screens: diary, progress, programs, profile, recipes, log
 
+**Core Types** (`DagnaraApp/src/store/diaryStore.ts`):
+- **`FoodItem`**: `id`, `icon`, `name`, `kcal`, `carbs`, `protein`, `fat`, `unit`, `meal` (`'breakfast'|'lunch'|'dinner'|'snack'`). Optional micros: `fiber`, `sugar`, `sodium`, `vitaminC`, `calcium`, `iron`, `potassium`.
+- **`DiaryEntry`**: `date`, `foods[]`, `water`, `calories_burned`, `sleep?`, `mood?`, `steps?`, `veggies?`, `fruits?`.
+- **`LocalFood`**: Per-100g data found in `src/lib/foodDatabase.ts` (`FOOD_DATABASE` and `RECIPE_DATABASE`).
+
 **State Management** — Three Zustand stores in `DagnaraApp/src/store/` (Zustand v5 — `useShallow` imported from `zustand/react/shallow`):
 - `authStore.ts` — Session, user profile (name, age, weight, height, goal). Persisted to AsyncStorage + `dagnara_profiles` table.
 - `appStore.ts` — XP/leveling, streaks, weight history, calorie goals, programs. Exports: `calcTDEE(age, weightKg, heightCm, sex, activityLevel, weightGoal)`, `getXpLevel(xp)`, `XP_LEVELS`. Persisted to AsyncStorage + `dagnara_app_state`.
-- `diaryStore.ts` — Daily food entries. `FoodItem.meal` is `'breakfast'|'lunch'|'dinner'|'snack'`. `FoodItem` supports optional micros: `fiber`, `sugar`, `sodium`, `vitaminC`, `calcium`, `iron`, `potassium`. Persisted to AsyncStorage + `dagnara_diary`.
+- `diaryStore.ts` — Daily food entries and activity. Persisted to AsyncStorage + `dagnara_diary`.
+
+**Life Score Logic** (`app/(tabs)/progress.tsx`):
+- **Scale**: 0–150.
+- **Formula**: Weighted sum of 15 survey answers (0–6). Positive Qs: `(v/6 * unit * 1.2)`, Negative Qs: `((6-v)/6 * unit * 0.9)`, Neutral: `unit * 0.4`.
+- **Pillars**: Nutrition (40), Sleep (30), Activity (30), Hydration (25), Mindset (25).
 
 **Theme** — All design tokens live in `DagnaraApp/src/theme/index.ts`. Never hardcode values — always import from theme.
 - **Backgrounds:** `colors.bg` `colors.bg2` `colors.layer1` `colors.layer2` `colors.layer3`
@@ -77,8 +87,14 @@ The mobile app communicates with two backends:
 
 Express server with three API routes:
 - `GET /api/config` — Returns Supabase credentials (rate-limited: 30/min)
-- `POST /api/analyze-food` — Accepts base64 image, calls Claude claude-haiku-4-5 with vision, returns parsed nutrition data (rate-limited: 20/15min per IP)
-- `POST /api/import-recipe` — Fetches URL content, extracts recipe via Claude (rate-limited: 10/min)
+- `POST /api/analyze-food` — Accepts base64 image, returns nutrition list.
+- `POST /api/estimate-nutrition` — Natural language text to nutrition.
+- `POST /api/import-recipe` — URL to structured recipe.
+
+**AI JSON Schemas**:
+- **Food/Estimation**: `[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]`
+- **Recipe Import**: `{"name":"recipe name","servings":number,"items":[FoodItem]}`
+- **Note**: `kcal` must always equal `(carbs*4 + protein*4 + fat*9) * weight_g/100`.
 
 Falls back to serving the legacy web app from `dist/` or `dagnara.html`.
 
@@ -120,6 +136,47 @@ Copy `.env.example` to `.env` to get started.
 - Backend deployed to Railway: `https://9ysummpd.up.railway.app`
 - Mobile app builds via EAS (`DagnaraApp/eas.json`): development uses local API, preview/production use the Railway URL
 - Bundle ID: `com.dagnara.app`
+
+## Plugin & Tool Usage Rules
+
+### Mandatory: AI-Generated Code Must Be Audited
+Any code written by Gemini, Copilot, or another external AI **must be audited before committing**:
+1. `/production-audit` — correctness and readiness sweep
+2. Use `context7` MCP to verify any new Expo/RN/Supabase API calls against live docs
+3. TypeScript hook confirms no type errors automatically
+
+### dx Plugin Skills (ykdojo marketplace)
+
+| Skill | Purpose |
+|---|---|
+| `/dx:handoff` | Rich pre-compact context dump — run before long sessions end |
+| `/dx:reddit-fetch` | Bypass blocked Reddit URLs via Gemini relay |
+| `/dx:review-claudemd` | Audit CLAUDE.md for stale or conflicting rules |
+| `/dx:clone` | Clone a repo and set up the dev environment |
+| `/dx:half-clone` | Shallow clone (fast, no history) |
+| `/dx:gha` | GitHub Actions workflow helper |
+
+**Blocked URL workaround**: paste the page content directly into the chat, or use `/dx:reddit-fetch` for Reddit links.
+
+### When to Use Which Tool
+
+| Situation | Tool |
+|---|---|
+| Starting any non-trivial feature | `/brainstorming` first |
+| Multi-step implementation | `/writing-plans` → `/executing-plans` |
+| Touching Expo / RN / Supabase / Zustand APIs | `context7` MCP for live docs |
+| After Gemini modifies code | `/production-audit` before committing |
+| Screen feels flat or unpolished | `/make-interfaces-feel-better` |
+| About to claim work is done | `/verification-before-completion` |
+| Any bug or unexpected behavior | `/systematic-debugging` |
+| Security change (auth, API keys, RLS) | `/security-review` |
+| AI output feels over-engineered | `/karpathy-guidelines` then re-prompt |
+| Test UI in a real browser | `playwright` MCP |
+| Query/inspect Supabase DB | `Supabase` MCP |
+| Create PRs, read CI | `github` MCP |
+| Research competitors / nutrition APIs | `/deep-research` with `exa` MCP |
+| Session about to compact | `/dx:handoff` for richer recovery context |
+| Stale rules in CLAUDE.md | `/dx:review-claudemd` |
 
 ## Self-Evaluation Protocol
 
