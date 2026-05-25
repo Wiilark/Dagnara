@@ -107,27 +107,52 @@ function emptyEntry(date: string): DiaryEntry {
   return { date, foods: [], water: 0, calories_burned: 0 };
 }
 
-// Save locally and push to Supabase if email available (retries once on failure)
-async function saveEntry(date: string, entry: DiaryEntry, email: string | null) {
+// Debounced sync queue to prevent excessive Supabase writes
+const syncQueue = new Set<string>();
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function processSyncQueue(get: () => DiaryState) {
+  const email = getEmail();
+  if (!email || syncQueue.size === 0) return;
+
+  const dates = Array.from(syncQueue);
+  syncQueue.clear();
+
+  const entries = get().entries;
+  const updates = dates
+    .filter(date => !!entries[date])
+    .map(date => ({
+      email,
+      date,
+      entry_data: entries[date],
+      updated_at: entries[date]._savedAt || new Date().toISOString(),
+    }));
+
+  if (updates.length > 0) {
+    try {
+      await supabase.from('dagnara_diary').upsert(updates, { onConflict: 'email,date' });
+    } catch (e) {
+      // Re-queue on failure
+      dates.forEach(d => syncQueue.add(d));
+      // eslint-disable-next-line no-console
+      console.error('[diaryStore] batch sync failed, re-queued:', e);
+    }
+  }
+}
+
+function queueSync(date: string, get: () => DiaryState) {
+  syncQueue.add(date);
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => processSyncQueue(get), 5000); // 5s debounce
+}
+
+// Save locally and push to Supabase if email available
+async function saveEntry(date: string, entry: DiaryEntry, email: string | null, get: () => DiaryState) {
   const stamped = { ...entry, _savedAt: new Date().toISOString() };
   const key = email ? `diary_${email}_${date}` : `diary_anon_${date}`;
   await AsyncStorage.setItem(key, JSON.stringify(stamped));
   if (email) {
-    const push = () => supabase.from('dagnara_diary').upsert(
-      { email, date, entry_data: stamped, updated_at: stamped._savedAt },
-      { onConflict: 'email,date' }
-    );
-    void (async () => {
-      try { await push(); } catch (e1: any) {
-        try {
-          await new Promise(r => setTimeout(r, 4000));
-          await push();
-        } catch (e2: any) {
-          // eslint-disable-next-line no-console
-          console.error('[diaryStore.saveEntry] cloud sync failed after retry:', e2?.message ?? e1?.message ?? 'unknown');
-        }
-      }
-    })();
+    queueSync(date, get);
   }
 }
 
@@ -199,7 +224,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, foods: [...entry.foods, item] };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   removeFood: async (date, id) => {
@@ -207,7 +232,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, foods: entry.foods.filter((f) => f.id !== id) };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   addWater: async (date) => {
@@ -215,7 +240,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, water: entry.water + 1 };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   removeWater: async (date) => {
@@ -224,7 +249,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     if (entry.water === 0) return;
     const updated = { ...entry, water: entry.water - 1 };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   setWater: async (date, n) => {
@@ -232,7 +257,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, water: Math.max(0, n) };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   setVeggies: async (date, n) => {
@@ -240,7 +265,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, veggies: Math.max(0, n) };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   setFruits: async (date, n) => {
@@ -248,7 +273,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, fruits: Math.max(0, n) };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   setSkippedMeals: async (date, meals) => {
@@ -256,7 +281,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, skippedMeals: meals };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   updateCaloriesBurned: async (date, kcal) => {
@@ -264,7 +289,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, calories_burned: kcal };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   logSleep: async (date, sleep) => {
@@ -272,7 +297,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, sleep };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   logMood: async (date, mood) => {
@@ -280,7 +305,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, mood };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   logSteps: async (date, steps) => {
@@ -288,7 +313,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, steps };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   addStrengthSession: async (date, session) => {
@@ -296,7 +321,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, strengthSessions: [...(entry.strengthSessions ?? []), session] };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   removeStrengthSession: async (date, id) => {
@@ -304,7 +329,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, strengthSessions: (entry.strengthSessions ?? []).filter(s => s.id !== id) };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   addCardioSession: async (date, session) => {
@@ -312,7 +337,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
     const entry = entries[date] ?? emptyEntry(date);
     const updated = { ...entry, cardioSessions: [...(entry.cardioSessions ?? []), session] };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   removeCardioSession: async (date, id) => {
@@ -325,7 +350,7 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
       calories_burned: Math.max(0, entry.calories_burned - (removed?.kcal ?? 0)),
     };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
-    await saveEntry(date, updated, getEmail());
+    await saveEntry(date, updated, getEmail(), get);
   },
 
   reset: () => set({ entries: {}, selectedDate: todayStr(), today: todayStr() }),

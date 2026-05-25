@@ -206,6 +206,53 @@ export async function cancelQsNotifications(): Promise<void> {
   }
 }
 
+// ── Quit Drinking milestone notifications ─────────────────────────────────────
+
+const QD_MILESTONES_NOTIFY = [
+  { hours: 12,   title: '🍵 12 hours alcohol-free',     body: 'Blood sugar is stabilising and sleep will start improving.' },
+  { hours: 24,   title: '📅 One full day!',              body: 'Hydration is already up and anxiety starting to ease.' },
+  { hours: 48,   title: '💪 Two days alcohol-free!',     body: 'Your liver has begun clearing fatty deposits.' },
+  { hours: 72,   title: '🧠 Three days!',                body: 'Dopamine receptors are beginning to recalibrate.' },
+  { hours: 168,  title: '🏃 One week alcohol-free!',     body: 'Sleep quality is noticeably better. Keep going!' },
+  { hours: 336,  title: '🌿 Two weeks!',                 body: 'Blood pressure measurably lower. Skin looking clearer.' },
+  { hours: 720,  title: '🏆 One month alcohol-free!',    body: 'Liver fat significantly reduced. Energy is up.' },
+  { hours: 2160, title: '🌟 Three months!',              body: 'Immune system stronger. Mood is more stable day-to-day.' },
+  { hours: 4380, title: '🎉 Six months alcohol-free!',   body: 'Liver largely healed. Cancer risk is falling.' },
+  { hours: 8760, title: '🥇 ONE YEAR ALCOHOL-FREE!',     body: 'Heart disease risk cut in half. You are transformed.' },
+];
+
+export async function scheduleQdNotifications(quitDate: Date): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    const tag = String((n.content.data as Record<string, unknown>)?.tag ?? '');
+    if (tag.startsWith('qd_milestone_')) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+  const granted = await requestNotificationPermission();
+  if (!granted) return;
+  const now = Date.now();
+  for (const ms of QD_MILESTONES_NOTIFY) {
+    const fireAt = new Date(quitDate.getTime() + ms.hours * 3600_000);
+    if (fireAt.getTime() <= now) continue;
+    await Notifications.scheduleNotificationAsync({
+      content: { title: ms.title, body: ms.body, data: { tag: `qd_milestone_${ms.hours}` } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    });
+  }
+}
+
+export async function cancelQdNotifications(): Promise<void> {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    const tag = String((n.content.data as Record<string, unknown>)?.tag ?? '');
+    if (tag.startsWith('qd_milestone_')) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+}
+
 // ── Pill reminder notifications ───────────────────────────────────────────────
 
 /**

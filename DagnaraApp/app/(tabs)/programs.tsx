@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Modal, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard, Share,
+  Modal, Alert, TextInput, Platform, Keyboard, Share,
   Animated, Linking, Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,10 +15,12 @@ import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { ClockPickerModal } from '../../src/components/ClockPickerModal';
 import { CalendarPickerModal } from '../../src/components/CalendarPickerModal';
 import { BackChevron } from '../../src/components/BackChevron';
+import { FastingModal } from '../../src/components/programs/FastingModal';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
-import { schedulePillReminders, scheduleQsNotifications, cancelQsNotifications } from '../../src/lib/notifications';
+import { schedulePillReminders, scheduleQsNotifications, cancelQsNotifications, scheduleQdNotifications, cancelQdNotifications } from '../../src/lib/notifications';
 import { formatMoneyFromUsd, currencySymbol, usdToLocal, localToUsd, minorUnits } from '../../src/lib/currency';
+import { fmt, fmtFlex } from '../../src/lib/format';
 import {
   groceryKey,
   loadGroceryHistory,
@@ -39,9 +41,14 @@ function makeKeys(email: string) {
     QS_TIP:   `dagnara_quit_smoking_tip_${email}`,        // tip prefs (liked/skipped IDs)
     QS_NRT:   `dagnara_quit_smoking_nrt_${email}`,        // NRT log
     QS_COST_PROMPT: `dagnara_quit_smoking_cost_prompt_${email}`, // last cost-update prompt date
+    QS_GOAL:  `dagnara_quit_smoking_goal_${email}`,       // money-saved goal ({amount,label})
     QD:       `dagnara_quit_drinking_${email}`,
     QD_SLIPS: `dagnara_quit_drinking_slips_${email}`,
     QD_BEST:  `dagnara_quit_drinking_best_${email}`,
+    QD_REASONS: `dagnara_quit_drinking_reasons_${email}`, // user's reasons-I'm-quitting anchor
+    QD_CRAVE: `dagnara_quit_drinking_cravings_${email}`,  // craving log entries
+    QD_TIP:   `dagnara_quit_drinking_tip_${email}`,        // tip prefs (liked/skipped IDs)
+    QD_COST_PROMPT: `dagnara_quit_drinking_cost_prompt_${email}`, // last cost-update prompt date
     PILLS:    `dagnara_pill_meds_${email}`,
     PILL_LOG: (day: string) => `dagnara_pill_log_${day}_${email}`,
   };
@@ -315,35 +322,41 @@ const QS_MILESTONES = [
   { hours: 131400,  text: "The risk of coronary heart disease is that of a nonsmoker's" },
 ];
 
+// QD achievements — id and illo added in chunk 15 so the QD achievement detail
+// view and the unlock overlay can reuse the existing QsIllo SVG family (clock,
+// sunrise, calendar, sprout, trophy, star, crown) instead of the temporary
+// emoji-in-disc. Calendar entries reuse the QS ids (t_1d…t_1w) so CAL_DAY shows
+// the correct day number on the badge; the remaining ids are QD-local and only
+// need to be unique within this array.
 const QD_ACHIEVEMENTS = [
-  { hours: 0.083, icon: '⚡', title: '5 Minutes',  desc: 'You made the first step' },
-  { hours: 1,     icon: '1️⃣', title: '1 Hour',     desc: 'First hour alcohol-free' },
-  { hours: 6,     icon: '🌅', title: '6 Hours',    desc: 'Blood alcohol cleared' },
-  { hours: 12,    icon: '💧', title: '12 Hours',   desc: 'Hydration starts recovering' },
-  { hours: 24,    icon: '☀️', title: '1 Day',      desc: 'First full day complete' },
-  { hours: 48,    icon: '🛌', title: '2 Days',     desc: 'Sleep quality improving' },
-  { hours: 72,    icon: '🧠', title: '3 Days',     desc: 'Anxiety and fogginess lift' },
-  { hours: 96,    icon: '🍎', title: '4 Days',     desc: 'Hunger and thirst normalize' },
-  { hours: 120,   icon: '💪', title: '5 Days',     desc: 'Energy levels rising' },
-  { hours: 144,   icon: '🎯', title: '6 Days',     desc: 'Focus and clarity improve' },
-  { hours: 168,   icon: '🏅', title: '1 Week',     desc: 'Liver starts to recover' },
-  { hours: 240,   icon: '😊', title: '10 Days',    desc: 'Mood significantly better' },
-  { hours: 336,   icon: '🌿', title: '2 Weeks',    desc: 'Skin begins to clear up' },
-  { hours: 504,   icon: '🔋', title: '3 Weeks',    desc: 'Physical energy restored' },
-  { hours: 720,   icon: '🥇', title: '1 Month',    desc: 'Liver fat reduces by 15%' },
-  { hours: 1080,  icon: '💎', title: '45 Days',    desc: 'Blood pressure normalizes' },
-  { hours: 1440,  icon: '🦁', title: '2 Months',   desc: 'Immune system strengthening' },
-  { hours: 2160,  icon: '🌟', title: '3 Months',   desc: 'Cancer risk begins to drop' },
-  { hours: 2880,  icon: '🎉', title: '4 Months',   desc: 'Red blood cells fully renewed' },
-  { hours: 3600,  icon: '🏆', title: '5 Months',   desc: 'Bone density improving' },
-  { hours: 4380,  icon: '🎊', title: '6 Months',   desc: 'Liver fully regenerating' },
-  { hours: 5040,  icon: '⭐', title: '7 Months',   desc: 'Brain chemistry rebalancing' },
-  { hours: 5760,  icon: '🌙', title: '8 Months',   desc: 'Sleep patterns normalized' },
-  { hours: 6480,  icon: '🎵', title: '9 Months',   desc: 'Social confidence returns' },
-  { hours: 7200,  icon: '🌈', title: '10 Months',  desc: 'Depression risk greatly reduced' },
-  { hours: 7920,  icon: '🦅', title: '11 Months',  desc: 'Craving frequency very low' },
-  { hours: 8760,  icon: '🏅', title: '1 Year',     desc: 'Liver disease risk halved' },
-  { hours: 43800, icon: '👑', title: '5 Years',    desc: 'Mouth cancer risk halved' },
+  { id: '5m',   hours: 0.083, icon: '⚡', illo: 'clock',    title: '5 Minutes',  desc: 'You made the first step' },
+  { id: '1h',   hours: 1,     icon: '1️⃣', illo: 'clock',    title: '1 Hour',     desc: 'First hour alcohol-free' },
+  { id: '6h',   hours: 6,     icon: '🌅', illo: 'sunrise',  title: '6 Hours',    desc: 'Blood alcohol cleared' },
+  { id: '12h',  hours: 12,    icon: '💧', illo: 'sunrise',  title: '12 Hours',   desc: 'Hydration starts recovering' },
+  { id: 't_1d', hours: 24,    icon: '☀️', illo: 'calendar', title: '1 Day',      desc: 'First full day complete' },
+  { id: 't_2d', hours: 48,    icon: '🛌', illo: 'calendar', title: '2 Days',     desc: 'Sleep quality improving' },
+  { id: 't_3d', hours: 72,    icon: '🧠', illo: 'calendar', title: '3 Days',     desc: 'Anxiety and fogginess lift' },
+  { id: 't_4d', hours: 96,    icon: '🍎', illo: 'calendar', title: '4 Days',     desc: 'Hunger and thirst normalize' },
+  { id: 't_5d', hours: 120,   icon: '💪', illo: 'calendar', title: '5 Days',     desc: 'Energy levels rising' },
+  { id: 't_6d', hours: 144,   icon: '🎯', illo: 'calendar', title: '6 Days',     desc: 'Focus and clarity improve' },
+  { id: 't_1w', hours: 168,   icon: '🏅', illo: 'calendar', title: '1 Week',     desc: 'Liver starts to recover' },
+  { id: '10d',  hours: 240,   icon: '😊', illo: 'sprout',   title: '10 Days',    desc: 'Mood significantly better' },
+  { id: '2w',   hours: 336,   icon: '🌿', illo: 'sprout',   title: '2 Weeks',    desc: 'Skin begins to clear up' },
+  { id: '3w',   hours: 504,   icon: '🔋', illo: 'sprout',   title: '3 Weeks',    desc: 'Physical energy restored' },
+  { id: '1mo',  hours: 720,   icon: '🥇', illo: 'sprout',   title: '1 Month',    desc: 'Liver fat reduces by 15%' },
+  { id: '45d',  hours: 1080,  icon: '💎', illo: 'sprout',   title: '45 Days',    desc: 'Blood pressure normalizes' },
+  { id: '2mo',  hours: 1440,  icon: '🦁', illo: 'sprout',   title: '2 Months',   desc: 'Immune system strengthening' },
+  { id: '3mo',  hours: 2160,  icon: '🌟', illo: 'trophy',   title: '3 Months',   desc: 'Cancer risk begins to drop' },
+  { id: '4mo',  hours: 2880,  icon: '🎉', illo: 'trophy',   title: '4 Months',   desc: 'Red blood cells fully renewed' },
+  { id: '5mo',  hours: 3600,  icon: '🏆', illo: 'trophy',   title: '5 Months',   desc: 'Bone density improving' },
+  { id: '6mo',  hours: 4380,  icon: '🎊', illo: 'trophy',   title: '6 Months',   desc: 'Liver fully regenerating' },
+  { id: '7mo',  hours: 5040,  icon: '⭐', illo: 'star',     title: '7 Months',   desc: 'Brain chemistry rebalancing' },
+  { id: '8mo',  hours: 5760,  icon: '🌙', illo: 'star',     title: '8 Months',   desc: 'Sleep patterns normalized' },
+  { id: '9mo',  hours: 6480,  icon: '🎵', illo: 'star',     title: '9 Months',   desc: 'Social confidence returns' },
+  { id: '10mo', hours: 7200,  icon: '🌈', illo: 'star',     title: '10 Months',  desc: 'Depression risk greatly reduced' },
+  { id: '11mo', hours: 7920,  icon: '🦅', illo: 'star',     title: '11 Months',  desc: 'Craving frequency very low' },
+  { id: '1y',   hours: 8760,  icon: '🏅', illo: 'trophy',   title: '1 Year',     desc: 'Liver disease risk halved' },
+  { id: '5y',   hours: 43800, icon: '👑', illo: 'crown',    title: '5 Years',    desc: 'Mouth cancer risk halved' },
 ];
 
 const QD_MILESTONES = [
@@ -360,6 +373,136 @@ const QD_MILESTONES = [
   { hours: 26280, icon: '🌟', text: 'Stroke risk approaches normal' },
   { hours: 43800, icon: '👑', text: 'Life expectancy normalizing' },
 ];
+
+// Quit-drinking daily tips — alcohol-craving-aware (urge surfing, HALT,
+// mocktails, social scripts). Mirrors QS_TIPS shape so the pickDailyQdTip
+// rotation works the same way.
+const QD_TIPS: { id: string; title: string; body: string }[] = [
+  { id: 'urge-surf',     title: 'Surf the urge',              body: 'A craving peaks in 15–20 minutes then fades. Set a timer, do anything else, and watch it pass.' },
+  { id: 'water',         title: 'Drink a tall glass of water', body: 'Slow sips. Alcohol dehydrates — replacing fluid blunts the urge and gives your hand a job.' },
+  { id: 'halt',          title: 'Run the HALT check',         body: 'Hungry, Angry, Lonely, Tired? Cravings rarely show up alone. Fix the underlying one and the urge often goes with it.' },
+  { id: 'mocktail',      title: 'Pour a real mocktail',       body: 'Sparkling water + lime + a slice of ginger in your favorite glass. The ritual matters as much as the drink.' },
+  { id: 'walk',          title: 'Walk it off',                body: 'Even a 5-minute walk drops the urge and floods your brain with natural dopamine alcohol used to fake.' },
+  { id: 'trigger',       title: 'Name your trigger',          body: 'Stress, Friday, a fight, boredom? Naming the trigger is half the battle the next time it shows up.' },
+  { id: 'brush',         title: 'Brush your teeth',           body: 'A clean mouth feels too good to ruin with wine. Use it as a hard reset whenever a craving hits.' },
+  { id: 'reach',         title: 'Text one person',            body: 'A single "I’m struggling" to someone who knows you’re quitting is enough — you don’t have to be alone in this.' },
+  { id: 'reward',        title: 'Move the money',             body: 'Transfer what you didn’t spend on alcohol into a savings goal. Watching the jar fill beats any glass of wine.' },
+  { id: 'cold-chew',     title: 'Chew something cold',        body: 'Ice, frozen grapes, sugar-free gum. The cold sensation interrupts the hand-to-mouth loop.' },
+  { id: 'breathe',       title: 'Breathe like you mean it',   body: '4 in, 7 hold, 8 out. Three rounds. Your nervous system thinks the craving already happened.' },
+  { id: 'avoid-bar',     title: 'Skip the bar tonight',       body: 'Early days deserve every shortcut. It’s OK to say no, leave early, or never go in the first place.' },
+  { id: 'eat',           title: 'Eat a real meal',            body: 'Low blood sugar feels exactly like a craving. Protein + carbs settles it within 20 minutes.' },
+  { id: 'visualize',     title: 'Visualize the win',          body: 'Picture yourself one year sober. Sharper, lighter, prouder. That person is the one you’re fighting for.' },
+  { id: 'fidget',        title: 'Move your hands',            body: 'Doodle, stretch a rubber band, fold laundry. The hand-to-glass ritual is half of why you reach for one.' },
+  { id: 'sleep',         title: 'Sleep is everything',        body: 'A bad night doubles cravings. Protect your 7–8 hours and you protect your sobriety.' },
+  { id: 'replace',       title: 'Replace the routine',        body: 'Wine with dinner was a cue. Have it with sparkling water in a new glass, with a new playlist. Break the trigger pairing.' },
+  { id: 'journal',       title: 'Write it down',              body: 'Two lines: "what triggered me, what I did instead." Three weeks of these and you’ll see your own playbook.' },
+  { id: 'cold-blast',    title: 'Cold shower or face splash', body: 'A 30-second cold blast resets your stress response and the craving with it.' },
+  { id: 'why',           title: 'Re-read your why',           body: 'Pin one sentence about why you quit. Open it whenever a craving hits. Your past self knows the way.' },
+  { id: 'fruit',         title: 'Eat a piece of fruit',       body: 'Apple, orange, anything sweet and crunchy. Cravings often spike when blood sugar dips.' },
+  { id: 'stretch',       title: 'Stretch for 60 seconds',     body: 'Roll your shoulders, open your chest, look up. Drinkers carry tension here — let it out.' },
+  { id: 'caffeine',      title: 'Skip the late coffee',       body: 'Caffeine after 2pm wrecks sleep, and bad sleep brings cravings. Protect the next morning.' },
+  { id: 'forgive',       title: 'Forgive yourself fast',      body: 'Slipped? It’s data, not a failure. The streak is the long game, not the perfection.' },
+  { id: 'route',         title: 'Change your route',          body: 'If you used to stop at the off-licence on the way home, take a different street. Out of sight beats out of mind.' },
+  { id: 'phone',         title: 'Phone a friend',             body: 'Two minutes of a voice you love can shut down a craving faster than any willpower hack.' },
+  { id: 'chore',         title: 'Do one small chore',         body: 'Wash a dish, fold a shirt, water a plant. Movement + completion beats sitting with the urge.' },
+  { id: 'tea',           title: 'Hot tea or broth',           body: 'Warm cups give your hands and mouth something to do for ten minutes — long enough for the wave to pass.' },
+  { id: 'wins',          title: 'Open your wins',             body: 'Check the achievements tab. You’ve done more than you think. Receipts beat doubt.' },
+  { id: 'plan',          title: 'Plan tomorrow morning',      body: 'Write 3 things you’ll do tomorrow before noon. Future-focus drains the craving of its emotional power.' },
+];
+
+// Major alcohol-help hotlines — country / region, number, blurb. Free + confidential
+// in their respective countries. Numbers should be verified yearly against the
+// national helpline website at time of build; `code` is ISO 3166-1 alpha-2 and is
+// matched against appStore `country` so we surface the user’s home country first.
+const QD_QUITLINES: { code: string; region: string; flag: string; number: string; hours: string; href: string }[] = [
+  { code: 'US', region: 'United States',  flag: '🇺🇸', number: '1-800-662-4357',  hours: '24/7 · SAMHSA',                                  href: 'tel:18006624357' },
+  { code: 'GB', region: 'United Kingdom', flag: '🇬🇧', number: '0300 123 1110',    hours: 'Mon–Fri 9am–8pm · weekends 11am–4pm',            href: 'tel:03001231110' },
+  { code: 'CA', region: 'Canada',         flag: '🇨🇦', number: '1-866-585-0445',   hours: '24/7',                                            href: 'tel:18665850445' },
+  { code: 'AU', region: 'Australia',      flag: '🇦🇺', number: '1800 250 015',     hours: '24/7 · National Alcohol & Drug',                  href: 'tel:1800250015' },
+  { code: 'IE', region: 'Ireland',        flag: '🇮🇪', number: '1800 459 459',     hours: 'Mon–Fri 9:30am–5:30pm',                           href: 'tel:1800459459' },
+  { code: 'NZ', region: 'New Zealand',    flag: '🇳🇿', number: '0800 787 797',     hours: '24/7 · Alcohol Drug Helpline',                    href: 'tel:0800787797' },
+  { code: 'FR', region: 'France',         flag: '🇫🇷', number: '0 980 980 930',    hours: 'Daily 8am–2am · Alcool Info Service',             href: 'tel:0980980930' },
+  { code: 'ES', region: 'Spain',          flag: '🇪🇸', number: '900 161 515',      hours: 'Mon–Fri 9am–9pm',                                 href: 'tel:900161515' },
+  { code: 'SE', region: 'Sweden',         flag: '🇸🇪', number: '020-84 44 48',     hours: 'Mon–Thu 9am–9pm · Fri 9am–5pm · Sun 12pm–7pm',    href: 'tel:+4620844448' },
+  { code: 'DE', region: 'Germany',        flag: '🇩🇪', number: '01806 313031',     hours: 'Mon–Thu 10am–10pm · Fri–Sun 10am–6pm',            href: 'tel:01806313031' },
+  { code: 'NL', region: 'Netherlands',    flag: '🇳🇱', number: '0900 1995',        hours: 'Mon–Fri 10am–10pm · Sat–Sun 1pm–6pm',             href: 'tel:09001995' },
+  { code: 'NO', region: 'Norway',         flag: '🇳🇴', number: '08588',            hours: 'Mon–Fri 11am–6pm · RUStelefonen',                 href: 'tel:08588' },
+  { code: 'DK', region: 'Denmark',        flag: '🇩🇰', number: '80 200 500',       hours: 'Mon–Fri 11am–5pm · Alkolinjen',                   href: 'tel:80200500' },
+  { code: 'IT', region: 'Italy',          flag: '🇮🇹', number: '800 632 000',      hours: 'Mon–Fri 10am–4pm · Telefono Verde Alcol',         href: 'tel:800632000' },
+  { code: 'BE', region: 'Belgium',        flag: '🇧🇪', number: '078 15 10 20',     hours: 'Mon–Fri 10am–8pm · De DrugLijn',                  href: 'tel:078151020' },
+  { code: 'FI', region: 'Finland',        flag: '🇫🇮', number: '0800 900 45',      hours: 'Mon–Fri 9am–3pm · Päihdeneuvonta',                href: 'tel:0800900450' },
+  { code: 'AT', region: 'Austria',        flag: '🇦🇹', number: '01 4000 53535',    hours: 'Mon–Sun 10am–6pm · Sucht & Drogen Hotline',       href: 'tel:0140005353' },
+  { code: 'CH', region: 'Switzerland',    flag: '🇨🇭', number: '0800 104 104',     hours: 'Mon–Fri 8am–12pm · 1pm–5pm',                       href: 'tel:0800104104' },
+  { code: 'PT', region: 'Portugal',       flag: '🇵🇹', number: '1414',             hours: 'Mon–Fri 9am–7pm · SICAD Linha Vida',              href: 'tel:1414' },
+  { code: 'PL', region: 'Poland',         flag: '🇵🇱', number: '801 199 990',      hours: 'Mon–Sat 6pm–10pm · Telefon Zaufania',             href: 'tel:801199990' },
+];
+
+// Trigger and coping options tuned for alcohol cravings — distinct from the
+// smoking lists (no 'meal' pairing since wine-with-dinner is a *trigger*, and
+// 'celebration' replaces 'social' as the biggest alcohol-specific cue).
+const QD_CRAVING_TRIGGERS: Array<{ key: string; label: string; icon: string }> = [
+  { key: 'stress',      label: 'Stress',      icon: '😣' },
+  { key: 'social',      label: 'Social',      icon: '👥' },
+  { key: 'celebration', label: 'Celebration', icon: '🎉' },
+  { key: 'boredom',     label: 'Bored',       icon: '🥱' },
+  { key: 'emotion',     label: 'Low mood',    icon: '😔' },
+  { key: 'habit',       label: 'Habit',       icon: '🕰' },
+  { key: 'other',       label: 'Other',       icon: '•' },
+];
+const QD_CRAVING_COPING: Array<{ key: string; label: string; icon: string }> = [
+  { key: 'breath',   label: 'Breathe',  icon: '🫁' },
+  { key: 'walk',     label: 'Walk',     icon: '🚶' },
+  { key: 'water',    label: 'Water',    icon: '💧' },
+  { key: 'mocktail', label: 'Mocktail', icon: '🍹' },
+  { key: 'snack',    label: 'Snack',    icon: '🥜' },
+  { key: 'distract', label: 'Distract', icon: '🎧' },
+  { key: 'reach',    label: 'Reach out', icon: '📞' },
+  { key: 'other',    label: 'Other',    icon: '•' },
+];
+
+// Recovery support communities & frameworks — surfaced from the QD main view
+// and again on its own detail screen. Each entry is either a `url` (opens the
+// program's website) or a `phone` (dials directly via tel: link). Order matters
+// only for first impression: AA / SMART lead because they're the two most-cited
+// programs, then secular / Buddhist / women-only alternatives, then a 24/7
+// helpline as a last-resort always-available fallback.
+const QD_SUPPORT: {
+  key: string;
+  name: string;
+  desc: string;
+  icon: 'people' | 'school' | 'leaf' | 'compass' | 'flower' | 'videocam' | 'call';
+  color: string;
+  url?: string;
+  phone?: string;
+}[] = [
+  { key: 'aa',         name: 'Alcoholics Anonymous', desc: 'Worldwide 12-step fellowship. Free meetings in-person & online.',  icon: 'people',   color: colors.purple3,  url: 'https://www.aa.org' },
+  { key: 'smart',      name: 'SMART Recovery',       desc: 'Secular, evidence-based. CBT tools and free meetings.',            icon: 'school',   color: colors.teal,     url: 'https://smartrecovery.org' },
+  { key: 'dharma',     name: 'Recovery Dharma',      desc: 'Buddhist-inspired, peer-led recovery — meditation & community.',   icon: 'leaf',     color: colors.green,    url: 'https://recoverydharma.org' },
+  { key: 'lifering',   name: 'LifeRing Secular',     desc: 'Secular alternative to 12-step — your sober self, your way.',      icon: 'compass',  color: colors.honey,    url: 'https://lifering.org' },
+  { key: 'wfs',        name: 'Women for Sobriety',   desc: 'Women-only program built on positive affirmations & support.',     icon: 'flower',   color: colors.rose,     url: 'https://womenforsobriety.org' },
+  { key: 'intherooms', name: 'In The Rooms',         desc: 'Online meetings around the clock — AA, SMART, NA, and more.',      icon: 'videocam', color: colors.sky,      url: 'https://www.intherooms.com' },
+  { key: 'samhsa',     name: 'SAMHSA Helpline',      desc: '24/7 free, confidential treatment referral. Call any time.',       icon: 'call',     color: colors.lavender, phone: '18006624357' },
+];
+
+// Daily tip seed (QD) — same calendar day returns the same tip, rotation moves
+// forward across the array each new day. Uses local date (yyyy-mm-dd) seeding,
+// and skips any tip the user has previously dismissed. Mirrors pickDailyTip()
+// behavior exactly so the UI patterns can be shared.
+function pickDailyQdTip(prefs?: TipPrefs): { id: string; title: string; body: string } {
+  const d = new Date();
+  const dayIndex = Math.floor(
+    (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2024, 0, 1)) / 86400000
+  );
+  const len = QD_TIPS.length;
+  const start = ((dayIndex % len) + len) % len;
+  const skipped = prefs?.skipped ?? [];
+  if (skipped.length === 0 || skipped.length >= len) return QD_TIPS[start];
+  for (let i = 0; i < len; i++) {
+    const tip = QD_TIPS[(start + i) % len];
+    if (!skipped.includes(tip.id)) return tip;
+  }
+  return QD_TIPS[start];
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDuration(ms: number): string {
@@ -405,17 +548,27 @@ const QS_CAT_COLORS = {
   money: colors.honey,
 };
 
-// ── Hero crest — "Liberation Bloom" victory medallion ───────────────────────
-// Design rationale: a gold-rimmed deep-purple enamel medallion — celebratory
-// like a championship medal yet native to the app's deep-space palette — framed
-// by a living laurel wreath. At its heart a spent cigarette breaks apart and a
-// verdant stem climbs through teal + green leaves to a honey star: the visual
-// story of breaking free and growing into something brighter. 180×180 viewBox,
-// family-consistent with the other QuitNow-style illustrations in this file.
+// ── Hero crest — "Liberation Sunrise" victory medallion ─────────────────────
+// A heroic single sprout surges from a cleanly snapped honey-gold cigarette
+// inside a deep-enamel medallion lit from within by a honey sunrise, cradled
+// by a partial laurel arc with berries — the reading order break → growth →
+// light narrates the moment breath returns.
+// ── HeroBadgeArt — "Phoenix Horizon Crest" ─────────────────────────────────
+// A premium quit-smoking medallion: a visible dawn sun rises behind a clear
+// horizon line on a deep-enamel coin face. The spent cigarette filter rests
+// at the horizon as a foundation, its paper stub torn open. A confident
+// sprout climbs UP from the break — silhouetted against the sun — into a
+// quiet sky. A classical laurel wreath cradles the lower hemisphere; a milled
+// honey-gold rim frames it all. Every element earns its place; nothing is
+// decorative for its own sake.
 function HeroBadgeArt({ size = 132 }: { size?: number }) {
-  const cx = 90, cy = 92; // slight downward bias gives the crown gem breathing room
+  const cx = 90, cy = 92;
 
-  // 4-point sharp star — celebration sparkles
+  // Coin geometry — referenced by horizon, sun, laurel, centerpiece.
+  const faceR = 47.5;   // inner enamel face radius
+  const horizonY = cy + 8; // the threshold — past below, future above
+
+  // 4-point sharp celestial star.
   const star4 = (sx: number, sy: number, R: number, r: number): string => {
     const k = r * 0.707;
     return [
@@ -430,20 +583,7 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
     ].join(' ');
   };
 
-  // 5-point star — apex honey marker atop the growing stem
-  const star5 = (sx: number, sy: number, R: number, r: number): string => {
-    const pts: string[] = [];
-    for (let i = 0; i < 10; i++) {
-      const radius = i % 2 === 0 ? R : r;
-      const ang = (-90 + i * 36) * Math.PI / 180;
-      pts.push(`${(sx + Math.cos(ang) * radius).toFixed(2)},${(sy + Math.sin(ang) * radius).toFixed(2)}`);
-    }
-    return pts.join(' ');
-  };
-
-  // Laurel-leaf path generator. Returns a closed Bézier outline + a center-vein line.
-  // For LEFT side, tip rotates clockwise (toward outward) from the climbing tangent.
-  // For RIGHT side, tip rotates counter-clockwise.
+  // Classical laurel leaf — pointed-oval with central vein.
   const laurel = (
     baseAng: number,
     side: 'L' | 'R',
@@ -460,8 +600,8 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
     const tipX = baseX + Math.cos(tipA) * len;
     const tipY = baseY + Math.sin(tipA) * len;
     const perpA = tipA + Math.PI / 2;
-    const midX = baseX + Math.cos(tipA) * (len * 0.45);
-    const midY = baseY + Math.sin(tipA) * (len * 0.45);
+    const midX = baseX + Math.cos(tipA) * (len * 0.46);
+    const midY = baseY + Math.sin(tipA) * (len * 0.46);
     const sideLX = midX + Math.cos(perpA) * halfW;
     const sideLY = midY + Math.sin(perpA) * halfW;
     const sideRX = midX - Math.cos(perpA) * halfW;
@@ -472,58 +612,74 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
     };
   };
 
-  // Wreath leaf placements — 7 leaves per side, full wrap from base to apex.
-  // Tilt is highest at the base (leaves splay outward) and lowest at the top
-  // (leaves converge toward the crown gem). Alternating green/green2 for rhythm.
-  const leftLeaves = [
-    { ang: 108, tilt: 44, len: 12,   halfW: 4.8, fill: colors.green2 },
-    { ang: 130, tilt: 38, len: 13,   halfW: 5.2, fill: colors.green  },
-    { ang: 152, tilt: 32, len: 14,   halfW: 5.5, fill: colors.green2 },
-    { ang: 175, tilt: 26, len: 14.5, halfW: 5.7, fill: colors.green  },
-    { ang: 198, tilt: 22, len: 14.5, halfW: 5.6, fill: colors.green2 },
-    { ang: 220, tilt: 18, len: 13.5, halfW: 5.2, fill: colors.green  },
-    { ang: 246, tilt: 14, len: 12,   halfW: 4.8, fill: colors.green2 },
+  // Partial laurel cradle — 5 leaves per side along the bottom arc. Tilt eases
+  // from sharp at the outer base to soft at the apex so leaves climb naturally.
+  const cradleLeft = [
+    { ang: 140, tilt: 38, len: 13.2, halfW: 4.9, fill: colors.green2 },
+    { ang: 160, tilt: 30, len: 14.8, halfW: 5.4, fill: colors.green  },
+    { ang: 180, tilt: 24, len: 15.4, halfW: 5.6, fill: colors.green2 },
+    { ang: 200, tilt: 20, len: 14.6, halfW: 5.3, fill: colors.green  },
+    { ang: 220, tilt: 16, len: 12.8, halfW: 4.8, fill: colors.green2 },
   ];
-  const rightLeaves = [
-    { ang: 72,  tilt: 44, len: 12,   halfW: 4.8, fill: colors.green  },
-    { ang: 50,  tilt: 38, len: 13,   halfW: 5.2, fill: colors.green2 },
-    { ang: 28,  tilt: 32, len: 14,   halfW: 5.5, fill: colors.green  },
-    { ang: 5,   tilt: 26, len: 14.5, halfW: 5.7, fill: colors.green2 },
-    { ang: -18, tilt: 22, len: 14.5, halfW: 5.6, fill: colors.green  },
-    { ang: -40, tilt: 18, len: 13.5, halfW: 5.2, fill: colors.green2 },
-    { ang: -66, tilt: 14, len: 12,   halfW: 4.8, fill: colors.green  },
+  const cradleRight = [
+    { ang: 40,  tilt: 38, len: 13.2, halfW: 4.9, fill: colors.green  },
+    { ang: 20,  tilt: 30, len: 14.8, halfW: 5.4, fill: colors.green2 },
+    { ang: 0,   tilt: 24, len: 15.4, halfW: 5.6, fill: colors.green  },
+    { ang: -20, tilt: 20, len: 14.6, halfW: 5.3, fill: colors.green2 },
+    { ang: -40, tilt: 16, len: 12.8, halfW: 4.8, fill: colors.green  },
   ];
+
+  // Sun rays radiating from the rising sun — 9 thin beams across the sky.
+  // Stops just shy of the rim so the rim frames the scene cleanly.
+  const sunRays = Array.from({ length: 9 }, (_, i) => {
+    // Spread from -82° to +82° (in screen space, where -90° = straight up).
+    const deg = -82 + i * 20.5;
+    const ang = deg * Math.PI / 180;
+    return {
+      ang,
+      // Beam length varies subtly — center beam tallest.
+      len: 28 + (1 - Math.abs(deg) / 90) * 7,
+      // Center beam slightly brighter.
+      bright: Math.abs(deg) < 12,
+    };
+  });
 
   return (
     <Svg width={size} height={size} viewBox="0 0 180 180">
-      {/* ═══ 1 · COSMIC FIELD — 18 atmospheric particles, 3 sizes / 3 tones ══ */}
-      {Array.from({ length: 18 }).map((_, i) => {
-        const ang = (i * 20 - 90 + (i % 2 ? 5 : -5)) * Math.PI / 180;
-        const r = 76 + (i % 3) * 2;
-        const dx = cx + Math.cos(ang) * r;
-        const dy = cy + Math.sin(ang) * r;
-        const k = i % 5;
-        const isBig = k === 0;
-        const isMid = k === 2;
+      {/* ═══ 1 · ATMOSPHERE — 7 sparse cosmic specks on the outer field ═══ */}
+      {[
+        { ang: -70, r: 82, c: colors.honey,    sz: 1.9, op: 0.92 },
+        { ang: -32, r: 80, c: colors.purple3,  sz: 1.1, op: 0.62 },
+        { ang:   4, r: 84, c: colors.lavender, sz: 1.5, op: 0.75 },
+        { ang:  46, r: 81, c: colors.purple2,  sz: 0.95, op: 0.55 },
+        { ang:  92, r: 83, c: colors.honey,    sz: 1.05, op: 0.6 },
+        { ang: 158, r: 80, c: colors.purple3,  sz: 0.9, op: 0.5 },
+        { ang: 208, r: 82, c: colors.lavender, sz: 1.2, op: 0.7 },
+      ].map((s, i) => {
+        const a = s.ang * Math.PI / 180;
         return (
           <Circle
             key={`hb-cosmos-${i}`}
-            cx={dx}
-            cy={dy}
-            r={isBig ? 2.4 : isMid ? 1.5 : 0.95}
-            fill={isBig ? colors.honey : isMid ? colors.lavender : colors.purple2}
-            opacity={isBig ? 0.95 : isMid ? 0.7 : 0.55}
+            cx={cx + Math.cos(a) * s.r}
+            cy={cy + Math.sin(a) * s.r}
+            r={s.sz}
+            fill={s.c}
+            opacity={s.op}
           />
         );
       })}
 
-      {/* ═══ 2 · SUNBURST — 16 tapered rays, alternating long/short ═════════ */}
-      {Array.from({ length: 16 }).map((_, i) => {
-        const ang = (i * (360 / 16) - 90) * Math.PI / 180;
-        const long = i % 2 === 0;
-        const innerR = 56;
-        const outerR = long ? 73 : 64;
-        const wHalf = long ? 4.4 : 2.8;
+      {/* ═══ 2 · OUTER HALO — quiet honey aura widening the medallion ═════ */}
+      <Circle cx={cx} cy={cy} r={76} fill={colors.honey} opacity={0.045} />
+      <Circle cx={cx} cy={cy} r={66} fill={colors.honey} opacity={0.07} />
+
+      {/* ═══ 3 · DEEP RAYS — 12 long restrained beams behind the coin ════ */}
+      {/* These read as the sun's far-reach beyond the medallion frame.   */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const ang = (i * 30 - 90) * Math.PI / 180;
+        const innerR = 58;
+        const outerR = 74;
+        const wHalf = 1.7;
         const cosA = Math.cos(ang), sinA = Math.sin(ang);
         const perpX = -sinA, perpY = cosA;
         const tipX = cx + cosA * outerR;
@@ -534,29 +690,104 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
         const baseRY = cy + sinA * innerR - perpY * wHalf;
         return (
           <Polygon
-            key={`hb-ray-${i}`}
+            key={`hb-deepray-${i}`}
             points={`${tipX.toFixed(2)},${tipY.toFixed(2)} ${baseLX.toFixed(2)},${baseLY.toFixed(2)} ${baseRX.toFixed(2)},${baseRY.toFixed(2)}`}
-            fill={long ? colors.purple : colors.purple2}
-            opacity={long ? 1 : 0.78}
+            fill={colors.purple}
+            opacity={0.65}
           />
         );
       })}
 
-      {/* ═══ 3 · MEDALLION — gold rim cradling a deep-enamel coin face ═════ */}
-      <Circle cx={cx} cy={cy} r={55.5} fill={colors.purple3} opacity={0.5} />
+      {/* ═══ 4 · MEDALLION — concentric sculptural rim cradling the face ══ */}
+      {/* Drop shadow seated under the coin */}
+      <Circle cx={cx} cy={cy + 2.5} r={56.5} fill={colors.bg} opacity={0.55} />
+      {/* Outer dark band — anchors the rim against the sunburst */}
+      <Circle cx={cx} cy={cy} r={55.5} fill={colors.purple3} opacity={0.48} />
+      {/* Honey-gold rim — the medallion's signature */}
       <Circle cx={cx} cy={cy} r={54}   fill={colors.honey} />
-      <Circle cx={cx} cy={cy} r={49.5} fill={colors.purple} />
-      <Circle cx={cx} cy={cy} r={47.5} fill={colors.purple3} opacity={0.4} />
-      <Circle cx={cx} cy={cy} r={46}   fill={colors.layer3} />
-      {/* Centred purple bloom — lifts the flat enamel face into a lit dome */}
-      <Circle cx={cx} cy={cy} r={34} fill={colors.purple} opacity={0.16} />
-      <Circle cx={cx} cy={cy} r={20} fill={colors.purple} opacity={0.14} />
+      {/* Inner shadow groove carved into the gold */}
+      <Circle cx={cx} cy={cy} r={51}   fill={colors.purple} />
+      {/* Bezel transition — soft purple between gold and enamel */}
+      <Circle cx={cx} cy={cy} r={49.3} fill={colors.purple3} opacity={0.32} />
+      {/* Deep enamel coin face — the sky */}
+      <Circle cx={cx} cy={cy} r={faceR} fill={colors.layer3} />
 
-      {/* ═══ 4 · RIM ENGRAVING — 36 milled ticks + polished gold sheen ════ */}
-      {Array.from({ length: 36 }).map((_, i) => {
-        const ang = (i * 10) * Math.PI / 180;
-        const inner = 50.5;
-        const outer = 53.2;
+      {/* ═══ 5 · SKY — purple dawn wash above the horizon ═════════════════ */}
+      {/* Soft purple wash anchors the sky in the brand */}
+      <Circle cx={cx - 2} cy={cy - 6} r={42} fill={colors.purple} opacity={0.16} />
+
+      {/* ═══ 6 · SUN — radial halos + a visible dawn disc ═════════════════ */}
+      {/* Concentric honey halos — the dawn rising inside the coin face */}
+      <Circle cx={cx} cy={cy - 6} r={34} fill={colors.honey} opacity={0.06} />
+      <Circle cx={cx} cy={cy - 8} r={24} fill={colors.honey} opacity={0.10} />
+      <Circle cx={cx} cy={cy - 9} r={16} fill={colors.honey} opacity={0.18} />
+
+      {/* Sun rays — thin beams climbing from the sun across the sky */}
+      {sunRays.map((s, i) => {
+        // Beams emanate from the sun's center (cy - 4) — they fan upward.
+        const sunCx = cx;
+        const sunCy = cy - 4;
+        const innerR = 11;
+        const outerR = innerR + s.len;
+        const cosA = Math.cos(s.ang - Math.PI / 2);
+        const sinA = Math.sin(s.ang - Math.PI / 2);
+        const perpX = -sinA, perpY = cosA;
+        const wHalf = s.bright ? 1.1 : 0.78;
+        const tipX = sunCx + cosA * outerR;
+        const tipY = sunCy + sinA * outerR;
+        const baseLX = sunCx + cosA * innerR + perpX * wHalf;
+        const baseLY = sunCy + sinA * innerR + perpY * wHalf;
+        const baseRX = sunCx + cosA * innerR - perpX * wHalf;
+        const baseRY = sunCy + sinA * innerR - perpY * wHalf;
+        return (
+          <Polygon
+            key={`hb-sunray-${i}`}
+            points={`${tipX.toFixed(2)},${tipY.toFixed(2)} ${baseLX.toFixed(2)},${baseLY.toFixed(2)} ${baseRX.toFixed(2)},${baseRY.toFixed(2)}`}
+            fill={colors.honey}
+            opacity={s.bright ? 0.62 : 0.42}
+          />
+        );
+      })}
+
+      {/* Sun disc — half-emerged above the horizon (the dawn moment) */}
+      <Circle cx={cx} cy={cy - 4} r={9.5} fill={colors.honey} />
+      <Circle cx={cx} cy={cy - 4} r={9.5} fill={colors.white} opacity={0.18} />
+      {/* Sun specular pip — the brightest point of the sun */}
+      <Circle cx={cx - 2.2} cy={cy - 6.4} r={2.4} fill={colors.white} opacity={0.7} />
+
+      {/* ═══ 7 · HORIZON — the threshold separating past from future ══════ */}
+      {/* Sea / foreground bowl — subtle darkening below the horizon line.   */}
+      {/* Endpoints aligned to the actual rim chord at horizonY so the arc   */}
+      {/* follows the coin's true curvature (half-width = √(47.5²-8²) ≈ 46.82) */}
+      <Path
+        d={`M ${cx - 46.82} ${horizonY} A 47.5 47.5 0 0 1 ${cx + 46.82} ${horizonY} Z`}
+        fill={colors.bg2}
+        opacity={0.55}
+      />
+      {/* Crisp horizon line — honey reflected on a still surface */}
+      <Line
+        x1={cx - 44} y1={horizonY}
+        x2={cx + 44} y2={horizonY}
+        stroke={colors.honey}
+        strokeOpacity={0.6}
+        strokeWidth={0.9}
+        strokeLinecap="round"
+      />
+      {/* Horizon shimmer — a single subtle gleam on the surface */}
+      <Line
+        x1={cx - 18} y1={horizonY + 1.2}
+        x2={cx + 18} y2={horizonY + 1.2}
+        stroke={colors.honey}
+        strokeOpacity={0.3}
+        strokeWidth={0.55}
+        strokeLinecap="round"
+      />
+
+      {/* ═══ 8 · RIM ENGRAVING — 24 milled ticks + reflection rings ══════ */}
+      {Array.from({ length: 24 }).map((_, i) => {
+        const ang = (i * 15) * Math.PI / 180;
+        const inner = 51;
+        const outer = 53.4;
         return (
           <Line
             key={`hb-tick-${i}`}
@@ -566,50 +797,58 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
             y2={cy + Math.sin(ang) * outer}
             stroke={colors.purple}
             strokeOpacity={0.5}
-            strokeWidth={0.9}
+            strokeWidth={0.85}
             strokeLinecap="round"
           />
         );
       })}
-
       {/* Honey reflection ring — gold light caught at the enamel's edge */}
       <Circle
-        cx={cx} cy={cy} r={43}
+        cx={cx} cy={cy} r={44.5}
         fill="none"
         stroke={colors.honey}
-        strokeOpacity={0.3}
-        strokeWidth={1.1}
+        strokeOpacity={0.34}
+        strokeWidth={1.0}
+      />
+      {/* Inner purple bezel line */}
+      <Circle
+        cx={cx} cy={cy} r={42}
+        fill="none"
+        stroke={colors.purple}
+        strokeOpacity={0.4}
+        strokeWidth={0.55}
       />
 
-      {/* Polished sheen — true arc tracing the upper gold rim exactly */}
+      {/* ═══ 9 · RIM SHEEN — polished gold catches the upper light ═══════ */}
+      {/* Long arc tracing the upper gold rim — confident specular sweep */}
       <Path
-        d={`M ${cx - 42.4} ${cy - 29.7} A 51.75 51.75 0 0 1 ${cx + 42.4} ${cy - 29.7}`}
+        d={`M ${cx - 42} ${cy - 30} A 51.7 51.7 0 0 1 ${cx + 42} ${cy - 30}`}
         stroke={colors.white}
-        strokeOpacity={0.5}
-        strokeWidth={2.4}
+        strokeOpacity={0.46}
+        strokeWidth={2.2}
         strokeLinecap="round"
         fill="none"
       />
-      {/* Face sheen — true arc concentric with the enamel dome */}
+      {/* Bright top gleam at 12 o'clock — a single confident highlight */}
       <Path
-        d={`M ${cx - 24.8} ${cy - 27.5} A 37 37 0 0 1 ${cx + 24.8} ${cy - 27.5}`}
+        d={`M ${cx - 13} ${cy - 50.5} A 53 53 0 0 1 ${cx + 13} ${cy - 50.5}`}
         stroke={colors.white}
-        strokeOpacity={0.2}
-        strokeWidth={2.6}
+        strokeOpacity={0.78}
+        strokeWidth={1.4}
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* ═══ 5 · LAUREL WREATH — 7 leaves per side, full wrap ═══════════════ */}
-      {leftLeaves.map((l, i) => {
-        const { path, vein } = laurel(l.ang, 'L', l.tilt, 48, l.len, l.halfW);
+      {/* ═══ 10 · LAUREL CRADLE — classical wreath wrapping lower arc ════ */}
+      {cradleLeft.map((l, i) => {
+        const { path, vein } = laurel(l.ang, 'L', l.tilt, 49, l.len, l.halfW);
         return (
           <G key={`hb-laurelL-${i}`}>
             <Path d={path} fill={l.fill} />
             <Path
               d={vein}
               stroke={colors.white}
-              strokeOpacity={0.55}
+              strokeOpacity={0.58}
               strokeWidth={0.85}
               strokeLinecap="round"
               fill="none"
@@ -617,15 +856,15 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
           </G>
         );
       })}
-      {rightLeaves.map((l, i) => {
-        const { path, vein } = laurel(l.ang, 'R', l.tilt, 48, l.len, l.halfW);
+      {cradleRight.map((l, i) => {
+        const { path, vein } = laurel(l.ang, 'R', l.tilt, 49, l.len, l.halfW);
         return (
           <G key={`hb-laurelR-${i}`}>
             <Path d={path} fill={l.fill} />
             <Path
               d={vein}
               stroke={colors.white}
-              strokeOpacity={0.55}
+              strokeOpacity={0.58}
               strokeWidth={0.85}
               strokeLinecap="round"
               fill="none"
@@ -634,255 +873,176 @@ function HeroBadgeArt({ size = 132 }: { size?: number }) {
         );
       })}
 
-      {/* ═══ 6 · CENTERPIECE — broken cigarette + ascending stem ═══════════ */}
+      {/* Honey berries — three pairs nestled between leaf clusters */}
+      <Circle cx={cx - 30} cy={cy + 39} r={1.85} fill={colors.honey} />
+      <Circle cx={cx - 30} cy={cy + 39} r={0.7} fill={colors.white} opacity={0.75} />
+      <Circle cx={cx + 30} cy={cy + 39} r={1.85} fill={colors.honey} />
+      <Circle cx={cx + 30} cy={cy + 39} r={0.7} fill={colors.white} opacity={0.75} />
+      <Circle cx={cx - 14} cy={cy + 47} r={1.5} fill={colors.honey} opacity={0.92} />
+      <Circle cx={cx - 14} cy={cy + 47} r={0.55} fill={colors.white} opacity={0.65} />
+      <Circle cx={cx + 14} cy={cy + 47} r={1.5} fill={colors.honey} opacity={0.92} />
+      <Circle cx={cx + 14} cy={cy + 47} r={0.55} fill={colors.white} opacity={0.65} />
 
-      {/* Cigarette contact shadow */}
+      {/* ═══ 11 · CENTERPIECE — broken cigarette at the horizon ══════════ */}
+      {/* The filter + stub rest ON the horizon line. The break faces up.  */}
+      {/* All Y coordinates reference horizonY so the scene reads correctly */}
+
+      {/* Cigarette contact shadow — anchors it to the horizon */}
       <Rect
-        x={cx - 27}
-        y={cy + 19}
-        width={26}
+        x={cx - 30}
+        y={horizonY + 5}
+        width={32}
         height={1.4}
         rx={0.7}
         fill={colors.bg}
-        opacity={0.5}
+        opacity={0.55}
       />
-      {/* Filter — spent, ashen cork */}
-      <Rect x={cx - 27} y={cy + 9} width={12} height={9} rx={1.4} fill={colors.purple3} />
-      {/* Filter cork band — darker seam */}
-      <Rect x={cx - 27} y={cy + 9} width={12} height={2.4} fill={colors.purple} opacity={0.85} />
-      {/* Cork-texture speckles */}
-      <Circle cx={cx - 23.5} cy={cy + 13.5} r={0.55} fill={colors.purple} opacity={0.5} />
-      <Circle cx={cx - 20.5} cy={cy + 12}   r={0.5}  fill={colors.purple} opacity={0.42} />
-      <Circle cx={cx - 18.5} cy={cy + 15}   r={0.55} fill={colors.purple} opacity={0.5} />
-      <Circle cx={cx - 22}   cy={cy + 16}   r={0.4}  fill={colors.purple} opacity={0.38} />
-      {/* Paper stub */}
-      <Rect x={cx - 15} y={cy + 9} width={13} height={9} fill={colors.white} />
-      {/* Paper subtle horizontal lines */}
-      <Rect x={cx - 15} y={cy + 10.6} width={13} height={0.7} fill={colors.line3} opacity={0.6} />
-      <Rect x={cx - 15} y={cy + 16}   width={13} height={0.6} fill={colors.line3} opacity={0.45} />
-      {/* Jagged broken edge — 3 sharp teeth */}
+
+      {/* Filter — honey-gold cork (the spent gold of the released habit) */}
+      {/* Sits horizontally on the horizon: filter on the left, stub on the right */}
+      <Rect x={cx - 30} y={horizonY - 5} width={12} height={10} rx={1.6} fill={colors.honey} />
+      {/* Filter cork seams — darker bands at paper junction + base */}
+      <Rect x={cx - 30} y={horizonY - 5}   width={12} height={1.9} fill={colors.purple} opacity={0.68} />
+      <Rect x={cx - 30} y={horizonY + 3}   width={12} height={1.8} fill={colors.purple} opacity={0.4} />
+      {/* Filter highlight — a confident vertical gleam on the cork */}
+      <Rect x={cx - 29} y={horizonY - 2}   width={1.4} height={4.6} rx={0.7} fill={colors.white} opacity={0.5} />
+
+      {/* Paper stub — torn open, the break facing right toward the sprout */}
+      <Rect x={cx - 18} y={horizonY - 5} width={16} height={10} fill={colors.white} />
+      {/* Paper edge shadow at the filter junction */}
+      <Rect x={cx - 18.5} y={horizonY - 5} width={0.9} height={10} fill={colors.purple} opacity={0.22} />
+      {/* Paper subtle horizontal ribbing — paper texture */}
+      <Rect x={cx - 18} y={horizonY - 2.4} width={16} height={0.55} fill={colors.line3} opacity={0.55} />
+      <Rect x={cx - 18} y={horizonY + 2.6} width={16} height={0.45} fill={colors.line3} opacity={0.4} />
+
+      {/* Jagged broken edge — sharp teeth where the cigarette was snapped */}
       <Polygon
-        points={`${cx - 2},${cy + 9} ${cx + 0.4},${cy + 11.2} ${cx - 2},${cy + 12.8} ${cx + 0.8},${cy + 14.6} ${cx - 2},${cy + 16.2} ${cx + 0.4},${cy + 17.6} ${cx - 2},${cy + 18}`}
+        points={`${cx - 2},${horizonY - 5} ${cx + 1.4},${horizonY - 3.2} ${cx - 2},${horizonY - 1.4} ${cx + 1.8},${horizonY + 0.6} ${cx - 2},${horizonY + 2.4} ${cx + 1.4},${horizonY + 4} ${cx - 2},${horizonY + 5}`}
         fill={colors.white}
       />
-      {/* Drifting ash particles below the break */}
-      <Circle cx={cx + 3} cy={cy + 20.5} r={0.7}  fill={colors.purple3} opacity={0.75} />
-      <Circle cx={cx + 6} cy={cy + 22.5} r={0.5}  fill={colors.purple3} opacity={0.6} />
-      <Circle cx={cx + 1} cy={cy + 22.5} r={0.4}  fill={colors.purple3} opacity={0.5} />
-      <Circle cx={cx + 8} cy={cy + 20.5} r={0.35} fill={colors.purple3} opacity={0.45} />
+      {/* Paper-edge accent — soft purple inner shadow on the teeth */}
+      <Polygon
+        points={`${cx - 2.5},${horizonY - 5} ${cx - 0.4},${horizonY - 3.4} ${cx - 2.5},${horizonY - 1.8} ${cx - 0.2},${horizonY + 0.2} ${cx - 2.5},${horizonY + 2.2} ${cx - 0.4},${horizonY + 3.8} ${cx - 2.5},${horizonY + 5}`}
+        fill={colors.purple}
+        opacity={0.18}
+      />
 
-      {/* Ascending stem — gentle S-curve from break to apex */}
+      {/* Drifting ash — the old habit dispersing rightward into the past */}
+      <Circle cx={cx + 5}    cy={horizonY + 6.5} r={0.85} fill={colors.purple3} opacity={0.78} />
+      <Circle cx={cx + 9}    cy={horizonY + 8.5} r={0.55} fill={colors.purple3} opacity={0.62} />
+      <Circle cx={cx + 3.2}  cy={horizonY + 9}   r={0.45} fill={colors.purple3} opacity={0.5} />
+      <Circle cx={cx + 11.5} cy={horizonY + 7}   r={0.4}  fill={colors.purple3} opacity={0.5} />
+      <Circle cx={cx + 13.5} cy={horizonY + 9.5} r={0.3}  fill={colors.purple3} opacity={0.42} />
+      <Circle cx={cx + 15.5} cy={horizonY + 7.5} r={0.28} fill={colors.purple3} opacity={0.38} />
+
+      {/* ═══ 12 · HEROIC SPROUT — climbing UP from the break, into the sun ═ */}
+      {/* Confident upright stem — gentle arc, not anxious zigzag */}
       <Path
-        d={`M ${cx - 2} ${cy + 9}
-            C ${cx - 3} ${cy + 2}, ${cx + 1} ${cy - 4}, ${cx + 1} ${cy - 11}
-            C ${cx + 1} ${cy - 18}, ${cx - 1} ${cy - 22}, ${cx} ${cy - 25}`}
+        d={`M ${cx - 0.5} ${horizonY - 5}
+            C ${cx + 1}   ${horizonY - 18},
+              ${cx - 1.5} ${horizonY - 30},
+              ${cx + 1}   ${horizonY - 44}`}
         stroke={colors.green}
-        strokeWidth={2.4}
+        strokeWidth={2.8}
         strokeLinecap="round"
         fill="none"
       />
-      {/* Stem specular highlight */}
+      {/* Stem highlight — light catches the right edge */}
       <Path
-        d={`M ${cx - 1.4} ${cy + 7}
-            C ${cx - 2.2} ${cy + 1}, ${cx + 1.6} ${cy - 4}, ${cx + 1.6} ${cy - 11}
-            C ${cx + 1.6} ${cy - 17}, ${cx - 0.4} ${cy - 21}, ${cx + 0.4} ${cy - 24}`}
+        d={`M ${cx + 0.6} ${horizonY - 7}
+            C ${cx + 1.9} ${horizonY - 18},
+              ${cx - 0.4} ${horizonY - 30},
+              ${cx + 1.9} ${horizonY - 43}`}
         stroke={colors.white}
-        strokeOpacity={0.4}
-        strokeWidth={0.85}
+        strokeOpacity={0.5}
+        strokeWidth={0.95}
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* Left teal stem leaf — curving up-and-left */}
+      {/* SECONDARY LEAF — left side, lower; compact and confident */}
       <Path
-        d={`M ${cx - 1} ${cy - 8}
-            C ${cx - 9}  ${cy - 10}, ${cx - 14} ${cy - 17}, ${cx - 12} ${cy - 22}
-            C ${cx - 5}  ${cy - 19}, ${cx - 2}  ${cy - 14}, ${cx - 1} ${cy - 8} Z`}
-        fill={colors.teal}
+        d={`M ${cx - 0.2} ${horizonY - 16}
+            C ${cx - 9}    ${horizonY - 18},
+              ${cx - 13.5} ${horizonY - 25},
+              ${cx - 11}   ${horizonY - 33}
+            C ${cx - 4.5}  ${horizonY - 29},
+              ${cx - 1}    ${horizonY - 22},
+              ${cx - 0.2}  ${horizonY - 16} Z`}
+        fill={colors.green2}
       />
       <Path
-        d={`M ${cx - 1} ${cy - 8} Q ${cx - 7} ${cy - 15}, ${cx - 12} ${cy - 22}`}
+        d={`M ${cx - 0.2} ${horizonY - 16} Q ${cx - 6} ${horizonY - 24}, ${cx - 11} ${horizonY - 33}`}
         stroke={colors.white}
         strokeOpacity={0.65}
-        strokeWidth={1.0}
+        strokeWidth={1.05}
         strokeLinecap="round"
         fill="none"
       />
       <Path
-        d={`M ${cx - 5} ${cy - 13} L ${cx - 9} ${cy - 15}`}
+        d={`M ${cx - 5} ${horizonY - 22} L ${cx - 8.5} ${horizonY - 24}`}
         stroke={colors.white}
-        strokeOpacity={0.4}
+        strokeOpacity={0.42}
         strokeWidth={0.7}
         strokeLinecap="round"
       />
 
-      {/* Right hero leaf — vivid green, curving up-and-right */}
+      {/* HERO LEAF — right side, higher; bold and aspirational */}
       <Path
-        d={`M ${cx + 1} ${cy - 8}
-            C ${cx + 10} ${cy - 8},  ${cx + 17} ${cy - 16}, ${cx + 14} ${cy - 22}
-            C ${cx + 6}  ${cy - 18}, ${cx + 2}  ${cy - 13}, ${cx + 1} ${cy - 8} Z`}
+        d={`M ${cx + 1} ${horizonY - 22}
+            C ${cx + 13}   ${horizonY - 21},
+              ${cx + 21}   ${horizonY - 33},
+              ${cx + 17.5} ${horizonY - 45}
+            C ${cx + 8}    ${horizonY - 39},
+              ${cx + 2.5}  ${horizonY - 30},
+              ${cx + 1}    ${horizonY - 22} Z`}
         fill={colors.green}
       />
       <Path
-        d={`M ${cx + 1} ${cy - 8} Q ${cx + 8} ${cy - 14}, ${cx + 14} ${cy - 22}`}
+        d={`M ${cx + 1} ${horizonY - 22} Q ${cx + 9.5} ${horizonY - 32}, ${cx + 17.5} ${horizonY - 45}`}
         stroke={colors.white}
-        strokeOpacity={0.65}
-        strokeWidth={1.2}
+        strokeOpacity={0.72}
+        strokeWidth={1.3}
         strokeLinecap="round"
         fill="none"
       />
       <Path
-        d={`M ${cx + 5} ${cy - 11} L ${cx + 9} ${cy - 13}`}
+        d={`M ${cx + 6} ${horizonY - 26} L ${cx + 10.5} ${horizonY - 28.5}`}
         stroke={colors.white}
-        strokeOpacity={0.45}
+        strokeOpacity={0.48}
         strokeWidth={0.8}
         strokeLinecap="round"
       />
       <Path
-        d={`M ${cx + 9} ${cy - 16} L ${cx + 13} ${cy - 19}`}
+        d={`M ${cx + 10} ${horizonY - 32} L ${cx + 14.5} ${horizonY - 35}`}
         stroke={colors.white}
-        strokeOpacity={0.4}
-        strokeWidth={0.7}
+        strokeOpacity={0.42}
+        strokeWidth={0.75}
         strokeLinecap="round"
       />
-      {/* Hero leaf gloss highlight */}
+      {/* Hero leaf gloss — the wet shine of fresh growth */}
       <Path
-        d={`M ${cx + 9} ${cy - 17} Q ${cx + 11} ${cy - 19.5}, ${cx + 13} ${cy - 21}`}
+        d={`M ${cx + 11} ${horizonY - 36} Q ${cx + 13.5} ${horizonY - 39.5}, ${cx + 16} ${horizonY - 42.5}`}
         stroke={colors.white}
-        strokeOpacity={0.55}
+        strokeOpacity={0.58}
         strokeWidth={1.4}
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* Honey branching bud — golden seed at the leaf node */}
-      <Circle cx={cx} cy={cy - 9} r={1.7} fill={colors.honey} />
-      <Circle
-        cx={cx} cy={cy - 9} r={1.7}
-        fill="none"
-        stroke={colors.purple}
-        strokeOpacity={0.45}
-        strokeWidth={0.55}
-      />
-      <Circle cx={cx - 0.45} cy={cy - 9.5} r={0.6} fill={colors.white} opacity={0.85} />
+      {/* APEX BUD — the new tip, just emerged */}
+      <Circle cx={cx + 1} cy={horizonY - 47} r={2.4} fill={colors.green} />
+      <Circle cx={cx + 0.4} cy={horizonY - 47.6} r={1.0} fill={colors.white} opacity={0.55} />
 
-      {/* APEX HONEY STAR — the victory marker at the top of the stem */}
-      <Polygon points={star5(cx, cy - 29, 4.2, 1.75)} fill={colors.honey} />
-      <Polygon
-        points={star5(cx, cy - 29, 4.2, 1.75)}
-        fill="none"
-        stroke={colors.purple}
-        strokeOpacity={0.5}
-        strokeWidth={0.55}
-        strokeLinejoin="round"
-      />
-      <Circle cx={cx - 0.8} cy={cy - 30.5} r={1.0} fill={colors.white} opacity={0.92} />
+      {/* ═══ 13 · CELESTIAL ACCENTS — 3 strategic stars at compositional rests ═ */}
+      <Polygon points={star4(cx + 56, cy - 42, 3.2, 1.05)} fill={colors.white} opacity={0.95} />
+      <Polygon points={star4(cx - 54, cy - 38, 2.7, 0.9)}  fill={colors.honey} opacity={0.92} />
+      <Polygon points={star4(cx + 62, cy + 4,  2.0, 0.78)} fill={colors.white} opacity={0.78} />
 
-      {/* ═══ 7 · CROWN APEX GEM — faceted honey diamond set into the rim ═══ */}
-      <Polygon
-        points={`${cx},${cy - 66} ${cx + 5},${cy - 60} ${cx},${cy - 54} ${cx - 5},${cy - 60}`}
-        fill={colors.honey}
-      />
-      {/* Right facet — lighter */}
-      <Polygon
-        points={`${cx},${cy - 66} ${cx + 5},${cy - 60} ${cx},${cy - 60}`}
-        fill={colors.white}
-        opacity={0.2}
-      />
-      {/* Left facet — brighter (light source from upper-left) */}
-      <Polygon
-        points={`${cx},${cy - 66} ${cx},${cy - 60} ${cx - 5},${cy - 60}`}
-        fill={colors.white}
-        opacity={0.42}
-      />
-      {/* Bottom facets — slight shadow */}
-      <Polygon
-        points={`${cx},${cy - 60} ${cx + 5},${cy - 60} ${cx},${cy - 54}`}
-        fill={colors.purple}
-        opacity={0.18}
-      />
-      {/* Gem outline */}
-      <Polygon
-        points={`${cx},${cy - 66} ${cx + 5},${cy - 60} ${cx},${cy - 54} ${cx - 5},${cy - 60}`}
-        fill="none"
-        stroke={colors.purple}
-        strokeOpacity={0.55}
-        strokeWidth={0.65}
-        strokeLinejoin="round"
-      />
-      {/* Gem sparkle */}
-      <Circle cx={cx - 1.6} cy={cy - 62} r={0.85} fill={colors.white} opacity={0.95} />
-
-      {/* ═══ 8 · RIBBON — bow knot + two notched tails at the wreath base ═══ */}
-
-      {/* Left ribbon tail */}
-      <Polygon
-        points={`${cx - 5},${cy + 50} ${cx - 1.5},${cy + 50} ${cx - 6},${cy + 64} ${cx - 9.5},${cy + 60.5} ${cx - 13},${cy + 64}`}
-        fill={colors.honey}
-      />
-      <Path
-        d={`M ${cx - 4} ${cy + 51} L ${cx - 7.5} ${cy + 61.5}`}
-        stroke={colors.purple}
-        strokeOpacity={0.3}
-        strokeWidth={0.8}
-        strokeLinecap="round"
-      />
-
-      {/* Right ribbon tail */}
-      <Polygon
-        points={`${cx + 1.5},${cy + 50} ${cx + 5},${cy + 50} ${cx + 13},${cy + 64} ${cx + 9.5},${cy + 60.5} ${cx + 6},${cy + 64}`}
-        fill={colors.honey}
-      />
-      <Path
-        d={`M ${cx + 4} ${cy + 51} L ${cx + 7.5} ${cy + 61.5}`}
-        stroke={colors.purple}
-        strokeOpacity={0.3}
-        strokeWidth={0.8}
-        strokeLinecap="round"
-      />
-
-      {/* Central bow knot */}
-      <Rect
-        x={cx - 6}
-        y={cy + 47}
-        width={12}
-        height={7}
-        rx={1.8}
-        fill={colors.honey}
-      />
-      <Rect
-        x={cx - 5.5}
-        y={cy + 49.5}
-        width={11}
-        height={2}
-        fill={colors.purple}
-        opacity={0.3}
-      />
-      <Rect
-        x={cx - 6}
-        y={cy + 47}
-        width={12}
-        height={7}
-        rx={1.8}
-        fill="none"
-        stroke={colors.purple}
-        strokeOpacity={0.5}
-        strokeWidth={0.55}
-      />
-      {/* Tiny knot highlight */}
-      <Circle cx={cx - 2} cy={cy + 48.4} r={0.7} fill={colors.white} opacity={0.7} />
-
-      {/* ═══ 9 · OUTER SPARKLES — 4-point stars + floating sparks ═══════════ */}
-      <Polygon points={star4(cx + 56, cy - 40, 3.0, 1.0)} fill={colors.white} opacity={0.95} />
-      <Polygon points={star4(cx - 56, cy - 36, 2.6, 0.9)} fill={colors.white} opacity={0.85} />
-      <Polygon points={star4(cx + 60, cy + 8,  2.4, 0.85)} fill={colors.white} opacity={0.8} />
-      <Polygon points={star4(cx - 60, cy + 12, 2.2, 0.8)}  fill={colors.white} opacity={0.75} />
-
-      {/* Tiny floating sparks */}
-      <Circle cx={cx + 65} cy={cy - 24} r={0.9} fill={colors.white} opacity={0.6} />
-      <Circle cx={cx - 65} cy={cy - 20} r={0.8} fill={colors.white} opacity={0.55} />
-      <Circle cx={cx + 48} cy={cy - 54} r={0.7} fill={colors.white} opacity={0.55} />
-      <Circle cx={cx - 48} cy={cy - 52} r={0.6} fill={colors.white} opacity={0.5} />
+      {/* Tiny floating sparks at field edges */}
+      <Circle cx={cx - 62} cy={cy + 6}   r={0.85} fill={colors.honey} opacity={0.65} />
+      <Circle cx={cx + 48} cy={cy - 56}  r={0.7}  fill={colors.white} opacity={0.55} />
+      <Circle cx={cx - 46} cy={cy - 54}  r={0.6}  fill={colors.white} opacity={0.5} />
     </Svg>
   );
 }
@@ -1811,7 +1971,7 @@ function formatAchStat(a: QsAchievement, country: string = 'US', product: QsProd
     const y = Math.round(h / 8760);
     return `${y} ${y === 1 ? 'year' : 'years'} ${suffix}`;
   }
-  if (a.type === 'cigs')  return `${a.threshold.toLocaleString()} ${unitPl} avoided`;
+  if (a.type === 'cigs')  return `${fmt(a.threshold)} ${unitPl} avoided`;
   if (a.type === 'life') {
     const h = a.threshold;
     if (h < 24)   return `${Math.round(h)} ${h === 1 ? 'hour' : 'hours'} of life regained`;
@@ -2015,6 +2175,74 @@ function QuitlinePhoneArt({ size = 96 }: { size?: number }) {
   );
 }
 
+/** Bar-chart insights — hero illo for the Patterns view. Five ascending purple
+ *  bars on a clean baseline with a trending arrow that arcs up over them. The
+ *  honey accent reads as the "peak / best" bar. Family-consistent with the
+ *  other QuitNow-style art (dotted halo accents + flat fills, single subject). */
+function PatternsArt({ size = 96 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 140 140">
+      {/* Decorative halo dots — match TipBulbArt / MeditationArt rhythm */}
+      <Circle cx={22} cy={36} r={2.8} fill={colors.honey} />
+      <Circle cx={118} cy={32} r={2.2} fill={colors.purple3} />
+      <Circle cx={20} cy={92} r={2.0} fill={colors.purple3} />
+      <Circle cx={120} cy={96} r={2.6} fill={colors.honey} />
+      <Path d="M 32 24 L 34 30 L 28 28 Z" fill={colors.honey} />
+      <Path d="M 108 26 L 110 32 L 104 30 Z" fill={colors.purple3} />
+
+      {/* Baseline — the chart floor */}
+      <Rect x={26} y={108} width={88} height={2} rx={1} fill={colors.purple3} />
+      <Circle cx={26} cy={109} r={2.2} fill={colors.purple3} />
+
+      {/* Five ascending bars — left-to-right growth narrative; honey peak */}
+      <Rect x={32}  y={92}  width={11} height={16} rx={2} fill={colors.purple2} />
+      <Rect x={48}  y={78}  width={11} height={30} rx={2} fill={colors.purple2} />
+      <Rect x={64}  y={64}  width={11} height={44} rx={2} fill={colors.purple} />
+      <Rect x={80}  y={48}  width={11} height={60} rx={2} fill={colors.purple} />
+      <Rect x={96}  y={38}  width={11} height={70} rx={2} fill={colors.honey} />
+
+      {/* Bar highlights — a vertical specular line catches the light */}
+      <Rect x={33}  y={94}  width={1.2} height={12} rx={0.6} fill={colors.white} opacity={0.45} />
+      <Rect x={49}  y={80}  width={1.2} height={26} rx={0.6} fill={colors.white} opacity={0.45} />
+      <Rect x={65}  y={66}  width={1.2} height={40} rx={0.6} fill={colors.white} opacity={0.42} />
+      <Rect x={81}  y={50}  width={1.2} height={56} rx={0.6} fill={colors.white} opacity={0.4} />
+      <Rect x={97}  y={40}  width={1.2} height={66} rx={0.6} fill={colors.white} opacity={0.6} />
+
+      {/* Trend arc — confident upward sweep tying the bars together */}
+      <Path
+        d="M 37 98 Q 60 86 70 70 Q 82 50 101 36"
+        stroke={colors.honey}
+        strokeWidth={2.4}
+        fill="none"
+        strokeLinecap="round"
+        strokeOpacity={0.9}
+      />
+      {/* Arrowhead at the apex of the trend */}
+      <Polygon
+        points="101,36 96,40 100,42"
+        fill={colors.honey}
+      />
+      <Polygon
+        points="101,36 105,41 100,42"
+        fill={colors.honey}
+      />
+
+      {/* Data points — small dots crowning each bar */}
+      <Circle cx={37.5}  cy={92} r={1.8} fill={colors.white} opacity={0.75} />
+      <Circle cx={53.5}  cy={78} r={1.8} fill={colors.white} opacity={0.75} />
+      <Circle cx={69.5}  cy={64} r={1.8} fill={colors.white} opacity={0.78} />
+      <Circle cx={85.5}  cy={48} r={1.8} fill={colors.white} opacity={0.8} />
+      <Circle cx={101.5} cy={38} r={2.2} fill={colors.white} />
+    </Svg>
+  );
+}
+
+// ── Achievement persistent trackers ──────────────────────────────────────────
+// Moved outside components so they persist across modal opens/mounts.
+// Seeding happens on first open; subsequent opens won't trigger historical popups.
+const prevUnlockedRefGlobal = { current: null as Set<string> | null };
+const prevQdUnlockedRefGlobal = { current: null as Set<string> | null };
+
 // ── Quit Smoking Modal ────────────────────────────────────────────────────────
 function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { email } = useAuthStore();
@@ -2044,8 +2272,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [tipPrefs, setTipPrefs] = useState<TipPrefs>(DEFAULT_TIP_PREFS);
   // Confetti overlay — fired when a new achievement unlocks (#6). We diff the
   // unlocked set against the previous render to detect "new this tick".
-  const prevUnlockedRef = useRef<Set<string> | null>(null);
   const [unlockOverlayAch, setUnlockOverlayAch] = useState<QsAchievement | null>(null);
+  const [isSettled, setIsSettled] = useState(false);
   // Setup form state
   const [showSetup, setShowSetup] = useState(false);
   const [formDate, setFormDate] = useState('');
@@ -2060,7 +2288,21 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [cravingCoping, setCravingCoping] = useState<string | null>(null);
   const [cravingGaveIn, setCravingGaveIn] = useState(false);
   // UI: which detail view is showing inside the modal
-  const [qsView, setQsView] = useState<'main' | 'progress' | 'achievements' | 'achievement' | 'health' | 'cravings' | 'tip' | 'quitline' | 'breathing' | 'reasons' | 'nrt'>('main');
+  const [qsView, setQsView] = useState<'main' | 'progress' | 'achievements' | 'achievement' | 'health' | 'cravings' | 'tip' | 'quitline' | 'breathing' | 'reasons' | 'nrt' | 'rescue' | 'patterns' | 'goal'>('main');
+  // Money-saved goal — user names what they're saving for + dollar target.
+  // Persisted to QS_GOAL. Stored amount is in user's display currency (NOT USD)
+  // so the editor's number is what the user typed and the bar reads naturally.
+  const [moneyGoal, setMoneyGoal] = useState<{ amount: number; label: string } | null>(null);
+  const [goalDraftAmount, setGoalDraftAmount] = useState('');
+  const [goalDraftLabel,  setGoalDraftLabel ] = useState('');
+  // Craving rescue — 3-minute countdown the user runs in the moment a craving
+  // hits. Reuses the breathing animation circle for visual rhythm. On completion
+  // we auto-log a Craving with gaveIn:false (rode it out).
+  const RESCUE_TOTAL_SEC = 180;
+  const [rescueSecondsLeft, setRescueSecondsLeft] = useState(RESCUE_TOTAL_SEC);
+  const [rescueRunning, setRescueRunning] = useState(false);
+  const [rescueDone, setRescueDone] = useState(false);
+  const rescueIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // UI: which achievement is selected for the QuitNow-style detail screen
   const [selectedAch, setSelectedAch] = useState<QsAchievement | null>(null);
   const qsScrollRef = useRef<ScrollView>(null);
@@ -2142,9 +2384,11 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     breathTimersRef.current = [];
   }
 
-  // Auto-stop breathing whenever we leave the breathing view or close the modal
+  // Auto-stop breathing/rescue whenever we leave those views or close the modal.
+  // Both share the breathing animation infrastructure — kill it on any exit.
   useEffect(() => {
-    if (!visible || qsView !== 'breathing') {
+    const isAnimView = qsView === 'breathing' || qsView === 'rescue';
+    if (!visible || !isAnimView) {
       breathRunningRef.current = false;
       breathRoundRef.current = 0;
       setBreathRunning(false);
@@ -2153,6 +2397,13 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       breathScale.stopAnimation();
       breathTimersRef.current.forEach(t => clearTimeout(t));
       breathTimersRef.current = [];
+      if (rescueIntervalRef.current) { clearInterval(rescueIntervalRef.current); rescueIntervalRef.current = null; }
+      // Only reset the rescue countdown when leaving rescue, not when leaving breathing
+      if (qsView !== 'rescue') {
+        setRescueRunning(false);
+        setRescueSecondsLeft(RESCUE_TOTAL_SEC);
+        setRescueDone(false);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, qsView]);
@@ -2174,8 +2425,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
         statLine + '.',
         '',
         '— My quit so far —',
-        `🗓  ${days.toLocaleString()} day${days === 1 ? '' : 's'} ${data?.productType === 'pouches' ? 'pouch-free' : data?.productType === 'vape' ? 'vape-free' : 'smoke-free'}`,
-        `🚫  ${cigsAvoided.toLocaleString()} ${labels.unitPlural} avoided`,
+        `🗓  ${fmt(days)} day${days === 1 ? '' : 's'} ${data?.productType === 'pouches' ? 'pouch-free' : data?.productType === 'vape' ? 'vape-free' : 'smoke-free'}`,
+        `🚫  ${fmt(cigsAvoided)} ${labels.unitPlural} avoided`,
         `💰  ${moneyTxt} saved`,
         `⏱  ${lifeRegainedTxt} of life won back`,
         '',
@@ -2187,7 +2438,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   // Reset detail-view state any time the modal closes so the next open lands on main
   useEffect(() => {
-    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); }
+    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); }
   }, [visible]);
 
   // Scroll to top whenever the inner view changes so first item is always visible
@@ -2206,7 +2457,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       AsyncStorage.getItem(KEYS.QS_NRT),
       AsyncStorage.getItem(KEYS.QS_TIP),
       AsyncStorage.getItem(KEYS.QS_COST_PROMPT),
-    ]).then(([raw, rawSlips, rawBest, rawCrave, rawReasons, rawNrt, rawTip, rawCostPrompt]) => {
+      AsyncStorage.getItem(KEYS.QS_GOAL),
+    ]).then(([raw, rawSlips, rawBest, rawCrave, rawReasons, rawNrt, rawTip, rawCostPrompt, rawGoal]) => {
       if (raw) {
         try {
           const d: QsData = JSON.parse(raw);
@@ -2294,6 +2546,20 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
         setTipPrefs(safe);
       } catch {
         setTipPrefs(DEFAULT_TIP_PREFS);
+      }
+      try {
+        if (rawGoal) {
+          const g = JSON.parse(rawGoal) as { amount: number; label: string };
+          if (g && typeof g.amount === 'number' && Number.isFinite(g.amount) && g.amount > 0 && typeof g.label === 'string') {
+            setMoneyGoal({ amount: g.amount, label: g.label });
+          } else {
+            setMoneyGoal(null);
+          }
+        } else {
+          setMoneyGoal(null);
+        }
+      } catch {
+        setMoneyGoal(null);
       }
     });
   }, [visible]);
@@ -2423,6 +2689,108 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     Haptics.notificationAsync(
       entry.gaveIn ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success,
     ).catch(() => {});
+  }
+
+  // ── Craving rescue — start/stop/finish the 3-min wave-rider timer ──────────
+  // On natural finish we auto-log a Craving entry as a win (gaveIn:false) so the
+  // user's stats reflect every rescue they completed. On abort we leave the log
+  // alone — aborting != slipping. The breathing animation is reused for rhythm.
+  function startRescue() {
+    if (rescueRunning) return;
+    setRescueDone(false);
+    setRescueSecondsLeft(RESCUE_TOTAL_SEC);
+    setRescueRunning(true);
+    breathRoundRef.current = 0;
+    breathRunningRef.current = true;
+    setBreathRunning(true);
+    runBreathCycle();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (rescueIntervalRef.current) clearInterval(rescueIntervalRef.current);
+    rescueIntervalRef.current = setInterval(() => {
+      setRescueSecondsLeft((s) => {
+        const next = s - 1;
+        if (next <= 0) {
+          // Natural completion — stop everything, fire success, auto-log win
+          if (rescueIntervalRef.current) { clearInterval(rescueIntervalRef.current); rescueIntervalRef.current = null; }
+          breathRunningRef.current = false;
+          breathRoundRef.current = 0;
+          setBreathRunning(false);
+          setBreathRound(0);
+          setBreathPhase('idle');
+          breathScale.stopAnimation();
+          Animated.timing(breathScale, { toValue: 0.55, duration: 250, useNativeDriver: true }).start();
+          breathTimersRef.current.forEach(t => clearTimeout(t));
+          breathTimersRef.current = [];
+          setRescueRunning(false);
+          setRescueDone(true);
+          // Auto-log a "rode it out" craving — use the user's last intensity guess
+          // (or default 7) and trigger='other' since no chip is picked in-rescue.
+          const entry: Craving = {
+            ts: new Date().toISOString(),
+            intensity: 7,
+            coping: 'breath',
+            gaveIn: false,
+          };
+          const updated = [...cravings, entry];
+          AsyncStorage.setItem(KEYS.QS_CRAVE, JSON.stringify(updated));
+          setCravings(updated);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+  }
+  function stopRescue() {
+    if (rescueIntervalRef.current) { clearInterval(rescueIntervalRef.current); rescueIntervalRef.current = null; }
+    breathRunningRef.current = false;
+    breathRoundRef.current = 0;
+    setBreathRunning(false);
+    setBreathRound(0);
+    setBreathPhase('idle');
+    breathScale.stopAnimation();
+    Animated.timing(breathScale, { toValue: 0.55, duration: 250, useNativeDriver: true }).start();
+    breathTimersRef.current.forEach(t => clearTimeout(t));
+    breathTimersRef.current = [];
+    setRescueRunning(false);
+    setRescueSecondsLeft(RESCUE_TOTAL_SEC);
+    setRescueDone(false);
+  }
+
+  // Persist the money-saved goal. Stored amount is in display currency (NOT USD)
+  // so what the user typed is what they read back. Label is freeform (under 60 ch).
+  function saveGoal() {
+    const amt = parseFloat(goalDraftAmount);
+    const lbl = goalDraftLabel.trim();
+    if (!Number.isFinite(amt) || amt <= 0) {
+      Alert.alert('Invalid amount', 'Enter a goal amount greater than 0.');
+      return;
+    }
+    if (!lbl) {
+      Alert.alert('What are you saving for?', 'Give your goal a name — e.g. "Weekend in Lisbon" or "New bike".');
+      return;
+    }
+    const g = { amount: amt, label: lbl.slice(0, 60) };
+    AsyncStorage.setItem(KEYS.QS_GOAL, JSON.stringify(g));
+    setMoneyGoal(g);
+    setQsView('progress');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }
+  function clearGoal() {
+    Alert.alert(
+      'Remove your goal?',
+      'You can set a new one any time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => {
+          AsyncStorage.removeItem(KEYS.QS_GOAL);
+          setMoneyGoal(null);
+          setGoalDraftAmount('');
+          setGoalDraftLabel('');
+          setQsView('progress');
+        } },
+      ],
+    );
   }
 
   // Cravings in the rolling last 7 days, plus the win-rate (didn't give in) so the
@@ -2619,9 +2987,9 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     const unlockedNow = new Set<string>(
       achList.filter(a => isAchUnlocked(a, hours, cigsAvoided, moneySaved)).map(a => a.id),
     );
-    const prev = prevUnlockedRef.current;
-    if (prev == null) {
-      prevUnlockedRef.current = unlockedNow;
+    const prev = prevUnlockedRefGlobal.current;
+    if (prev == null || !isSettled) {
+      prevUnlockedRefGlobal.current = unlockedNow;
       return;
     }
     const newly: QsAchievement[] = [];
@@ -2638,7 +3006,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       // of the app. 20xp per unlock keeps it meaningful but not exploitative.
       void useAppStore.getState().addXp(20 * newly.length);
     }
-    prevUnlockedRef.current = unlockedNow;
+    prevUnlockedRefGlobal.current = unlockedNow;
   }, [achList, hours, cigsAvoided, moneySaved, data]);
 
   if (showSetup) {
@@ -2744,7 +3112,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                   //  • anything else (progress, ach list,
                   //    health, cravings)                   → main
                   if (qsView === 'achievement') { setSelectedAch(null); setQsView('achievements'); }
-                  else if (qsView === 'tip' || qsView === 'quitline' || qsView === 'breathing') setQsView('cravings');
+                  else if (qsView === 'tip' || qsView === 'quitline' || qsView === 'breathing' || qsView === 'rescue' || qsView === 'patterns') setQsView('cravings');
+                  else if (qsView === 'goal') setQsView('progress');
                   else { setReasonsEditing(false); setQsView('main'); }
                 }}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -2765,6 +3134,9 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 {qsView === 'breathing'    && 'Calm breathing'}
                 {qsView === 'reasons'      && 'My reasons'}
                 {qsView === 'nrt'          && 'NRT log'}
+                {qsView === 'rescue'       && 'Ride the wave'}
+                {qsView === 'patterns'     && 'Your patterns'}
+                {qsView === 'goal'         && 'Money-saved goal'}
               </Text>
               {qsView === 'health' ? (
                 <View style={m.qsHealthHeartCount}>
@@ -2835,7 +3207,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                     <View style={[m.qsProgCircle, { backgroundColor: colors.rose }]}>
                       <Ionicons name="flame" size={22} color={colors.white} />
                     </View>
-                    <Text style={m.qsProgNum}>{cigsAvoided.toLocaleString()}</Text>
+                    <Text style={m.qsProgNum}>{fmt(cigsAvoided)}</Text>
                     <Text style={m.qsProgLbl}>{productLabels(data).unitPlural}{'\n'}avoided</Text>
                   </View>
                   <View style={m.qsProgStat}>
@@ -2851,6 +3223,40 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                     </View>
                     <Text style={m.qsProgNum}>{lifeRegainedTxt}</Text>
                     <Text style={m.qsProgLbl}>won{'\n'}back</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Resilience strip — personal best + slip count surfaced inline so
+                  the user sees their record without tapping into the detail.
+                  A ★ next to personal best when current streak ties or beats it.
+                  Tapping the strip opens the Progress view (Resilience block). */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setQsView('progress');
+                }}
+                style={m.qsResilienceStrip}
+              >
+                <View style={m.qsResilienceCell}>
+                  <Ionicons name="trophy" size={14} color={colors.honey} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={m.qsResilienceLbl}>Personal best</Text>
+                    <Text style={m.qsResilienceVal} numberOfLines={1}>
+                      {formatStreakHours(Math.max(bestHours, hours))}
+                      {hours >= bestHours && bestHours > 0 ? '  ★' : ''}
+                    </Text>
+                  </View>
+                </View>
+                <View style={m.qsResilienceDiv} />
+                <View style={m.qsResilienceCell}>
+                  <Ionicons name="refresh" size={14} color={slips.length === 0 ? colors.green : colors.ink2} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={m.qsResilienceLbl}>Slips logged</Text>
+                    <Text style={[m.qsResilienceVal, slips.length === 0 && { color: colors.green }]} numberOfLines={1}>
+                      {slips.length === 0 ? 'None yet' : fmt(slips.length)}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -3063,27 +3469,6 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
               </TouchableOpacity>
 
-              {/* ── Track weight — cross-feature link to diary (the #1 quit fear) ─ */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  onClose();
-                  setTimeout(() => router.push('/(tabs)/progress'), 250);
-                }}
-                style={[m.qsHealthCard, { marginTop: spacing.md }]}
-              >
-                <View style={[m.qsProgCircle, { backgroundColor: colors.green, width: 56, height: 56 }]}>
-                  <Ionicons name="trending-up" size={26} color={colors.white} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={m.qsHealthDesc} numberOfLines={2}>
-                    Watch your weight while you quit. Open Progress →
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
-              </TouchableOpacity>
-
               {/* ── Actions ─────────────────────────────────────────────── */}
               <TouchableOpacity style={m.dangerBtn} onPress={resetProgress}>
                 <Text style={m.dangerBtnTxt}>I had a slip</Text>
@@ -3101,19 +3486,19 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
               <Text style={m.qsDetailSectionTitle}>{productLabels(data).unitPlural.replace(/^./, c => c.toUpperCase())} avoided</Text>
               <View style={m.qsDetailRow}>
                 <Text style={m.qsDetailRowLbl}>Per day</Text>
-                <Text style={m.qsDetailRowVal}>{cigPer.day.toLocaleString()}</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(cigPer.day)}</Text>
               </View>
               <View style={m.qsDetailRow}>
                 <Text style={m.qsDetailRowLbl}>Per week</Text>
-                <Text style={m.qsDetailRowVal}>{cigPer.week.toLocaleString()}</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(cigPer.week)}</Text>
               </View>
               <View style={m.qsDetailRow}>
                 <Text style={m.qsDetailRowLbl}>Per month</Text>
-                <Text style={m.qsDetailRowVal}>{cigPer.month.toLocaleString()}</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(cigPer.month)}</Text>
               </View>
               <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
                 <Text style={m.qsDetailRowLbl}>Per year</Text>
-                <Text style={m.qsDetailRowVal}>{cigPer.year.toLocaleString()}</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(cigPer.year)}</Text>
               </View>
 
               {/* Money saved */}
@@ -3134,6 +3519,97 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 <Text style={m.qsDetailRowLbl}>Per year</Text>
                 <Text style={m.qsDetailRowVal}>{fmtKr(moneyPer.year)}</Text>
               </View>
+
+              {/* Money-saved GOAL — named target with a live progress bar. Empty
+                  state shows a "Set a goal" CTA. moneyGoal.amount is stored in the
+                  user's display currency; moneySaved is USD, so we convert the
+                  USD figure into the same display currency for an apples-to-apples
+                  bar. Reuses the same fmtKr formatter for the readouts. */}
+              <Text style={m.qsDetailSectionTitle}>Money-saved goal</Text>
+              {moneyGoal ? (() => {
+                // moneySaved is in USD — convert to display currency so the bar
+                // compares like-for-like with the stored goal amount.
+                const savedDisplay = moneyPer.year > 0
+                  ? (moneySaved * (moneyPer.day / Math.max(0.0001, moneySaved * (data?.cigsPerDay ?? 0) / 365)))
+                  : 0;
+                // Simpler: moneyPer.day is display-currency per day. cumulative
+                // saved in display currency = moneyPer.day × full days quit. We
+                // already compute hours; use hours/24 for the day fraction.
+                const savedCurr = moneyPer.day * (hours / 24);
+                const pct = Math.max(0, Math.min(1, savedCurr / moneyGoal.amount));
+                const remaining = Math.max(0, moneyGoal.amount - savedCurr);
+                const done = pct >= 1;
+                return (
+                  <View style={m.qsGoalCard}>
+                    <View style={m.qsGoalHead}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={m.qsGoalLabel} numberOfLines={2}>{moneyGoal.label}</Text>
+                        <Text style={m.qsGoalSub}>
+                          {fmtKr(savedCurr)} of {fmtKr(moneyGoal.amount)} · {Math.round(pct * 100)}%
+                        </Text>
+                      </View>
+                      <View style={[m.qsGoalBadge, done && { backgroundColor: colors.green + '22', borderColor: colors.green + '55' }]}>
+                        <Ionicons
+                          name={done ? 'trophy' : 'flag'}
+                          size={14}
+                          color={done ? colors.green : colors.honey}
+                        />
+                      </View>
+                    </View>
+                    <View style={m.qsGoalBarTrack}>
+                      <View
+                        style={[
+                          m.qsGoalBarFill,
+                          {
+                            width: `${Math.max(2, pct * 100)}%`,
+                            backgroundColor: done ? colors.green : colors.honey,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[m.qsGoalFootnote, done && { color: colors.green }]}>
+                      {done
+                        ? "You hit it. Time to spend it on what you're saving for."
+                        : `${fmtKr(remaining)} to go — keep going.`}
+                    </Text>
+                    <View style={m.qsGoalActionsRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                          setGoalDraftAmount(String(moneyGoal.amount));
+                          setGoalDraftLabel(moneyGoal.label);
+                          setQsView('goal');
+                        }}
+                        style={m.qsGoalActionBtn}
+                      >
+                        <Ionicons name="pencil" size={14} color={colors.ink2} />
+                        <Text style={m.qsGoalActionTxt}>Edit goal</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })() : (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setGoalDraftAmount('');
+                    setGoalDraftLabel('');
+                    setQsView('goal');
+                  }}
+                  style={m.qsGoalEmpty}
+                >
+                  <View style={m.qsGoalEmptyIcon}>
+                    <Ionicons name="trophy" size={20} color={colors.honey} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={m.qsGoalEmptyTitle}>Set a savings goal</Text>
+                    <Text style={m.qsGoalEmptySub}>Name what you're saving for and watch your bar fill as you stay quit.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
+                </TouchableOpacity>
+              )}
 
               {/* Time won back */}
               <Text style={m.qsDetailSectionTitle}>Time won back</Text>
@@ -3169,7 +3645,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
               </View>
               <View style={m.qsDetailRow}>
                 <Text style={m.qsDetailRowLbl}>Slips logged</Text>
-                <Text style={m.qsDetailRowVal}>{slips.length.toLocaleString()}</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(slips.length)}</Text>
               </View>
               <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
                 <Text style={m.qsDetailRowLbl}>Last slip</Text>
@@ -3429,6 +3905,36 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 </View>
               )}
 
+              {/* "Craving right now?" rescue CTA — the headline in-the-moment tool.
+                  Bigger and louder than the log button because it's the action you
+                  want a panicking user to find in under a second. */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+                  setRescueSecondsLeft(RESCUE_TOTAL_SEC);
+                  setRescueDone(false);
+                  setQsView('rescue');
+                }}
+                style={m.qsRescueBtnWrap}
+              >
+                <LinearGradient
+                  colors={[colors.rose, colors.purpleGlow]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={m.qsRescueBtn}
+                >
+                  <View style={m.qsRescueBtnIcon}>
+                    <Ionicons name="flash" size={22} color={colors.white} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={m.qsRescueBtnTitle}>I'm craving right now</Text>
+                    <Text style={m.qsRescueBtnSub}>Ride the wave · 3 min</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+
               {/* Log a craving — primary action up top so it's the first tap target */}
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -3448,6 +3954,24 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                   <Text style={m.qsCravingLogBtnTxt}>Log a craving</Text>
                 </LinearGradient>
               </TouchableOpacity>
+
+              {/* Your patterns — unlocks after 3 logged cravings (else stats look thin) */}
+              {cravings.length >= 3 && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQsView('patterns'); }}
+                  style={m.qsCravingCard}
+                >
+                  <View style={m.qsCravingCardArt}>
+                    <PatternsArt size={84} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={m.qsCravingCardTitle}>Your patterns</Text>
+                    <Text style={m.qsCravingCardDesc}>See your top triggers, peak craving times, and what's working best for you.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+                </TouchableOpacity>
+              )}
 
               {/* Tip of the day */}
               <TouchableOpacity
@@ -3558,7 +4082,8 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
           )}
 
           {/* ════════════════════════════════════════════════════════════════
-              QUIT LINES — country list, tap to call
+              QUIT LINES — user's home-country quitline (falls back to the full
+              international list when no entry exists for their country).
           ════════════════════════════════════════════════════════════════ */}
           {qsView === 'quitline' && (
             <>
@@ -3570,14 +4095,15 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
               </Text>
 
               <View style={m.qsQuitlineGroup}>
-                {/* Sort the user's home country to the top so it's the first tap target. */}
-                {[...QS_QUITLINES]
-                  .sort((a, b) => {
-                    if (a.code === country) return -1;
-                    if (b.code === country) return 1;
-                    return a.region.localeCompare(b.region);
-                  })
-                  .map((q, idx, arr) => (
+                {/* Country-specific: show only the user's home-country quitline(s).
+                    If the user's country isn't in the dataset, fall back to the full
+                    list (alphabetised) so the screen is never empty. */}
+                {(() => {
+                  const local = QS_QUITLINES.filter(q => q.code === country);
+                  const list = local.length > 0
+                    ? local
+                    : [...QS_QUITLINES].sort((a, b) => a.region.localeCompare(b.region));
+                  return list.map((q, idx, arr) => (
                     <TouchableOpacity
                       key={q.code}
                       activeOpacity={0.85}
@@ -3599,11 +4125,14 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                         <Text style={m.qsQuitlineNumber}>{q.number}</Text>
                       </View>
                     </TouchableOpacity>
-                  ))}
+                  ));
+                })()}
               </View>
 
               <Text style={m.qsQuitlineFootnote}>
-                In an immediate medical emergency, dial your local emergency number instead.
+                {QS_QUITLINES.some(q => q.code === country)
+                  ? 'In an immediate medical emergency, dial your local emergency number instead.'
+                  : 'No dedicated quitline is listed for your country yet — these international lines may still help. In an immediate emergency, dial your local emergency number instead.'}
               </Text>
               <View style={{ height: 24 }} />
             </>
@@ -3731,6 +4260,403 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                 </Text>
               </View>
               <View style={{ height: 32 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              RIDE THE WAVE — 3-minute real-time craving rescue. Reuses the
+              breathing animation as the visual rhythm. A craving's peak is
+              usually 3-5 minutes — if you make it through, you win.
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'rescue' && (
+            <>
+              {!rescueDone ? (
+                <>
+                  <Text style={m.qsBreathingIntro}>
+                    {rescueRunning
+                      ? 'Cravings peak in about 3 minutes, then fade. Breathe with the circle and watch the timer.'
+                      : 'Hit start. Breathe with the circle. Outlast the wave — it always passes.'}
+                  </Text>
+
+                  {/* Reasons reminder — the single most effective in-moment tool */}
+                  {reasons.length > 0 && (
+                    <View style={m.qsRescueReasonCard}>
+                      <View style={m.qsRescueReasonHead}>
+                        <Ionicons name="heart" size={14} color={colors.rose} />
+                        <Text style={m.qsRescueReasonHeadTxt}>REMEMBER WHY</Text>
+                      </View>
+                      <Text style={m.qsRescueReasonTxt}>{`"${reasons[Math.floor(Math.random() * Math.min(reasons.length, 1000)) % reasons.length]}"`}</Text>
+                    </View>
+                  )}
+
+                  {/* Reused breathing stage — circle scales with breath rhythm */}
+                  <View style={m.qsBreathingStage}>
+                    <View style={m.qsBreathingGuideOuter} pointerEvents="none" />
+                    <View style={m.qsBreathingGuideMid} pointerEvents="none" />
+                    {Array.from({ length: 12 }).map((_, i) => {
+                      const ang = (i * 30 - 90) * Math.PI / 180;
+                      const r = 150;
+                      const dx = Math.cos(ang) * r;
+                      const dy = Math.sin(ang) * r;
+                      const big = i % 3 === 0;
+                      const color = big ? colors.honey : (i % 3 === 1 ? colors.purple3 : colors.purple);
+                      return (
+                        <View
+                          key={`rsq-halo-${i}`}
+                          pointerEvents="none"
+                          style={{
+                            position: 'absolute',
+                            width: big ? 6 : 4,
+                            height: big ? 6 : 4,
+                            borderRadius: radius.pill,
+                            backgroundColor: color,
+                            transform: [{ translateX: dx }, { translateY: dy }],
+                          }}
+                        />
+                      );
+                    })}
+                    <Animated.View
+                      style={[
+                        m.qsBreathingCircle,
+                        { transform: [{ scale: breathScale }] },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[colors.rose, colors.purpleGlow]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <View style={m.qsBreathingCircleHighlight} pointerEvents="none" />
+                    </Animated.View>
+                    <View style={m.qsBreathingPhaseWrap} pointerEvents="none">
+                      <Text style={m.qsRescueTimer}>
+                        {`${String(Math.floor(rescueSecondsLeft / 60)).padStart(1, '0')}:${String(rescueSecondsLeft % 60).padStart(2, '0')}`}
+                      </Text>
+                      <Text style={m.qsBreathingPhaseSub}>
+                        {breathPhase === 'inhale'   && 'Breathe in'}
+                        {breathPhase === 'hold'     && 'Hold'}
+                        {breathPhase === 'exhale'   && 'Breathe out'}
+                        {(breathPhase === 'idle' || breathPhase === 'complete') && (rescueRunning ? 'Stay with it' : 'Ready')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Progress dots — fill as seconds elapse (10 dots = 18s each) */}
+                  <View style={m.qsBreathingDots}>
+                    {Array.from({ length: 10 }).map((_, i) => {
+                      const elapsedSec = RESCUE_TOTAL_SEC - rescueSecondsLeft;
+                      const passed = elapsedSec >= (i + 1) * (RESCUE_TOTAL_SEC / 10);
+                      return (
+                        <View
+                          key={`rsq-dot-${i}`}
+                          style={[
+                            m.qsBreathingDot,
+                            { backgroundColor: passed ? colors.honey : colors.line2 },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if (rescueRunning) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                        Alert.alert(
+                          'Stop now?',
+                          'You\'re not weak for stopping — but you\'re stronger than you think. Want to keep going?',
+                          [
+                            { text: 'Keep going', style: 'cancel' },
+                            { text: 'Stop', style: 'destructive', onPress: () => stopRescue() },
+                          ],
+                        );
+                      } else {
+                        startRescue();
+                      }
+                    }}
+                    style={m.qsBreathingBtnWrap}
+                  >
+                    {rescueRunning ? (
+                      <View style={[m.qsBreathingBtn, { backgroundColor: colors.rose + '22', borderColor: colors.rose + '55' }]}>
+                        <Ionicons name="stop" size={16} color={colors.rose} />
+                        <Text style={[m.qsBreathingBtnTxt, { color: colors.rose }]}>Stop</Text>
+                      </View>
+                    ) : (
+                      <LinearGradient
+                        colors={[colors.purple, colors.purpleGlow]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={m.qsBreathingBtn}
+                      >
+                        <Ionicons name="play" size={16} color={colors.white} />
+                        <Text style={m.qsBreathingBtnTxt}>Start</Text>
+                      </LinearGradient>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={m.qsBreathingTips}>
+                    <Text style={m.qsBreathingTipsHead}>Why three minutes?</Text>
+                    <Text style={m.qsBreathingTipsBody}>
+                      Nicotine cravings rise, peak, and fall in waves of 3–5 minutes. If you can outlast one wave, the urge fades on its own. Every wave you ride is one less the next time gets to push you around.
+                    </Text>
+                  </View>
+                  <View style={{ height: 32 }} />
+                </>
+              ) : (
+                /* Completion celebration — the user just rode out a craving */
+                <>
+                  <View style={m.qsRescueDoneHero}>
+                    <Svg width={140} height={140} viewBox="0 0 64 64">
+                      {/* Scalloped sun-burst seal */}
+                      <Polygon
+                        points={Array.from({ length: 24 }, (_, i) => {
+                          const ang = (i / 24) * Math.PI * 2 - Math.PI / 2;
+                          const r = i % 2 === 0 ? 30 : 24;
+                          return `${(32 + Math.cos(ang) * r).toFixed(2)},${(32 + Math.sin(ang) * r).toFixed(2)}`;
+                        }).join(' ')}
+                        fill={colors.green}
+                      />
+                      <Path
+                        d="M 22 33 L 29 40 L 44 25"
+                        stroke={colors.white}
+                        strokeWidth={5}
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  </View>
+                  <Text style={m.qsRescueDoneTitle}>You rode it out.</Text>
+                  <Text style={m.qsRescueDoneBody}>
+                    The urge rose, peaked, and passed — and you stayed steady through all three minutes. We logged it as a win in your craving history. Every wave you outlast makes the next one quieter.
+                  </Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => { stopRescue(); setQsView('cravings'); }}
+                    style={m.qsCravingSaveBtnWrap}
+                  >
+                    <LinearGradient
+                      colors={[colors.purple, colors.purpleGlow]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={m.qsCravingSaveBtn}
+                    >
+                      <Text style={m.qsCravingSaveBtnTxt}>Back to cravings</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => { setRescueDone(false); setRescueSecondsLeft(RESCUE_TOTAL_SEC); }}
+                    style={m.qsRescueAgainBtn}
+                  >
+                    <Text style={m.qsRescueAgainBtnTxt}>Go again</Text>
+                  </TouchableOpacity>
+                  <View style={{ height: 32 }} />
+                </>
+              )}
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              YOUR PATTERNS — visualize what's driving the cravings (triggers,
+              hour-of-day, coping wins) so the user can see their own data.
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'patterns' && (() => {
+            // Aggregate trigger counts — top 5 displayed as horizontal bars
+            const triggerCounts = new Map<string, number>();
+            const copingCountsWon = new Map<string, number>();
+            const hourCounts = new Array(24).fill(0) as number[];
+            let totalIntensity = 0;
+            let intensityN = 0;
+            let totalWon = 0;
+            for (const c of cravings) {
+              if (c.trigger) triggerCounts.set(c.trigger, (triggerCounts.get(c.trigger) ?? 0) + 1);
+              if (c.coping && !c.gaveIn) copingCountsWon.set(c.coping, (copingCountsWon.get(c.coping) ?? 0) + 1);
+              try {
+                const h = new Date(c.ts).getHours();
+                if (h >= 0 && h < 24) hourCounts[h] += 1;
+              } catch { /* ignore bad date */ }
+              if (Number.isFinite(c.intensity)) { totalIntensity += c.intensity; intensityN += 1; }
+              if (!c.gaveIn) totalWon += 1;
+            }
+            const winRate = cravings.length > 0 ? Math.round((totalWon / cravings.length) * 100) : 0;
+            const avgIntensity = intensityN > 0 ? (totalIntensity / intensityN) : 0;
+            const triggerLabel = (k: string) => CRAVING_TRIGGERS.find(t => t.key === k)?.label ?? k;
+            const triggerIcon  = (k: string) => CRAVING_TRIGGERS.find(t => t.key === k)?.icon  ?? '•';
+            const copingLabel  = (k: string) => CRAVING_COPING.find(t => t.key === k)?.label   ?? k;
+            const copingIcon   = (k: string) => CRAVING_COPING.find(t => t.key === k)?.icon    ?? '•';
+            const topTriggers = [...triggerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const topCoping   = [...copingCountsWon.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const maxTrigger  = topTriggers[0]?.[1] ?? 0;
+            const maxCoping   = topCoping[0]?.[1] ?? 0;
+            const maxHour     = Math.max(0, ...hourCounts);
+            // Bucket the 24 hours into 6 four-hour slots for a readable histogram
+            const slots: Array<{ label: string; count: number }> = [
+              { label: '12-4a',  count: hourCounts.slice(0, 4).reduce((a, b) => a + b, 0) },
+              { label: '4-8a',   count: hourCounts.slice(4, 8).reduce((a, b) => a + b, 0) },
+              { label: '8-12p',  count: hourCounts.slice(8, 12).reduce((a, b) => a + b, 0) },
+              { label: '12-4p',  count: hourCounts.slice(12, 16).reduce((a, b) => a + b, 0) },
+              { label: '4-8p',   count: hourCounts.slice(16, 20).reduce((a, b) => a + b, 0) },
+              { label: '8-12a',  count: hourCounts.slice(20, 24).reduce((a, b) => a + b, 0) },
+            ];
+            const maxSlot = Math.max(0, ...slots.map(s => s.count));
+            return (
+              <>
+                <Text style={m.qsBreathingIntro}>
+                  Based on {cravings.length} logged craving{cravings.length === 1 ? '' : 's'}. The more you log, the clearer your picture gets.
+                </Text>
+
+                {/* Top-line summary stats */}
+                <View style={m.qsCravingSummary}>
+                  <View style={m.qsCravingSummaryCell}>
+                    <Text style={[m.qsCravingSummaryVal, { color: colors.green }]}>{winRate}%</Text>
+                    <Text style={m.qsCravingSummaryLbl}>win rate</Text>
+                  </View>
+                  <View style={m.qsCravingSummaryDiv} />
+                  <View style={m.qsCravingSummaryCell}>
+                    <Text style={m.qsCravingSummaryVal}>{avgIntensity > 0 ? avgIntensity.toFixed(1) : '—'}</Text>
+                    <Text style={m.qsCravingSummaryLbl}>avg intensity</Text>
+                  </View>
+                  <View style={m.qsCravingSummaryDiv} />
+                  <View style={m.qsCravingSummaryCell}>
+                    <Text style={[m.qsCravingSummaryVal, { color: colors.honey }]}>{totalWon}</Text>
+                    <Text style={m.qsCravingSummaryLbl}>rode out</Text>
+                  </View>
+                </View>
+
+                {/* Top triggers — horizontal bar chart */}
+                <Text style={m.qsDetailSectionTitle}>Top triggers</Text>
+                {topTriggers.length === 0 ? (
+                  <Text style={m.qsPatternsEmpty}>No triggers tagged yet — pick one when you log your next craving.</Text>
+                ) : (
+                  <View style={m.qsPatternsCard}>
+                    {topTriggers.map(([k, count]) => {
+                      const pct = maxTrigger > 0 ? (count / maxTrigger) : 0;
+                      return (
+                        <View key={`tr-${k}`} style={m.qsPatternsBarRow}>
+                          <Text style={m.qsPatternsBarIcon}>{triggerIcon(k)}</Text>
+                          <Text style={m.qsPatternsBarLbl}>{triggerLabel(k)}</Text>
+                          <View style={m.qsPatternsBarTrack}>
+                            <View style={[m.qsPatternsBarFill, { width: `${Math.max(6, pct * 100)}%`, backgroundColor: colors.rose }]} />
+                          </View>
+                          <Text style={m.qsPatternsBarCount}>{count}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* When cravings hit — 6-slot histogram */}
+                <Text style={m.qsDetailSectionTitle}>When they hit</Text>
+                <View style={m.qsPatternsCard}>
+                  <View style={m.qsPatternsHistRow}>
+                    {slots.map((s, i) => {
+                      const pct = maxSlot > 0 ? s.count / maxSlot : 0;
+                      const isPeak = maxSlot > 0 && s.count === maxSlot;
+                      return (
+                        <View key={`slot-${i}`} style={m.qsPatternsHistCol}>
+                          <View style={m.qsPatternsHistBarWrap}>
+                            <View
+                              style={[
+                                m.qsPatternsHistBar,
+                                {
+                                  height: `${Math.max(4, pct * 100)}%`,
+                                  backgroundColor: isPeak ? colors.honey : colors.purple2,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text style={m.qsPatternsHistLbl}>{s.label}</Text>
+                          <Text style={m.qsPatternsHistCount}>{s.count}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  {maxSlot > 0 && (
+                    <Text style={m.qsPatternsHistCaption}>
+                      Most cravings hit during {slots.find(s => s.count === maxSlot)?.label}. Plan ahead for that window.
+                    </Text>
+                  )}
+                </View>
+
+                {/* What's working — top coping wins */}
+                <Text style={m.qsDetailSectionTitle}>What's working</Text>
+                {topCoping.length === 0 ? (
+                  <Text style={m.qsPatternsEmpty}>Pick a coping action on your craving log to see what's beating cravings for you.</Text>
+                ) : (
+                  <View style={m.qsPatternsCard}>
+                    {topCoping.map(([k, count]) => {
+                      const pct = maxCoping > 0 ? (count / maxCoping) : 0;
+                      return (
+                        <View key={`cp-${k}`} style={m.qsPatternsBarRow}>
+                          <Text style={m.qsPatternsBarIcon}>{copingIcon(k)}</Text>
+                          <Text style={m.qsPatternsBarLbl}>{copingLabel(k)}</Text>
+                          <View style={m.qsPatternsBarTrack}>
+                            <View style={[m.qsPatternsBarFill, { width: `${Math.max(6, pct * 100)}%`, backgroundColor: colors.green }]} />
+                          </View>
+                          <Text style={m.qsPatternsBarCount}>{count}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <View style={{ height: 32 }} />
+              </>
+            );
+          })()}
+
+          {/* ════════════════════════════════════════════════════════════════
+              MONEY-SAVED GOAL — name a thing you're saving for, watch the bar.
+          ════════════════════════════════════════════════════════════════ */}
+          {qsView === 'goal' && (
+            <>
+              <View style={m.qsReasonsIntro}>
+                <Ionicons name="trophy" size={18} color={colors.honey} />
+                <Text style={m.qsReasonsIntroTxt}>
+                  Name what you're saving for — a trip, gear, a treat — and we'll track your money-saved progress against it. The bigger the prize, the better the motivation.
+                </Text>
+              </View>
+
+              <Text style={m.qsDetailSectionTitle}>What are you saving for?</Text>
+              <TextInput
+                style={m.qsTextInput}
+                value={goalDraftLabel}
+                onChangeText={setGoalDraftLabel}
+                placeholder="e.g. Weekend in Lisbon"
+                placeholderTextColor={colors.ink3}
+                maxLength={60}
+                returnKeyType="next"
+              />
+
+              <Text style={m.qsDetailSectionTitle}>How much do you need?</Text>
+              <TextInput
+                style={m.qsTextInput}
+                value={goalDraftAmount}
+                onChangeText={setGoalDraftAmount}
+                placeholder="500"
+                placeholderTextColor={colors.ink3}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                onSubmitEditing={saveGoal}
+              />
+
+              <TouchableOpacity activeOpacity={0.85} onPress={saveGoal} style={m.qsCravingSaveBtnWrap}>
+                <LinearGradient
+                  colors={[colors.purple, colors.purpleGlow]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={m.qsCravingSaveBtn}
+                >
+                  <Text style={m.qsCravingSaveBtnTxt}>{moneyGoal ? 'Update goal' : 'Save goal'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {moneyGoal && (
+                <TouchableOpacity activeOpacity={0.85} onPress={clearGoal} style={m.qsRescueAgainBtn}>
+                  <Text style={[m.qsRescueAgainBtnTxt, { color: colors.rose }]}>Remove this goal</Text>
+                </TouchableOpacity>
+              )}
+              <View style={{ height: 24 }} />
             </>
           )}
 
@@ -4291,80 +5217,75 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
             <Ionicons name="close" size={22} color={colors.ink2} />
           </TouchableOpacity>
         </View>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView
-            contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Type */}
-            <View style={{ gap: spacing.sm }}>
-              <Text style={m.qsCravingFormLbl}>Type</Text>
-              <View style={m.qsCravingChipRow}>
-                {NRT_TYPES.map(t => {
-                  const active = nrtFormKind === t.key;
-                  return (
-                    <TouchableOpacity
-                      key={`nrtk-${t.key}`}
-                      activeOpacity={0.85}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                        setNrtFormKind(t.key);
-                      }}
-                      style={[m.qsCravingChip, active && m.qsCravingChipActive]}
-                    >
-                      <Text style={m.qsCravingChipIcon}>{t.icon}</Text>
-                      <Text style={[m.qsCravingChipLbl, active && { color: colors.ink }]}>{t.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+          {/* Type */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>Type</Text>
+            <View style={m.qsCravingChipRow}>
+              {NRT_TYPES.map(t => {
+                const active = nrtFormKind === t.key;
+                return (
+                  <TouchableOpacity
+                    key={`nrtk-${t.key}`}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setNrtFormKind(t.key);
+                    }}
+                    style={[m.qsCravingChip, active && m.qsCravingChipActive]}
+                  >
+                    <Text style={m.qsCravingChipIcon}>{t.icon}</Text>
+                    <Text style={[m.qsCravingChipLbl, active && { color: colors.ink }]}>{t.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          </View>
 
-            {/* Strength */}
-            <View style={{ gap: spacing.sm }}>
-              <Text style={m.qsCravingFormLbl}>Strength <Text style={m.qsNrtOptional}>· optional</Text></Text>
-              <TextInput
-                style={m.qsTextInput}
-                value={nrtFormStrength}
-                onChangeText={setNrtFormStrength}
-                placeholder="e.g. 21 mg, 4 mg, 2 mg"
-                placeholderTextColor={colors.ink3}
-                maxLength={40}
-                returnKeyType="done"
-              />
-            </View>
+          {/* Strength */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>Strength <Text style={m.qsNrtOptional}>· optional</Text></Text>
+            <TextInput
+              style={m.qsTextInput}
+              value={nrtFormStrength}
+              onChangeText={setNrtFormStrength}
+              placeholder="e.g. 21 mg, 4 mg, 2 mg"
+              placeholderTextColor={colors.ink3}
+              maxLength={40}
+              returnKeyType="done"
+            />
+          </View>
 
-            {/* Note */}
-            <View style={{ gap: spacing.sm }}>
-              <Text style={m.qsCravingFormLbl}>Note <Text style={m.qsNrtOptional}>· optional</Text></Text>
-              <TextInput
-                style={[m.qsTextInput, m.qsNrtNoteInput]}
-                value={nrtFormNote}
-                onChangeText={setNrtFormNote}
-                placeholder="How you felt, what triggered it…"
-                placeholderTextColor={colors.ink3}
-                multiline
-                maxLength={200}
-              />
-            </View>
+          {/* Note */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>Note <Text style={m.qsNrtOptional}>· optional</Text></Text>
+            <TextInput
+              style={[m.qsTextInput, m.qsNrtNoteInput]}
+              value={nrtFormNote}
+              onChangeText={setNrtFormNote}
+              placeholder="How you felt, what triggered it…"
+              placeholderTextColor={colors.ink3}
+              multiline
+              maxLength={200}
+            />
+          </View>
 
-            {/* Save CTA */}
-            <TouchableOpacity activeOpacity={0.85} onPress={saveNrtEntry} style={m.qsCravingSaveBtnWrap}>
-              <LinearGradient
-                colors={[colors.purple, colors.purpleGlow]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={m.qsCravingSaveBtn}
-              >
-                <Text style={m.qsCravingSaveBtnTxt}>Save entry</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+          {/* Save CTA */}
+          <TouchableOpacity activeOpacity={0.85} onPress={saveNrtEntry} style={m.qsCravingSaveBtnWrap}>
+            <LinearGradient
+              colors={[colors.purple, colors.purpleGlow]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={m.qsCravingSaveBtn}
+            >
+              <Text style={m.qsCravingSaveBtnTxt}>Save entry</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-            <View style={{ height: spacing.lg }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
+          <View style={{ height: spacing.lg }} />
+        </ScrollView>
       </SafeAreaView>
     </Modal>
     </>
@@ -4385,6 +5306,48 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [formDate, setFormDate] = useState('');
   const [formDpd, setFormDpd] = useState('2');
   const [formCpd, setFormCpd] = useState('5');
+  // UI: which detail view is showing inside the modal (mirrors QuitSmokingModal).
+  // 'support' replaces QS's 'nrt' — alcohol recovery uses programs (AA/SMART/etc.)
+  // instead of nicotine replacement therapy.
+  const [qdView, setQdView] = useState<'main' | 'progress' | 'achievements' | 'achievement' | 'health' | 'cravings' | 'tip' | 'quitline' | 'breathing' | 'reasons' | 'support'>('main');
+  // UI: which achievement is selected for the detail screen
+  const [selectedAch, setSelectedAch] = useState<typeof QD_ACHIEVEMENTS[number] | null>(null);
+  const qdScrollRef = useRef<ScrollView>(null);
+  // Craving logger state — modal visibility + form fields. Mirrors QS exactly so
+  // the UI/UX is identical between the two programs. Default intensity 6 matches
+  // the natural midpoint of "definitely noticeable" on the 1-10 scale.
+  const [cravings, setCravings] = useState<Craving[]>([]);
+  const [cravingFormOpen, setCravingFormOpen] = useState(false);
+  const [cravingIntensity, setCravingIntensity] = useState<number>(6);
+  const [cravingTrigger, setCravingTrigger] = useState<string | null>(null);
+  const [cravingCoping, setCravingCoping] = useState<string | null>(null);
+  const [cravingGaveIn, setCravingGaveIn] = useState(false);
+  // Tip personalization — liked / skipped tip IDs persist to KEYS.QD_TIP and
+  // bias pickDailyQdTip() so a skipped tip is rotated past on the next pull.
+  const [tipPrefs, setTipPrefs] = useState<TipPrefs>(DEFAULT_TIP_PREFS);
+  // Reasons-I'm-quitting anchor. Strongest evidence-based craving tool — reading
+  // these back beats any tip or breathing exercise. Surfaced as a reminder banner
+  // on the cravings view (once populated) and as a dedicated detail view.
+  const [reasons, setReasons]               = useState<string[]>([]);
+  const [reasonsDraft, setReasonsDraft]     = useState<string[]>([]);
+  const [reasonsEditing, setReasonsEditing] = useState(false);
+  const [reasonsInput, setReasonsInput]     = useState('');
+  // Confetti unlock overlay — fired when a new achievement unlocks. We diff the
+  // unlocked set across renders so historical unlocks don't carpet-bomb the user
+  // when they reopen the modal. Mirrors the QS implementation exactly.
+  const [unlockOverlayAch, setUnlockOverlayAch] = useState<typeof QD_ACHIEVEMENTS[number] | null>(null);
+  const [isSettled, setIsSettled] = useState(false);
+
+  // Scroll to top whenever we change views — same UX as the QS modal.
+  useEffect(() => {
+    qdScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [qdView]);
+
+  // Reset detail-view state any time the modal closes so the next open lands on
+  // the main view — mirrors QS, prevents resuming half-finished reasons-editor.
+  useEffect(() => {
+    if (!visible) { setQdView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -4392,11 +5355,49 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
       AsyncStorage.getItem(KEYS.QD),
       AsyncStorage.getItem(KEYS.QD_SLIPS),
       AsyncStorage.getItem(KEYS.QD_BEST),
-    ]).then(([raw, rawSlips, rawBest]) => {
+      AsyncStorage.getItem(KEYS.QD_CRAVE),
+      AsyncStorage.getItem(KEYS.QD_TIP),
+      AsyncStorage.getItem(KEYS.QD_REASONS),
+      AsyncStorage.getItem(KEYS.QD_COST_PROMPT),
+    ]).then(([raw, rawSlips, rawBest, rawCrave, rawTip, rawReasons, rawCostPrompt]) => {
       if (raw) {
         try {
-          setData(JSON.parse(raw));
+          const d: QdData = JSON.parse(raw);
+          setData(d);
           setShowSetup(false);
+          // Re-arm milestone notifications every modal open — cheap insurance against
+          // OS drops (app updates, force-stops, permission toggles). The schedule fn
+          // de-dupes by tag so this is a no-op when nothing has changed.
+          scheduleQdNotifications(new Date(d.quitDate)).catch(() => {});
+          // Yearly cost-update prompt — keeps money-saved numbers accurate as drink
+          // prices rise over time. Skips if prompted within the last 365 days.
+          try {
+            const lastPrompt = rawCostPrompt ? new Date(rawCostPrompt).getTime() : 0;
+            const setupAge   = Date.now() - new Date(d.quitDate).getTime();
+            const promptAge  = Date.now() - lastPrompt;
+            const YEAR_MS = 365 * 86_400_000;
+            if (setupAge > YEAR_MS && (lastPrompt === 0 || promptAge > YEAR_MS)) {
+              const formattedCpd = formatMoneyFromUsd(d.costPerDrink, country, 2);
+              setTimeout(() => {
+                Alert.alert(
+                  'Update your numbers?',
+                  `It's been a while since you set up your tracker. Has your cost per drink changed from ${formattedCpd}? Updating keeps "money saved" accurate.`,
+                  [
+                    { text: 'Looks right', style: 'cancel', onPress: () => {
+                      AsyncStorage.setItem(KEYS.QD_COST_PROMPT, new Date().toISOString());
+                    } },
+                    { text: 'Update now', onPress: () => {
+                      setFormDate(d.quitDate.slice(0, 10));
+                      setFormDpd(String(d.drinksPerDay));
+                      setFormCpd(usdToLocal(d.costPerDrink, country).toFixed(minorUnits(country)));
+                      setShowSetup(true);
+                      AsyncStorage.setItem(KEYS.QD_COST_PROMPT, new Date().toISOString());
+                    } },
+                  ],
+                );
+              }, 600);
+            }
+          } catch { /* prompt is best-effort */ }
         } catch {
           void AsyncStorage.removeItem(KEYS.QD);
           setData(null);
@@ -4411,6 +5412,31 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
         const parsed = rawBest ? parseFloat(rawBest) : 0;
         setBestHours(Number.isFinite(parsed) ? parsed : 0);
       } catch { setBestHours(0); }
+      try { setCravings(rawCrave ? (JSON.parse(rawCrave) as Craving[]) : []); } catch { setCravings([]); }
+      // Defensive parse — guard against malformed JSON, missing keys, and non-array
+      // values so a corrupted store can never throw or feed pickDailyQdTip junk.
+      try {
+        if (rawTip) {
+          const parsed = JSON.parse(rawTip) as Partial<TipPrefs>;
+          const liked   = Array.isArray(parsed?.liked)   ? parsed.liked.filter((x): x is string => typeof x === 'string')   : [];
+          const skipped = Array.isArray(parsed?.skipped) ? parsed.skipped.filter((x): x is string => typeof x === 'string') : [];
+          setTipPrefs({ liked, skipped });
+        } else {
+          setTipPrefs(DEFAULT_TIP_PREFS);
+        }
+      } catch { setTipPrefs(DEFAULT_TIP_PREFS); }
+      // Reasons list — string[] persisted to KEYS.QD_REASONS. Defensive parse so
+      // a corrupted store can't crash or surface garbage in the reasons view.
+      try {
+        if (rawReasons) {
+          const parsed = JSON.parse(rawReasons);
+          setReasons(Array.isArray(parsed)
+            ? parsed.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+            : []);
+        } else {
+          setReasons([]);
+        }
+      } catch { setReasons([]); }
     });
   }, [visible]);
 
@@ -4455,6 +5481,8 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     }
     const d: QdData = { quitDate, drinksPerDay: dpd, costPerDrink: cpdUsd };
     AsyncStorage.setItem(KEYS.QD, JSON.stringify(d));
+    AsyncStorage.setItem(KEYS.QD_COST_PROMPT, new Date().toISOString());
+    scheduleQdNotifications(new Date(quitDate)).catch(() => {});
     setData(d);
     setShowSetup(false);
   }
@@ -4486,6 +5514,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
             AsyncStorage.setItem(KEYS.QD, JSON.stringify(d));
             AsyncStorage.setItem(KEYS.QD_SLIPS, JSON.stringify(updated));
             AsyncStorage.setItem(KEYS.QD_BEST, String(newBest));
+            scheduleQdNotifications(new Date(slipTs)).catch(() => {});
             setSlips(updated);
             setBestHours(newBest);
             setData(d);
@@ -4496,11 +5525,312 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     );
   }
 
+  // Persist a craving log entry. Same pattern as QS — wins ride a Success haptic
+  // and losses ride a softer Warning haptic, never moralize about a slip, and
+  // never reset the timer (slips and cravings are separate buckets).
+  function saveCraving() {
+    const entry: Craving = {
+      ts: new Date().toISOString(),
+      intensity: cravingIntensity,
+      trigger: cravingTrigger ?? undefined,
+      coping:  cravingCoping ?? undefined,
+      gaveIn:  cravingGaveIn,
+    };
+    const updated = [...cravings, entry];
+    AsyncStorage.setItem(KEYS.QD_CRAVE, JSON.stringify(updated));
+    setCravings(updated);
+    setCravingFormOpen(false);
+    // Reset form for next time so the user doesn't see stale values
+    setCravingIntensity(6);
+    setCravingTrigger(null);
+    setCravingCoping(null);
+    setCravingGaveIn(false);
+    Haptics.notificationAsync(
+      entry.gaveIn ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success,
+    ).catch(() => {});
+  }
+
+  // Cravings in the rolling last 7 days, plus the win-rate (didn't give in) so
+  // the main view + cravings detail can surface a single resilience number.
+  const qdCravingsLast7d = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86_400_000;
+    return cravings.filter(c => new Date(c.ts).getTime() >= cutoff);
+  }, [cravings]);
+  const qdCravingsWon7d = qdCravingsLast7d.filter(c => !c.gaveIn).length;
+  const qdCravingsWinRatePct = qdCravingsLast7d.length > 0
+    ? Math.round((qdCravingsWon7d / qdCravingsLast7d.length) * 100)
+    : null;
+
+  // Today's tip — recomputes only when the user's preferences change so the same
+  // tip stays put within a session. pickDailyQdTip is deterministic on the date
+  // hash so the user sees one consistent tip per calendar day.
+  const dailyQdTip = useMemo(() => pickDailyQdTip(tipPrefs), [tipPrefs]);
+
+  // Toggle "love this" on a tip. Liking a tip auto-clears any prior skip so the
+  // user's signal is unambiguous: a love overrides the hide.
+  function toggleQdTipLike(id: string) {
+    setTipPrefs(prev => {
+      const isLiked = prev.liked.includes(id);
+      const next: TipPrefs = {
+        liked:   isLiked ? prev.liked.filter(x => x !== id) : [...prev.liked, id],
+        skipped: isLiked ? prev.skipped : prev.skipped.filter(x => x !== id),
+      };
+      AsyncStorage.setItem(KEYS.QD_TIP, JSON.stringify(next));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      return next;
+    });
+  }
+  // Toggle "not for me" on a tip. Hiding auto-clears any prior love for the same
+  // reason — opposite signals can't coexist on a single tip.
+  function toggleQdTipSkip(id: string) {
+    setTipPrefs(prev => {
+      const isSkipped = prev.skipped.includes(id);
+      const next: TipPrefs = {
+        liked:   isSkipped ? prev.liked : prev.liked.filter(x => x !== id),
+        skipped: isSkipped ? prev.skipped.filter(x => x !== id) : [...prev.skipped, id],
+      };
+      AsyncStorage.setItem(KEYS.QD_TIP, JSON.stringify(next));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      return next;
+    });
+  }
+
+  // ── Calm Breathing — 4-7-8 cycle state machine + animated scale ────────────
+  // Identical loop to QuitSmokingModal — three rounds (inhale 4s · hold 7s ·
+  // exhale 8s) → 'complete'. Refs back the running flag and round count so the
+  // timing callbacks read fresh values even if React renders haven't caught up.
+  const QD_BREATH_ROUNDS = 3;
+  const qdBreathScale = useRef(new Animated.Value(0.55)).current;
+  const qdBreathRunningRef = useRef(false);
+  const qdBreathRoundRef = useRef(0);
+  const qdBreathTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [qdBreathRunning, setQdBreathRunning] = useState(false);
+  const [qdBreathRound, setQdBreathRound] = useState(0);
+  const [qdBreathPhase, setQdBreathPhase] = useState<'idle' | 'inhale' | 'hold' | 'exhale' | 'complete'>('idle');
+
+  function runQdBreathCycle() {
+    if (!qdBreathRunningRef.current) return;
+    qdBreathRoundRef.current += 1;
+    setQdBreathRound(qdBreathRoundRef.current);
+    setQdBreathPhase('inhale');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Animated.timing(qdBreathScale, {
+      toValue: 1.0,
+      duration: 4000,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished || !qdBreathRunningRef.current) return;
+      setQdBreathPhase('hold');
+      const tHold = setTimeout(() => {
+        if (!qdBreathRunningRef.current) return;
+        setQdBreathPhase('exhale');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        Animated.timing(qdBreathScale, {
+          toValue: 0.55,
+          duration: 8000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }).start(({ finished: f }) => {
+          if (!f || !qdBreathRunningRef.current) return;
+          if (qdBreathRoundRef.current >= QD_BREATH_ROUNDS) {
+            qdBreathRunningRef.current = false;
+            setQdBreathRunning(false);
+            setQdBreathPhase('complete');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          } else {
+            runQdBreathCycle();
+          }
+        });
+      }, 7000);
+      qdBreathTimersRef.current.push(tHold);
+    });
+  }
+
+  function startQdBreathing() {
+    if (qdBreathRunningRef.current) return;
+    qdBreathRunningRef.current = true;
+    qdBreathRoundRef.current = 0;
+    setQdBreathRound(0);
+    setQdBreathRunning(true);
+    runQdBreathCycle();
+  }
+
+  function stopQdBreathing() {
+    qdBreathRunningRef.current = false;
+    qdBreathRoundRef.current = 0;
+    setQdBreathRunning(false);
+    setQdBreathRound(0);
+    setQdBreathPhase('idle');
+    qdBreathScale.stopAnimation();
+    Animated.timing(qdBreathScale, { toValue: 0.55, duration: 250, useNativeDriver: true }).start();
+    qdBreathTimersRef.current.forEach(t => clearTimeout(t));
+    qdBreathTimersRef.current = [];
+  }
+
+  // Auto-stop the breathing loop the moment we leave the breathing view or
+  // close the modal. Prevents background timers / haptics from firing into a
+  // hidden screen — the kind of bug that drains battery and confuses users.
+  useEffect(() => {
+    if (!visible || qdView !== 'breathing') {
+      qdBreathRunningRef.current = false;
+      qdBreathRoundRef.current = 0;
+      setQdBreathRunning(false);
+      setQdBreathRound(0);
+      setQdBreathPhase('idle');
+      qdBreathScale.stopAnimation();
+      qdBreathTimersRef.current.forEach(t => clearTimeout(t));
+      qdBreathTimersRef.current = [];
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, qdView]);
+
+  // ── Reasons editor — opens the reasons screen in edit mode with a fresh draft ─
+  // Mirrors QuitSmokingModal exactly so both programs share the same UX.
+  function openReasonsEditor() {
+    setReasonsDraft(reasons.length > 0 ? [...reasons] : []);
+    setReasonsInput('');
+    setReasonsEditing(true);
+    setQdView('reasons');
+  }
+  function addReasonToDraft() {
+    const trimmed = reasonsInput.trim();
+    if (!trimmed) return;
+    if (reasonsDraft.length >= 10) {
+      Alert.alert('That\'s plenty', 'Pick your strongest 10 reasons — the list should sting when you read it back.');
+      return;
+    }
+    setReasonsDraft([...reasonsDraft, trimmed]);
+    setReasonsInput('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+  function removeReasonFromDraft(idx: number) {
+    setReasonsDraft(reasonsDraft.filter((_, i) => i !== idx));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+  function saveReasons() {
+    const cleaned = reasonsDraft.map(r => r.trim()).filter(r => r.length > 0);
+    AsyncStorage.setItem(KEYS.QD_REASONS, JSON.stringify(cleaned));
+    setReasons(cleaned);
+    setReasonsEditing(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }
+
   const hours = elapsed / 3600000;
   const drinksAvoided = data ? Math.floor(hours * (data.drinksPerDay / 24)) : 0;
   const moneySaved = data ? drinksAvoided * data.costPerDrink : 0;
   const calsAvoided = drinksAvoided * 150; // ~150 kcal per drink
   const unlockedCount = data ? QD_ACHIEVEMENTS.filter(a => hours >= a.hours).length : 0;
+
+  // Returns "Xd Yh", "Xh Ym", or "Xm" — compact streak display for personal-best.
+  function qdFormatStreakHours(h: number): string {
+    if (h <= 0) return '0m';
+    const totalMin = Math.floor(h * 60);
+    const days = Math.floor(totalMin / 1440);
+    const hrs  = Math.floor((totalMin % 1440) / 60);
+    const mins = totalMin % 60;
+    if (days > 0) return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
+    if (hrs  > 0) return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+    return `${mins}m`;
+  }
+
+  // Tier-based color for achievement badges — escalates with milestone weight.
+  // <24h: first-day momentum (sky)   < 1wk: early days (teal)
+  // <1mo: real traction (green)      < 1yr: long haul (honey)
+  // ≥1yr: legendary (purple3)
+  function qdAchColor(h: number): string {
+    if (h < 24)    return colors.sky;
+    if (h < 168)   return colors.teal;
+    if (h < 720)   return colors.green;
+    if (h < 8760)  return colors.honey;
+    return colors.purple3;
+  }
+
+  // Date when an achievement was earned = quitDate + hours-threshold (in ms).
+  function qdAchEarnedAt(a: typeof QD_ACHIEVEMENTS[number], quitDate: string): Date {
+    const t = new Date(quitDate).getTime();
+    return new Date(t + a.hours * 3_600_000);
+  }
+
+  // ── Confetti + haptic on newly-unlocked QD achievement ─────────────────────
+  // Diff unlocked-IDs across renders. On first run we seed the ref without firing
+  // (so opening the modal at hour 500 doesn't carpet-bomb the user with confetti
+  // for every historical unlock). After seeding, any new id triggers the overlay.
+  // Uses `hours` as the stable id since QD_ACHIEVEMENTS items are keyed by it.
+  useEffect(() => {
+    if (!data) return;
+    const unlockedNow = new Set<string>(
+      QD_ACHIEVEMENTS.filter(a => hours >= a.hours).map(a => String(a.hours)),
+    );
+    const prev = prevQdUnlockedRefGlobal.current;
+    if (prev == null || !isSettled) {
+      prevQdUnlockedRefGlobal.current = unlockedNow;
+      return;
+    }
+    const newly: typeof QD_ACHIEVEMENTS[number][] = [];
+    for (const a of QD_ACHIEVEMENTS) {
+      if (unlockedNow.has(String(a.hours)) && !prev.has(String(a.hours))) newly.push(a);
+    }
+    if (newly.length > 0) {
+      // Pick the highest-tier (last in list) for the centerpiece celebration
+      const headliner = newly[newly.length - 1];
+      setUnlockOverlayAch(headliner);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Cross-feature XP grant — earned milestones feed the app-wide leveling
+      // system so quitting drinking pays into the same dopamine bank as QS.
+      // 20xp per unlock keeps it meaningful but not exploitative.
+      void useAppStore.getState().addXp(20 * newly.length);
+    }
+    prevQdUnlockedRefGlobal.current = unlockedNow;
+  }, [hours, data]);
+
+  async function shareQdAchievement(a: typeof QD_ACHIEVEMENTS[number]) {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const days = Math.floor(elapsed / 86_400_000);
+      const moneyTxt = formatMoneyFromUsd(moneySaved, country, 0);
+      const lines = [
+        `🏆 I just unlocked "${a.title}" on Dagnara.`,
+        a.desc + '.',
+        '',
+        '— My sobriety so far —',
+        `🗓  ${fmt(days)} day${days === 1 ? '' : 's'} alcohol-free`,
+        `🍺  ${fmt(drinksAvoided)} drink${drinksAvoided === 1 ? '' : 's'} avoided`,
+        `💰  ${moneyTxt} saved`,
+        '',
+        'Dagnara · dagnara.com #QuitDrinking',
+      ];
+      await Share.share({ message: lines.join('\n') });
+    } catch { /* user cancelled */ }
+  }
+
+  // ── Per-period projections (drives Overall Progress detail screen) ─────────
+  // Unlike smoking (cigs-per-pack adds a layer), alcohol's cost-per-drink IS the
+  // per-unit cost — no pack arithmetic needed. Calories use the ~150 kcal/drink
+  // heuristic (~140 ml wine / 350 ml beer / 45 ml spirit average).
+  const dpd = data?.drinksPerDay ?? 0;
+  const cpdUsd = data?.costPerDrink ?? 0;
+  const kcalPerDrink = 150;
+  const drinksPer = {
+    day:   Math.round(dpd),
+    week:  Math.round(dpd * 7),
+    month: Math.round(dpd * 30.42),
+    year:  Math.round(dpd * 365),
+  };
+  const qdMoneyPer = {
+    day:   cpdUsd * dpd,
+    week:  cpdUsd * dpd * 7,
+    month: cpdUsd * dpd * 30.42,
+    year:  cpdUsd * dpd * 365,
+  };
+  const caloriesPer = {
+    day:   Math.round(dpd * kcalPerDrink),
+    week:  Math.round(dpd * kcalPerDrink * 7),
+    month: Math.round(dpd * kcalPerDrink * 30.42),
+    year:  Math.round(dpd * kcalPerDrink * 365),
+  };
+  // Country-aware currency formatter — QdData stores cost in USD.
+  const fmtQdMoney = (vUsd: number): string => formatMoneyFromUsd(vUsd, country);
 
   if (showSetup) {
     return (
@@ -4540,31 +5870,73 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   }
 
   return (
+    <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['bottom']}>
+        {/* ── Header: edit + X on main; back-arrow + dynamic title on detail ── */}
         <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>🍺 Quit Drinking</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <TouchableOpacity
-              onPress={() => {
-                if (data) {
-                  setFormDate(data.quitDate.slice(0, 10));
-                  setFormDpd(String(data.drinksPerDay));
-                  // costPerDrink is stored in USD — convert to display currency for editing.
-                  setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
-                }
-                setShowSetup(true);
-              }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Ionicons name="pencil" size={20} color={colors.ink2} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="close" size={24} color={colors.ink3} />
-            </TouchableOpacity>
-          </View>
+          {qdView === 'main' ? (
+            <>
+              <Text style={m.sheetTitle}>🍺 Quit Drinking</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (data) {
+                      setFormDate(data.quitDate.slice(0, 10));
+                      setFormDpd(String(data.drinksPerDay));
+                      // costPerDrink is stored in USD — convert to display currency for editing.
+                      setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
+                    }
+                    setShowSetup(true);
+                  }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Ionicons name="pencil" size={20} color={colors.ink2} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name="close" size={24} color={colors.ink3} />
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => {
+                  // Detail-view back navigation mirrors QuitSmokingModal:
+                  //  • 'achievement'                       → achievements list
+                  //  • tip / quitline / breathing          → cravings list
+                  //  • anything else                       → main
+                  if (qdView === 'achievement') { setSelectedAch(null); setQdView('achievements'); }
+                  else if (qdView === 'tip' || qdView === 'quitline' || qdView === 'breathing') setQdView('cravings');
+                  else { setReasonsEditing(false); setQdView('main'); }
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <BackChevron size={28} color={colors.green} />
+              </TouchableOpacity>
+              <Text style={m.sheetTitle}>
+                {qdView === 'progress'     && 'Overall progress'}
+                {qdView === 'achievements' && 'Achievements'}
+                {qdView === 'achievement'  && ''}
+                {qdView === 'health'       && 'Health improvements'}
+                {qdView === 'cravings'     && 'Beat your cravings'}
+                {qdView === 'tip'          && 'Tip of the day'}
+                {qdView === 'quitline'     && 'Helplines'}
+                {qdView === 'breathing'    && 'Calm breathing'}
+                {qdView === 'reasons'      && 'My reasons'}
+                {qdView === 'support'      && 'Recovery support'}
+              </Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color={colors.ink2} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={qdScrollRef} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
+          {/* ════════════════════════════════════════════════════════════════
+              MAIN VIEW — timer + stats + achievements + health (existing content)
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'main' && (<>
           {/* Timer */}
           <View style={m.timerCard}>
             <Text style={m.timerLabel}>Alcohol-free for</Text>
@@ -4572,21 +5944,23 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
             <Text style={m.timerSub}>{unlockedCount}/{QD_ACHIEVEMENTS.length} achievements unlocked</Text>
           </View>
 
-          {/* Stats */}
-          <View style={m.statsRow}>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>{drinksAvoided}</Text>
-              <Text style={m.statLbl}>drinks avoided</Text>
+          {/* Stats — tap any card to open the Overall Progress detail view */}
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setQdView('progress')}>
+            <View style={m.statsRow}>
+              <View style={m.statCard}>
+                <Text style={m.statVal}>{drinksAvoided}</Text>
+                <Text style={m.statLbl}>drinks avoided</Text>
+              </View>
+              <View style={m.statCard}>
+                <Text style={m.statVal}>{formatMoneyFromUsd(moneySaved, country)}</Text>
+                <Text style={m.statLbl}>money saved</Text>
+              </View>
+              <View style={m.statCard}>
+                <Text style={m.statVal}>{calsAvoided}</Text>
+                <Text style={m.statLbl}>kcal avoided</Text>
+              </View>
             </View>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>{formatMoneyFromUsd(moneySaved, country)}</Text>
-              <Text style={m.statLbl}>money saved</Text>
-            </View>
-            <View style={m.statCard}>
-              <Text style={m.statVal}>{calsAvoided}</Text>
-              <Text style={m.statLbl}>kcal avoided</Text>
-            </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Resilience — personal best & slips (relapse-positive framing) */}
           <View style={m.statsRow}>
@@ -4628,42 +6002,1393 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
             </View>
           </View>
 
-          {/* Achievements */}
-          <Text style={m.sectionTitle}>Achievements</Text>
-          {QD_ACHIEVEMENTS.map((a, i) => {
-            const done = hours >= a.hours;
-            return (
-              <View key={`ach-${i}`} style={[m.achieveRow, !done && m.achieveLocked]}>
-                <Text style={[m.achieveIcon, !done && { opacity: 0.3 }]}>{a.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[m.achieveTitle, !done && { color: colors.ink3 }]}>{a.title}</Text>
-                  <Text style={m.achieveDesc}>{a.desc}</Text>
-                </View>
-                {done && <Ionicons name="checkmark-circle" size={20} color={colors.green} />}
-              </View>
-            );
-          })}
+          {/* ── Achievements (horizontal scroll + See all → grid) ─────────── */}
+          <View style={m.qsSectionHead}>
+            <Text style={m.qsHeading}>Achievements</Text>
+            <TouchableOpacity onPress={() => setQdView('achievements')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={m.qsSeeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={m.qsAchScroll}
+          >
+            {QD_ACHIEVEMENTS.map((a, i) => {
+              const done = hours >= a.hours;
+              return (
+                <TouchableOpacity
+                  key={`ach-${i}`}
+                  activeOpacity={0.85}
+                  style={[m.qsAchTile, !done && m.qsAchTileLocked]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setSelectedAch(a);
+                    setQdView('achievement');
+                  }}
+                >
+                  <QsAchBadge icon={a.icon} color={qdAchColor(a.hours)} locked={!done} />
+                  <Text style={[m.qsAchTileTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>{a.title}</Text>
+                  <Text style={m.qsAchTileDesc} numberOfLines={2}>{a.desc}</Text>
+                  {done && (
+                    <View style={m.qsAchCheck}>
+                      <Ionicons name="checkmark" size={12} color={colors.white} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-          {/* Health Timeline */}
-          <Text style={m.sectionTitle}>Health Timeline</Text>
-          {QD_MILESTONES.map((ms, i) => {
-            const done = hours >= ms.hours;
+          {/* ── Health improvements card → opens detail ─────────────── */}
+          <View style={m.qsSectionHead}>
+            <Text style={m.qsHeading}>Health improvements</Text>
+            <TouchableOpacity onPress={() => setQdView('health')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={m.qsSeeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          {(() => {
+            // Pick the next-in-progress milestone (first one not yet done), or the
+            // last one if everything is unlocked — keeps main view scannable.
+            const next = QD_MILESTONES.find((ms) => hours < ms.hours) ?? QD_MILESTONES[QD_MILESTONES.length - 1];
+            const pct  = Math.min(100, Math.round((hours / next.hours) * 100));
+            const done = pct >= 100;
             return (
-              <View key={`ms-${i}`} style={m.milestoneRow}>
-                <View style={[m.milestoneDot, done && { backgroundColor: colors.green }]} />
-                <Text style={m.milestoneIcon}>{ms.icon}</Text>
-                <Text style={[m.milestoneTxt, !done && { color: colors.ink3 }]}>{ms.text}</Text>
-              </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('health'); }}
+                style={m.qsHealthCard}
+              >
+                <Text style={{ fontSize: fontSize.xl }}>{next.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.qsHealthDesc}>{next.text}</Text>
+                  <View style={[m.qsHealthBarRow, { marginTop: spacing.xs }]}>
+                    <Text style={[m.qsHealthPct, { color: done ? colors.green : colors.sky }]}>{pct}</Text>
+                    <View style={m.qsHealthBarTrack}>
+                      <View
+                        style={[
+                          m.qsHealthBarFill,
+                          { width: `${Math.max(pct, 4)}%`, backgroundColor: done ? colors.green : colors.sky },
+                        ]}
+                      />
+                    </View>
+                    <Text style={m.qsHealthBarEnd}>100</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             );
-          })}
+          })()}
+
+          {/* ── Beat your cravings — entry card (same pattern as Health) ──── */}
+          <View style={m.qsSectionHead}>
+            <Text style={m.qsHeading}>Beat your cravings</Text>
+            <TouchableOpacity onPress={() => setQdView('cravings')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={m.qsSeeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('cravings'); }}
+            style={m.qsHealthCard}
+          >
+            <View style={{ width: 68, height: 78, alignItems: 'center', justifyContent: 'center' }}>
+              <MeditationArt size={76} />
+            </View>
+            <View style={{ flex: 1 }}>
+              {/* Show live stats if user has 7d history — otherwise generic intro */}
+              {qdCravingsLast7d.length > 0 ? (
+                <Text style={m.qsHealthDesc} numberOfLines={2}>
+                  <Text style={{ color: colors.green, fontWeight: '800' }}>{qdCravingsWon7d}</Text>
+                  {' '}
+                  craving{qdCravingsWon7d === 1 ? '' : 's'} ridden out this week
+                  {qdCravingsWinRatePct !== null ? ` · ${qdCravingsWinRatePct}% win rate` : ''}.
+                </Text>
+              ) : (
+                <Text style={m.qsHealthDesc} numberOfLines={2}>
+                  Small tools to ride out the urge when alcohol calls.
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+          </TouchableOpacity>
+
+          {/* ── My reasons — strongest evidence-based craving anchor ─────── */}
+          <View style={m.qsSectionHead}>
+            <Text style={m.qsHeading}>My reasons</Text>
+            <TouchableOpacity onPress={() => setQdView('reasons')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={m.qsSeeAll}>{reasons.length > 0 ? 'See all' : 'Add'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              if (reasons.length === 0) openReasonsEditor();
+              else setQdView('reasons');
+            }}
+            style={m.qsHealthCard}
+          >
+            <View style={[m.qsProgCircle, { backgroundColor: colors.rose, width: 56, height: 56 }]}>
+              <Ionicons name="heart" size={26} color={colors.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              {reasons.length > 0 ? (
+                <>
+                  <Text style={m.qsHealthDesc} numberOfLines={2}>
+                    {`"${reasons[0]}"`}
+                  </Text>
+                  <Text style={[m.qsHealthDesc, { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4 }]}>
+                    {reasons.length} reason{reasons.length === 1 ? '' : 's'} · read on the next craving
+                  </Text>
+                </>
+              ) : (
+                <Text style={m.qsHealthDesc} numberOfLines={2}>
+                  Write down why you're quitting. The strongest urge-fighting tool there is.
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+          </TouchableOpacity>
+
+          {/* ── Recovery support — AA / SMART / online programs ────────────── */}
+          <View style={m.qsSectionHead}>
+            <Text style={m.qsHeading}>Recovery support</Text>
+            <TouchableOpacity onPress={() => setQdView('support')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={m.qsSeeAll}>Open</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('support'); }}
+            style={m.qsHealthCard}
+          >
+            <View style={[m.qsProgCircle, { backgroundColor: colors.teal, width: 56, height: 56 }]}>
+              <Ionicons name="people" size={26} color={colors.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={m.qsHealthDesc} numberOfLines={2}>
+                AA, SMART Recovery, Refuge Recovery and more — find a meeting or community near you.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+          </TouchableOpacity>
 
           <TouchableOpacity style={m.dangerBtn} onPress={resetProgress}>
             <Text style={m.dangerBtnTxt}>I had a drink</Text>
           </TouchableOpacity>
           <View style={{ height: 24 }} />
+          </>)}
+
+          {/* ════════════════════════════════════════════════════════════════
+              PROGRESS DETAIL — drinks avoided / money saved / calories
+              avoided per period + resilience (personal-best + slips)
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'progress' && (
+            <>
+              {/* Drinks avoided */}
+              <Text style={m.qsDetailSectionTitle}>Drinks avoided</Text>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per day</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(drinksPer.day)}</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per week</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(drinksPer.week)}</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per month</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(drinksPer.month)}</Text>
+              </View>
+              <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                <Text style={m.qsDetailRowLbl}>Per year</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(drinksPer.year)}</Text>
+              </View>
+
+              {/* Money saved */}
+              <Text style={m.qsDetailSectionTitle}>Money saved</Text>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per day</Text>
+                <Text style={m.qsDetailRowVal}>{fmtQdMoney(qdMoneyPer.day)}</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per week</Text>
+                <Text style={m.qsDetailRowVal}>{fmtQdMoney(qdMoneyPer.week)}</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per month</Text>
+                <Text style={m.qsDetailRowVal}>{fmtQdMoney(qdMoneyPer.month)}</Text>
+              </View>
+              <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                <Text style={m.qsDetailRowLbl}>Per year</Text>
+                <Text style={m.qsDetailRowVal}>{fmtQdMoney(qdMoneyPer.year)}</Text>
+              </View>
+
+              {/* Calories avoided — alcohol's equivalent of QS's "time won back" */}
+              <Text style={m.qsDetailSectionTitle}>Calories avoided</Text>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per day</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(caloriesPer.day)} kcal</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per week</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(caloriesPer.week)} kcal</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Per month</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(caloriesPer.month)} kcal</Text>
+              </View>
+              <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                <Text style={m.qsDetailRowLbl}>Per year</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(caloriesPer.year)} kcal</Text>
+              </View>
+
+              {/* Resilience — personal best + slip recovery (relapse-positive framing) */}
+              <Text style={m.qsDetailSectionTitle}>Resilience</Text>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Current streak</Text>
+                <Text style={m.qsDetailRowVal}>{qdFormatStreakHours(hours)}</Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Personal best</Text>
+                <Text style={[m.qsDetailRowVal, hours >= bestHours && { color: colors.green }]}>
+                  {qdFormatStreakHours(Math.max(bestHours, hours))}
+                  {hours >= bestHours && bestHours > 0 ? '  ★' : ''}
+                </Text>
+              </View>
+              <View style={m.qsDetailRow}>
+                <Text style={m.qsDetailRowLbl}>Slips logged</Text>
+                <Text style={m.qsDetailRowVal}>{fmt(slips.length)}</Text>
+              </View>
+              <View style={[m.qsDetailRow, m.qsDetailRowLast]}>
+                <Text style={m.qsDetailRowLbl}>Last slip</Text>
+                <Text style={[m.qsDetailRowVal, slips.length === 0 && { color: colors.green }]}>
+                  {slips.length === 0
+                    ? 'Never'
+                    : `${qdFormatStreakHours((Date.now() - new Date(slips[slips.length - 1]).getTime()) / 3_600_000)} ago`}
+                </Text>
+              </View>
+
+              {/* Productivity scene — reuse the QS family-consistent bottom illo */}
+              <View style={m.qsDetailArt}>
+                <ProgressSceneArt width={240} />
+              </View>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              ACHIEVEMENTS DETAIL — QuitNow-style 2-col grid w/ tier badges
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'achievements' && (
+            <>
+              <View style={m.qsAchGrid2}>
+                {QD_ACHIEVEMENTS.map((a, i) => {
+                  const done = hours >= a.hours;
+                  return (
+                    <TouchableOpacity
+                      key={`ach-grid-${i}`}
+                      activeOpacity={0.85}
+                      style={m.qsAchCard}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        setSelectedAch(a);
+                        setQdView('achievement');
+                      }}
+                    >
+                      {/* Badge block — top portion of card */}
+                      <View style={m.qsAchCardArt}>
+                        <QsAchBadge icon={a.icon} color={qdAchColor(a.hours)} locked={!done} />
+                      </View>
+                      {/* Title */}
+                      <Text style={[m.qsAchCardTitle, !done && { color: colors.ink3 }]} numberOfLines={1}>
+                        {a.title}
+                      </Text>
+                      {/* Stat — the descriptive text from the achievement */}
+                      <Text style={[m.qsAchCardStat, !done && { color: colors.ink3 }]} numberOfLines={2}>
+                        {a.desc}
+                      </Text>
+                      {/* Green scalloped verification seal — only when unlocked */}
+                      {done && (
+                        <View style={m.qsAchCardSeal}>
+                          <Svg width={26} height={26} viewBox="0 0 64 64">
+                            <Polygon
+                              points={Array.from({ length: 24 }, (_, idx) => {
+                                const ang = (idx / 24) * Math.PI * 2 - Math.PI / 2;
+                                const r = idx % 2 === 0 ? 30 : 24;
+                                return `${(32 + Math.cos(ang) * r).toFixed(2)},${(32 + Math.sin(ang) * r).toFixed(2)}`;
+                              }).join(' ')}
+                              fill={colors.green}
+                            />
+                            <Path
+                              d="M 22 33 L 29 40 L 44 25"
+                              stroke={colors.white}
+                              strokeWidth={5}
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </Svg>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              ACHIEVEMENT DETAIL — QuitNow-style hero badge + stat + date
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'achievement' && selectedAch && data && (() => {
+            const a = selectedAch;
+            const done = hours >= a.hours;
+            const earnedAt = done ? qdAchEarnedAt(a, data.quitDate) : null;
+            const dateTxt = earnedAt
+              ? `${earnedAt.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })} at ${earnedAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`
+              : '';
+
+            return (
+              <>
+                {/* ── Hero illo — QsIllo SVG sits directly on page bg, no card
+                    frame. Chunk 15: swapped emoji-in-disc for the shared QsIllo
+                    family so QD reads as the same trophy class as QS. ──────── */}
+                <View style={m.qsAchDetailArt}>
+                  <QsIllo kind={a.illo} id={a.id} locked={!done} />
+                </View>
+
+                {/* ── Title + stat + date chip ──────────────────────────────── */}
+                <View style={m.qsAchDetailTitleWrap}>
+                  <Text style={m.qsAchDetailTitle}>{a.title}</Text>
+                  <Text style={m.qsAchDetailStat}>{a.desc}</Text>
+
+                  {done ? (
+                    <View style={m.qsAchDetailDate}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.green} style={{ marginRight: 6 }} />
+                      <Text style={m.qsAchDetailDateTxt}>{dateTxt || 'Unlocked'}</Text>
+                    </View>
+                  ) : (
+                    <View style={m.qsAchDetailDate}>
+                      <Ionicons name="lock-closed" size={14} color={colors.ink3} style={{ marginRight: 6 }} />
+                      <Text style={[m.qsAchDetailDateTxt, { color: colors.ink3 }]}>Locked — keep going</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* ── Locked state: in-flow encouragement card ──────────────── */}
+                {!done && (
+                  <View style={m.qsAchDetailLockedNote}>
+                    <Text style={m.qsAchDetailLockedTitle}>Almost there</Text>
+                    <Text style={m.qsAchDetailLockedSub}>
+                      {qdFormatStreakHours(Math.max(0, a.hours - hours))} to go — stay the course.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Spacer so the bottom dock (added in chunk 13) won't cover content */}
+                {done && <View style={{ height: 200 }} />}
+              </>
+            );
+          })()}
+
+          {/* ════════════════════════════════════════════════════════════════
+              HEALTH IMPROVEMENTS DETAIL — progress bars per milestone.
+              Same layout as QS but cited to NHS/NIH (alcohol-recovery sources).
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'health' && (
+            <>
+              <View style={m.qsHealthList}>
+                {QD_MILESTONES.map((ms, i) => {
+                  const pct  = Math.min(100, Math.round((hours / ms.hours) * 100));
+                  const done = pct >= 100;
+                  return (
+                    <View key={`qd-h-${i}`} style={m.qsHealthRow}>
+                      {/* Bar with end labels */}
+                      <View style={m.qsHealthBarRow}>
+                        <Text style={[m.qsHealthPct, { color: done ? colors.green : colors.sky }]}>{pct}</Text>
+                        <View style={m.qsHealthBarTrack}>
+                          <View
+                            style={[
+                              m.qsHealthBarFill,
+                              { width: `${Math.max(pct, 4)}%`, backgroundColor: done ? colors.green : colors.sky },
+                            ]}
+                          />
+                        </View>
+                        <Text style={m.qsHealthBarEnd}>100</Text>
+                      </View>
+                      {/* Icon + description + tick */}
+                      <View style={m.qsHealthBody}>
+                        <Text style={{ fontSize: fontSize.lg }}>{ms.icon}</Text>
+                        <Text style={m.qsHealthText}>{ms.text}</Text>
+                        {done && <Ionicons name="checkmark-circle" size={20} color={colors.green} />}
+                      </View>
+                    </View>
+                  );
+                })}
+                {/* Source footnote — NHS rod-of-asclepius mark in WHO blue family */}
+                <View style={m.qsHealthWhoBlock}>
+                  <Text style={m.qsHealthFootnote}>Based on</Text>
+                  <Svg width={38} height={38} viewBox="0 0 64 64">
+                    <Circle cx={32} cy={32} r={28} fill={colors.sky} />
+                    <Line x1={32} y1={14} x2={32} y2={52} stroke={colors.white} strokeWidth={2} strokeLinecap="round" />
+                    <Path
+                      d="M 32 20 Q 26 24 32 28 Q 38 32 32 36 Q 26 40 32 44"
+                      stroke={colors.white}
+                      strokeWidth={1.8}
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    <Circle cx={32} cy={32} r={14} fill="none" stroke={colors.white} strokeWidth={1.2} />
+                  </Svg>
+                  <Text style={m.qsHealthFootnote}>NHS &amp; NIAAA recovery data</Text>
+                </View>
+              </View>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              BEAT YOUR CRAVINGS — list of 3 tools (Tip / Quit lines / Breathing)
+              + an "add reasons" hint (active once chunk 11 lands).
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'cravings' && (
+            <>
+              <Text style={m.qsCravingsIntro}>
+                Pick a tool to ride the wave when an urge hits. Each takes less than a minute.
+              </Text>
+
+              {/* Reasons reminder banner — the strongest in-moment craving tool.
+                  Populated state previews reason #1 and routes to the reasons
+                  read-mode view; empty state pulls the user into the editor. */}
+              {reasons.length > 0 ? (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('reasons'); }}
+                  style={m.qsReasonsBanner}
+                >
+                  <View style={m.qsReasonsBannerIcon}>
+                    <Ionicons name="heart" size={18} color={colors.rose} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={m.qsReasonsBannerLbl}>READ FIRST · YOUR REASONS</Text>
+                    <Text style={m.qsReasonsBannerTxt} numberOfLines={2}>
+                      {`"${reasons[0]}"`}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); openReasonsEditor(); }}
+                  style={m.qsReasonsBannerEmpty}
+                >
+                  <Ionicons name="heart-outline" size={18} color={colors.rose} />
+                  <Text style={m.qsReasonsBannerEmptyTxt}>
+                    Write down your reasons — the #1 craving tool.
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* 7-day craving summary — only shown once user has any history */}
+              {qdCravingsLast7d.length > 0 && (
+                <View style={m.qsCravingSummary}>
+                  <View style={m.qsCravingSummaryCell}>
+                    <Text style={m.qsCravingSummaryVal}>{qdCravingsLast7d.length}</Text>
+                    <Text style={m.qsCravingSummaryLbl}>logged · 7d</Text>
+                  </View>
+                  <View style={m.qsCravingSummaryDiv} />
+                  <View style={m.qsCravingSummaryCell}>
+                    <Text style={[m.qsCravingSummaryVal, { color: colors.green }]}>{qdCravingsWon7d}</Text>
+                    <Text style={m.qsCravingSummaryLbl}>rode out</Text>
+                  </View>
+                  {qdCravingsWinRatePct !== null && (
+                    <>
+                      <View style={m.qsCravingSummaryDiv} />
+                      <View style={m.qsCravingSummaryCell}>
+                        <Text style={[m.qsCravingSummaryVal, { color: colors.honey }]}>{qdCravingsWinRatePct}%</Text>
+                        <Text style={m.qsCravingSummaryLbl}>win rate</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {/* Log a craving — primary action up top so it's the first tap target */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setCravingFormOpen(true);
+                }}
+                style={m.qsCravingLogBtnWrap}
+              >
+                <LinearGradient
+                  colors={[colors.purple, colors.purpleGlow]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={m.qsCravingLogBtn}
+                >
+                  <Ionicons name="add-circle" size={18} color={colors.white} />
+                  <Text style={m.qsCravingLogBtnTxt}>Log a craving</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Tip of the day */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('tip'); }}
+                style={m.qsCravingCard}
+              >
+                <View style={m.qsCravingCardArt}>
+                  <TipBulbArt size={84} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.qsCravingCardTitle}>Tip of the day</Text>
+                  <Text style={m.qsCravingCardDesc}>A fresh strategy every day to keep urges short and sweet.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+              </TouchableOpacity>
+
+              {/* Helplines */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('quitline'); }}
+                style={m.qsCravingCard}
+              >
+                <View style={m.qsCravingCardArt}>
+                  <QuitlinePhoneArt size={84} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.qsCravingCardTitle}>Helplines</Text>
+                  <Text style={m.qsCravingCardDesc}>Free, confidential support lines staffed by trained counselors.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+              </TouchableOpacity>
+
+              {/* Calm breathing */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setQdView('breathing'); }}
+                style={m.qsCravingCard}
+              >
+                <View style={m.qsCravingCardArt}>
+                  <MeditationArt size={84} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.qsCravingCardTitle}>Calm breathing</Text>
+                  <Text style={m.qsCravingCardDesc}>Guided 4-7-8 breath cycle to drop your stress and the urge with it.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.ink3} />
+              </TouchableOpacity>
+
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              TIP OF THE DAY — date stamp, one fresh tip, love/hide reactions.
+              Reactions persist to KEYS.QD_TIP and bias tomorrow's pick away
+              from skipped tips so the rotation feels personal over time.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'tip' && (
+            <>
+              <View style={m.qsTipHero}>
+                <TipBulbArt size={140} />
+              </View>
+              <Text style={m.qsTipDate}>
+                {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+              </Text>
+              <Text style={m.qsTipTitle}>{dailyQdTip.title}</Text>
+              <Text style={m.qsTipBody}>{dailyQdTip.body}</Text>
+
+              <View style={m.qsTipReactRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => toggleQdTipLike(dailyQdTip.id)}
+                  style={[m.qsTipReactBtn, tipPrefs.liked.includes(dailyQdTip.id) && m.qsTipReactBtnLiked]}
+                >
+                  <Ionicons
+                    name={tipPrefs.liked.includes(dailyQdTip.id) ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={tipPrefs.liked.includes(dailyQdTip.id) ? colors.rose : colors.ink2}
+                  />
+                  <Text style={[m.qsTipReactTxt, tipPrefs.liked.includes(dailyQdTip.id) && { color: colors.rose }]}>
+                    {tipPrefs.liked.includes(dailyQdTip.id) ? 'Loved' : 'Love this'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => toggleQdTipSkip(dailyQdTip.id)}
+                  style={[m.qsTipReactBtn, tipPrefs.skipped.includes(dailyQdTip.id) && m.qsTipReactBtnSkipped]}
+                >
+                  <Ionicons
+                    name={tipPrefs.skipped.includes(dailyQdTip.id) ? 'eye-off' : 'eye-off-outline'}
+                    size={18}
+                    color={tipPrefs.skipped.includes(dailyQdTip.id) ? colors.honey : colors.ink2}
+                  />
+                  <Text style={[m.qsTipReactTxt, tipPrefs.skipped.includes(dailyQdTip.id) && { color: colors.honey }]}>
+                    {tipPrefs.skipped.includes(dailyQdTip.id) ? 'Hidden' : 'Not for me'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={m.qsTipDivider} />
+              <View style={m.qsTipFootRow}>
+                <Ionicons name="refresh" size={16} color={colors.ink3} />
+                <Text style={m.qsTipFootTxt}>A new tip unlocks every day. Come back tomorrow.</Text>
+              </View>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              HELPLINES — user's home-country alcohol helpline (falls back to
+              the full international list when no entry exists for their
+              country). Tap a row to dial directly.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'quitline' && (
+            <>
+              <View style={m.qsQuitlineHero}>
+                <QuitlinePhoneArt size={120} />
+              </View>
+              <Text style={m.qsQuitlineIntro}>
+                Free, confidential, and staffed by counselors trained in alcohol recovery. Tap a number to call now.
+              </Text>
+
+              <View style={m.qsQuitlineGroup}>
+                {/* Country-specific: show only the user's home-country helpline(s).
+                    If the user's country isn't in the dataset, fall back to the full
+                    list (alphabetised) so the screen is never empty. */}
+                {(() => {
+                  const local = QD_QUITLINES.filter(q => q.code === country);
+                  const list = local.length > 0
+                    ? local
+                    : [...QD_QUITLINES].sort((a, b) => a.region.localeCompare(b.region));
+                  return list.map((q, idx, arr) => (
+                    <TouchableOpacity
+                      key={q.code}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        Linking.openURL(q.href).catch(() => {
+                          Alert.alert('Unable to dial', `Please dial ${q.number} from your phone app.`);
+                        });
+                      }}
+                      style={[m.qsQuitlineRow, idx === arr.length - 1 && m.qsQuitlineRowLast]}
+                    >
+                      <Text style={m.qsQuitlineFlag}>{q.flag}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={m.qsQuitlineRegion}>{q.region}</Text>
+                        <Text style={m.qsQuitlineHours}>{q.hours}</Text>
+                      </View>
+                      <View style={m.qsQuitlineCallBtn}>
+                        <Ionicons name="call" size={14} color={colors.white} />
+                        <Text style={m.qsQuitlineNumber}>{q.number}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ));
+                })()}
+              </View>
+
+              <Text style={m.qsQuitlineFootnote}>
+                {QD_QUITLINES.some(q => q.code === country)
+                  ? 'In an immediate medical emergency, dial your local emergency number instead.'
+                  : 'No dedicated helpline is listed for your country yet — these international lines may still help. In an immediate emergency, dial your local emergency number instead.'}
+              </Text>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              CALM BREATHING — 4-7-8 guided breath with animated circle.
+              Mirrors QuitSmokingModal exactly — the technique is identical and
+              the alcohol-specific framing is in the "Why it works" footer.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'breathing' && (
+            <>
+              <Text style={m.qsBreathingIntro}>
+                Inhale for 4 seconds, hold for 7, exhale for 8. Three rounds is enough to reset your nervous system.
+              </Text>
+
+              <View style={m.qsBreathingStage}>
+                {/* Outer dashed guide ring */}
+                <View style={m.qsBreathingGuideOuter} pointerEvents="none" />
+                {/* Mid solid guide ring */}
+                <View style={m.qsBreathingGuideMid} pointerEvents="none" />
+                {/* Halo dots scattered around the outer ring */}
+                {Array.from({ length: 12 }).map((_, i) => {
+                  const ang = (i * 30 - 90) * Math.PI / 180;
+                  const r = 150;
+                  const dx = Math.cos(ang) * r;
+                  const dy = Math.sin(ang) * r;
+                  const big = i % 3 === 0;
+                  const color = big ? colors.honey : (i % 3 === 1 ? colors.purple3 : colors.purple);
+                  return (
+                    <View
+                      key={`qd-br-halo-${i}`}
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        width: big ? 6 : 4,
+                        height: big ? 6 : 4,
+                        borderRadius: radius.pill,
+                        backgroundColor: color,
+                        transform: [{ translateX: dx }, { translateY: dy }],
+                      }}
+                    />
+                  );
+                })}
+                {/* Animated breath circle */}
+                <Animated.View
+                  style={[
+                    m.qsBreathingCircle,
+                    { transform: [{ scale: qdBreathScale }] },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[colors.purple2, colors.purpleGlow]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  {/* Inner highlight (polished plastic) */}
+                  <View style={m.qsBreathingCircleHighlight} pointerEvents="none" />
+                </Animated.View>
+                {/* Phase label sits on top, perfectly centered */}
+                <View style={m.qsBreathingPhaseWrap} pointerEvents="none">
+                  <Text style={m.qsBreathingPhase}>
+                    {qdBreathPhase === 'idle'     && 'Ready'}
+                    {qdBreathPhase === 'inhale'   && 'Breathe in'}
+                    {qdBreathPhase === 'hold'     && 'Hold'}
+                    {qdBreathPhase === 'exhale'   && 'Breathe out'}
+                    {qdBreathPhase === 'complete' && 'Complete'}
+                  </Text>
+                  <Text style={m.qsBreathingPhaseSub}>
+                    {qdBreathPhase === 'idle'     && 'Tap start when you’re ready'}
+                    {qdBreathPhase === 'inhale'   && '4 seconds'}
+                    {qdBreathPhase === 'hold'     && '7 seconds'}
+                    {qdBreathPhase === 'exhale'   && '8 seconds'}
+                    {qdBreathPhase === 'complete' && 'Three rounds done'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Round progress — three dots, one per breathing round */}
+              <View style={m.qsBreathingDots}>
+                {Array.from({ length: QD_BREATH_ROUNDS }).map((_, i) => (
+                  <View
+                    key={`qd-br-dot-${i}`}
+                    style={[
+                      m.qsBreathingDot,
+                      { backgroundColor: qdBreathRound > i ? colors.honey : colors.line2 },
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {/* Start / stop CTA */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  if (qdBreathRunning) stopQdBreathing();
+                  else startQdBreathing();
+                }}
+                style={m.qsBreathingBtnWrap}
+              >
+                {qdBreathRunning ? (
+                  <View style={[m.qsBreathingBtn, { backgroundColor: colors.rose + '22', borderColor: colors.rose + '55' }]}>
+                    <Ionicons name="stop" size={16} color={colors.rose} />
+                    <Text style={[m.qsBreathingBtnTxt, { color: colors.rose }]}>Stop</Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={[colors.purple, colors.purpleGlow]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={m.qsBreathingBtn}
+                  >
+                    <Ionicons name="play" size={16} color={colors.white} />
+                    <Text style={m.qsBreathingBtnTxt}>{qdBreathPhase === 'complete' ? 'Breathe again' : 'Start'}</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+
+              <View style={m.qsBreathingTips}>
+                <Text style={m.qsBreathingTipsHead}>Why it works</Text>
+                <Text style={m.qsBreathingTipsBody}>
+                  Slow exhales activate your parasympathetic nervous system — the same one that tells your body the danger has passed. Three rounds is usually enough to outlast an alcohol urge’s peak, which typically subsides within five minutes.
+                </Text>
+              </View>
+              <View style={{ height: 32 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              MY REASONS — strongest evidence-based craving anchor.
+              Editor mode (reasonsEditing) adds/removes; read mode shows list.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'reasons' && (
+            reasonsEditing ? (
+              <>
+                <View style={m.qsReasonsIntro}>
+                  <Ionicons name="heart" size={18} color={colors.rose} />
+                  <Text style={m.qsReasonsIntroTxt}>
+                    Write down why you're quitting, in your own words. On a hard craving, reading this back is the most effective thing you can do.
+                  </Text>
+                </View>
+
+                <View style={m.qsReasonAddRow}>
+                  <TextInput
+                    style={[m.qsTextInput, { flex: 1 }]}
+                    value={reasonsInput}
+                    onChangeText={setReasonsInput}
+                    placeholder="e.g. To be present for my family"
+                    placeholderTextColor={colors.ink3}
+                    returnKeyType="done"
+                    onSubmitEditing={addReasonToDraft}
+                    maxLength={120}
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={addReasonToDraft}
+                    style={m.qsReasonAddBtn}
+                  >
+                    <Ionicons name="add" size={26} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+
+                {reasonsDraft.length === 0 ? (
+                  <Text style={m.qsReasonsEmptyHint}>
+                    No reasons yet — add your first one above.
+                  </Text>
+                ) : (
+                  <View style={{ gap: spacing.sm }}>
+                    {reasonsDraft.map((r, i) => (
+                      <View key={`qd-rdraft-${i}`} style={m.qsReasonRow}>
+                        <View style={m.qsReasonNum}>
+                          <Text style={m.qsReasonNumTxt}>{i + 1}</Text>
+                        </View>
+                        <Text style={m.qsReasonRowTxt}>{r}</Text>
+                        <TouchableOpacity
+                          onPress={() => removeReasonFromDraft(i)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="close-circle" size={22} color={colors.ink3} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity activeOpacity={0.85} onPress={saveReasons} style={m.qsCravingSaveBtnWrap}>
+                  <LinearGradient
+                    colors={[colors.purple, colors.purpleGlow]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={m.qsCravingSaveBtn}
+                  >
+                    <Text style={m.qsCravingSaveBtnTxt}>Save reasons</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <View style={{ height: 24 }} />
+              </>
+            ) : reasons.length === 0 ? (
+              <>
+                <View style={m.qsReasonsEmptyWrap}>
+                  <View style={m.qsReasonsEmptyIcon}>
+                    <Ionicons name="heart" size={40} color={colors.rose} />
+                  </View>
+                  <Text style={m.qsReasonsEmptyTitle}>Why are you quitting?</Text>
+                  <Text style={m.qsReasonsEmptyBody}>
+                    Your reasons are the strongest craving tool there is. Reading them back beats any tip or breathing exercise.
+                  </Text>
+                  <TouchableOpacity activeOpacity={0.85} onPress={openReasonsEditor} style={m.qsCravingSaveBtnWrap}>
+                    <LinearGradient
+                      colors={[colors.purple, colors.purpleGlow]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={m.qsCravingSaveBtn}
+                    >
+                      <Text style={m.qsCravingSaveBtnTxt}>Add your reasons</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ height: 24 }} />
+              </>
+            ) : (
+              <>
+                <View style={m.qsReasonsIntro}>
+                  <Ionicons name="heart" size={18} color={colors.rose} />
+                  <Text style={m.qsReasonsIntroTxt}>
+                    When a craving hits, read this list slowly, top to bottom. Cravings peak and pass within a few minutes.
+                  </Text>
+                </View>
+                <View style={{ gap: spacing.sm }}>
+                  {reasons.map((r, i) => (
+                    <View key={`qd-reason-${i}`} style={m.qsReasonRow}>
+                      <View style={m.qsReasonNum}>
+                        <Text style={m.qsReasonNumTxt}>{i + 1}</Text>
+                      </View>
+                      <Text style={m.qsReasonRowTxt}>{r}</Text>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity activeOpacity={0.85} onPress={openReasonsEditor} style={m.qsReasonsEditBtn}>
+                  <Ionicons name="pencil" size={16} color={colors.purple} />
+                  <Text style={m.qsReasonsEditBtnTxt}>Edit reasons</Text>
+                </TouchableOpacity>
+                <View style={{ height: 24 }} />
+              </>
+            )
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              RECOVERY SUPPORT — AA / SMART / online programs. List of free,
+              evidence-based communities and frameworks. Each row opens either
+              the program's website (url) or dials a 24/7 helpline (phone).
+              Footnote warns about medical alcohol withdrawal — sudden
+              cessation in severe dependence can be dangerous and should be
+              done under medical supervision.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView === 'support' && (
+            <>
+              <View style={m.qsQuitlineHero}>
+                <View
+                  style={{
+                    width: 96, height: 96, borderRadius: radius.pill,
+                    backgroundColor: colors.purpleTint,
+                    borderWidth: 1, borderColor: colors.line3,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="people" size={48} color={colors.lavender} />
+                </View>
+              </View>
+              <Text style={m.qsQuitlineIntro}>
+                Evidence-based recovery support — pick the community or framework that fits how you think. All free.
+              </Text>
+
+              <View style={m.qsQuitlineGroup}>
+                {QD_SUPPORT.map((s, idx, arr) => (
+                  <TouchableOpacity
+                    key={s.key}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      const target = s.phone ? `tel:${s.phone}` : s.url!;
+                      Linking.openURL(target).catch(() => {
+                        Alert.alert(
+                          s.phone ? 'Unable to dial' : 'Unable to open',
+                          s.phone
+                            ? `Please dial ${s.phone} from your phone app.`
+                            : `Visit ${s.url} in your browser.`
+                        );
+                      });
+                    }}
+                    style={[m.qsQuitlineRow, idx === arr.length - 1 && m.qsQuitlineRowLast]}
+                  >
+                    <View
+                      style={{
+                        width: 36, height: 36, borderRadius: radius.pill,
+                        backgroundColor: s.color + '22',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Ionicons name={s.icon} size={18} color={s.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={m.qsQuitlineRegion}>{s.name}</Text>
+                      <Text
+                        style={[m.qsQuitlineHours, { lineHeight: fontSize.xs + 4 }]}
+                        numberOfLines={2}
+                      >
+                        {s.desc}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={s.phone ? 'call' : 'open-outline'}
+                      size={18}
+                      color={colors.ink3}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={m.qsQuitlineFootnote}>
+                Not medical advice. If you have severe alcohol dependence, talk to a doctor before quitting — sudden alcohol withdrawal can be dangerous.
+              </Text>
+              <View style={{ height: 24 }} />
+            </>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════
+              STUB VIEWS — all QD views now implemented. Guard left in place
+              as a defensive no-op in case qdView is set to an unknown value.
+          ════════════════════════════════════════════════════════════════ */}
+          {qdView !== 'main' && qdView !== 'progress' && qdView !== 'achievements' && qdView !== 'achievement' && qdView !== 'health' && qdView !== 'cravings' && qdView !== 'tip' && qdView !== 'quitline' && qdView !== 'breathing' && qdView !== 'reasons' && qdView !== 'support' && (
+            <View style={{ paddingVertical: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingHorizontal: spacing.lg }}>
+                This view is being built. Tap the back arrow to return.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* ════════════════════════════════════════════════════════════════
+            DOCKED SHARE BAR — anchored below the achievement detail view
+            when the selected achievement is unlocked. Same UX as QS: title +
+            sub on top, 5 brand-colored social buttons below. The brand hex
+            literals here are intentional (Instagram/X/Facebook/TikTok logo
+            identification) and mirror the QS implementation 1:1.
+        ════════════════════════════════════════════════════════════════ */}
+        {qdView === 'achievement' && selectedAch && data && hours >= selectedAch.hours && (() => {
+          const a = selectedAch;
+          const onShare = () => { void shareQdAchievement(a); };
+          return (
+            <View style={m.qsAchDetailDock} pointerEvents="box-none">
+              <Text style={m.qsAchDockTitle}>You did it!</Text>
+              <Text style={m.qsAchDockSub}>Your recovery has progressed</Text>
+
+              <View style={m.qsAchSocialRow}>
+                {/* Instagram — multi-stop brand gradient */}
+                <TouchableOpacity activeOpacity={0.8} onPress={onShare} style={m.qsAchSocialBtn}>
+                  <LinearGradient
+                    colors={['#feda75', '#fa7e1e', '#d62976', '#962fbf', '#4f5bd5']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={m.qsAchSocialGrad}
+                  >
+                    <Ionicons name="logo-instagram" size={20} color={colors.white} />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* X — brand black */}
+                <TouchableOpacity activeOpacity={0.8} onPress={onShare} style={m.qsAchSocialBtn}>
+                  <LinearGradient
+                    colors={['#0a0a0a', '#000000']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={m.qsAchSocialGrad}
+                  >
+                    <Text style={m.qsAchSocialX}>𝕏</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Facebook — brand blue */}
+                <TouchableOpacity activeOpacity={0.8} onPress={onShare} style={m.qsAchSocialBtn}>
+                  <LinearGradient
+                    colors={['#1877f2', '#0c5fd9']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={m.qsAchSocialGrad}
+                  >
+                    <Ionicons name="logo-facebook" size={20} color={colors.white} />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* TikTok — brand black */}
+                <TouchableOpacity activeOpacity={0.8} onPress={onShare} style={m.qsAchSocialBtn}>
+                  <LinearGradient
+                    colors={['#000000', '#0a0a0a']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={m.qsAchSocialGrad}
+                  >
+                    <Ionicons name="logo-tiktok" size={20} color={colors.white} />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Generic share — green to match the header share icon */}
+                <TouchableOpacity activeOpacity={0.8} onPress={onShare} style={m.qsAchSocialBtn}>
+                  <View style={[m.qsAchSocialGrad, { backgroundColor: colors.green }]}>
+                    <Ionicons name="share-outline" size={20} color={colors.white} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════════
+            ACHIEVEMENT UNLOCK CELEBRATION — full-screen overlay fired by
+            the newly-unlocked diff effect. Tap anywhere to dismiss.
+            Confetti + celebration card mirror QS exactly so the moment is
+            identical between programs.
+        ════════════════════════════════════════════════════════════════ */}
+        {unlockOverlayAch && (
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setUnlockOverlayAch(null);
+            }}
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: colors.bg + 'F2',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: spacing.xl,
+                zIndex: 50,
+              },
+            ]}
+          >
+            {/* Confetti — scattered theme-coloured shards framing the card */}
+            <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+              <Svg width="100%" height="100%" viewBox="0 0 100 170" preserveAspectRatio="xMidYMid slice">
+                {Array.from({ length: 30 }).map((_, i) => {
+                  const palette = [colors.honey, colors.purple2, colors.purple3, colors.green, colors.sky, colors.rose, colors.lavender];
+                  const fill = palette[i % palette.length];
+                  const x = (i * 67 + 11) % 100;
+                  const y = (i * 41 + 7) % 170;
+                  if (i % 4 === 0) {
+                    return (
+                      <Path
+                        key={`qd-cf-${i}`}
+                        d={`M ${x} ${y - 2.6} L ${x + 0.8} ${y - 0.8} L ${x + 2.6} ${y} L ${x + 0.8} ${y + 0.8} L ${x} ${y + 2.6} L ${x - 0.8} ${y + 0.8} L ${x - 2.6} ${y} L ${x - 0.8} ${y - 0.8} Z`}
+                        fill={fill}
+                        opacity={0.9}
+                      />
+                    );
+                  }
+                  return (
+                    <Rect
+                      key={`qd-cf-${i}`}
+                      x={x}
+                      y={y}
+                      width={3.2}
+                      height={1.9}
+                      rx={0.5}
+                      fill={fill}
+                      opacity={0.92}
+                      transform={`rotate(${(i * 57) % 360} ${x + 1.6} ${y + 0.95})`}
+                    />
+                  );
+                })}
+              </Svg>
+            </View>
+
+            {/* Celebration card */}
+            <View
+              style={{
+                width: '100%',
+                maxWidth: 320,
+                backgroundColor: colors.layer3,
+                borderWidth: 1,
+                borderColor: colors.line3,
+                borderRadius: radius.lg,
+                paddingVertical: spacing.xl,
+                paddingHorizontal: spacing.lg,
+                alignItems: 'center',
+                gap: spacing.sm,
+                shadowColor: colors.purple,
+                shadowOpacity: 0.45,
+                shadowRadius: 30,
+                shadowOffset: { width: 0, height: 14 },
+                elevation: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: fontSize.xs,
+                  fontWeight: '700',
+                  letterSpacing: 1.4,
+                  color: colors.honey,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Achievement unlocked
+              </Text>
+
+              {/* Hero illo — same QsIllo SVG family as the QS overlay so the
+                  unlock moment reads as the same trophy class the user will
+                  later revisit on the achievement-detail page. 200x143 frame
+                  matches the QS overlay exactly. */}
+              <View style={{ width: 200, height: 143, alignItems: 'center', justifyContent: 'center' }}>
+                <QsIllo kind={unlockOverlayAch.illo} id={unlockOverlayAch.id} />
+              </View>
+
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' }}>
+                {unlockOverlayAch.title}
+              </Text>
+
+              <Text style={{ fontSize: fontSize.sm, color: colors.ink2, textAlign: 'center' }}>
+                {unlockOverlayAch.desc}
+              </Text>
+
+              <View
+                style={{
+                  marginTop: spacing.sm,
+                  backgroundColor: colors.line,
+                  borderWidth: 1,
+                  borderColor: colors.line2,
+                  borderRadius: radius.pill,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                }}
+              >
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 0.8 }}>
+                  TAP TO CONTINUE
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+      </SafeAreaView>
+    </Modal>
+
+    {/* ────────────────────────────────────────────────────────────────────
+        QD CRAVING LOG FORM — intensity / trigger / coping / "did you give in"
+        Sibling Modal so it overlays the parent QuitDrinkingModal cleanly.
+        Uses QD_CRAVING_TRIGGERS / QD_CRAVING_COPING (alcohol-tuned chips).
+    ──────────────────────────────────────────────────────────────────── */}
+    <Modal
+      visible={cravingFormOpen}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setCravingFormOpen(false)}
+    >
+      <SafeAreaView style={m.sheet} edges={['bottom']}>
+        <View style={m.sheetHeader}>
+          <Text style={m.sheetTitle}>Log a craving</Text>
+          <TouchableOpacity onPress={() => setCravingFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Intensity 1-10 */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>Intensity</Text>
+            <View style={m.qsCravingIntensityRow}>
+              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+                const active = cravingIntensity === n;
+                const tint = n <= 3 ? colors.green : n <= 6 ? colors.honey : colors.rose;
+                return (
+                  <TouchableOpacity
+                    key={`qd-int-${n}`}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setCravingIntensity(n);
+                    }}
+                    style={[
+                      m.qsCravingIntensityCell,
+                      active && { backgroundColor: tint + '33', borderColor: tint },
+                    ]}
+                  >
+                    <Text style={[m.qsCravingIntensityNum, active && { color: tint }]}>{n}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={m.qsCravingFormHint}>
+              {cravingIntensity <= 3 ? 'Mild — a passing thought.' :
+                cravingIntensity <= 6 ? 'Moderate — definitely noticeable.' :
+                cravingIntensity <= 8 ? 'Strong — hard to ignore.' :
+                'Severe — fighting hard.'}
+            </Text>
+          </View>
+
+          {/* Trigger */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>What triggered it?</Text>
+            <View style={m.qsCravingChipRow}>
+              {QD_CRAVING_TRIGGERS.map(t => {
+                const active = cravingTrigger === t.key;
+                return (
+                  <TouchableOpacity
+                    key={`qd-trig-${t.key}`}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setCravingTrigger(active ? null : t.key);
+                    }}
+                    style={[m.qsCravingChip, active && m.qsCravingChipActive]}
+                  >
+                    <Text style={m.qsCravingChipIcon}>{t.icon}</Text>
+                    <Text style={[m.qsCravingChipLbl, active && { color: colors.ink }]}>{t.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Coping */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>How did you handle it?</Text>
+            <View style={m.qsCravingChipRow}>
+              {QD_CRAVING_COPING.map(t => {
+                const active = cravingCoping === t.key;
+                return (
+                  <TouchableOpacity
+                    key={`qd-cop-${t.key}`}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setCravingCoping(active ? null : t.key);
+                    }}
+                    style={[m.qsCravingChip, active && m.qsCravingChipActive]}
+                  >
+                    <Text style={m.qsCravingChipIcon}>{t.icon}</Text>
+                    <Text style={[m.qsCravingChipLbl, active && { color: colors.ink }]}>{t.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Gave in toggle — two-button outcome picker, never moralizing */}
+          <View style={{ gap: spacing.sm }}>
+            <Text style={m.qsCravingFormLbl}>Outcome</Text>
+            <View style={m.qsCravingOutcomeRow}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setCravingGaveIn(false);
+                }}
+                style={[
+                  m.qsCravingOutcomeBtn,
+                  !cravingGaveIn && { backgroundColor: colors.green + '22', borderColor: colors.green },
+                ]}
+              >
+                <Ionicons name="checkmark-circle" size={20} color={!cravingGaveIn ? colors.green : colors.ink3} />
+                <Text style={[m.qsCravingOutcomeTxt, !cravingGaveIn && { color: colors.green }]}>Rode it out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setCravingGaveIn(true);
+                }}
+                style={[
+                  m.qsCravingOutcomeBtn,
+                  cravingGaveIn && { backgroundColor: colors.honey + '22', borderColor: colors.honey },
+                ]}
+              >
+                <Ionicons name="alert-circle" size={20} color={cravingGaveIn ? colors.honey : colors.ink3} />
+                <Text style={[m.qsCravingOutcomeTxt, cravingGaveIn && { color: colors.honey }]}>Gave in</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={m.qsCravingFormHint}>
+              No judgment either way — logging gives you data on what works.
+            </Text>
+          </View>
+
+          {/* Save CTA */}
+          <TouchableOpacity activeOpacity={0.85} onPress={saveCraving} style={m.qsCravingSaveBtnWrap}>
+            <LinearGradient
+              colors={[colors.purple, colors.purpleGlow]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={m.qsCravingSaveBtn}
+            >
+              <Text style={m.qsCravingSaveBtnTxt}>Save craving</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={{ height: spacing.lg }} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
+    </>
   );
 }
 
@@ -4700,7 +7425,7 @@ function fmtPresetTime(t: string): string {
   return `${String(display).padStart(2, '0')}:${mStr.padStart(2, '0')} ${suffix}`;
 }
 function buildDosageStr(qty: number, unit: string): string {
-  return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ${unit}`;
+  return `${fmtFlex(qty, 1)} ${unit}`;
 }
 
 // ── Pill Reminder Modal ───────────────────────────────────────────────────────
@@ -5037,7 +7762,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   >
                     <Text style={m.doseStepBtnTxt}>−</Text>
                   </TouchableOpacity>
-                  <Text style={m.doseStepVal}>{formDosageQty % 1 === 0 ? formDosageQty : formDosageQty.toFixed(1)}</Text>
+                  <Text style={m.doseStepVal}>{fmtFlex(formDosageQty, 1)}</Text>
                   <TouchableOpacity
                     style={m.doseStepBtn}
                     onPress={() => setFormDosageQty(q => Math.min(20, +(q + (q >= 1 ? 1 : 0.5)).toFixed(1)))}
@@ -5400,332 +8125,6 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
             </LinearGradient>
           </TouchableOpacity>
           <View style={{ height: 24 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-// ── Intermittent Fasting ──────────────────────────────────────────────────────
-const IF_MODES = [
-  { id: '12:12', label: '12:12', fasting: 12, eating: 12, desc: 'Beginner friendly' },
-  { id: '16:8',  label: '16:8',  fasting: 16, eating: 8,  desc: 'Most popular' },
-  { id: '18:6',  label: '18:6',  fasting: 18, eating: 6,  desc: 'Intermediate' },
-  { id: '20:4',  label: '20:4',  fasting: 20, eating: 4,  desc: 'Advanced' },
-  { id: '23:1',  label: 'OMAD',  fasting: 23, eating: 1,  desc: 'One meal a day' },
-];
-
-interface FastingRecord { startTime: string; endTime: string; mode: string; completed: boolean; }
-interface FastingState {
-  mode: string;
-  active: boolean;
-  startTime: string | null;
-  history: FastingRecord[];
-}
-
-function FastingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { email } = useAuthStore();
-  const FASTING_KEY = `dagnara_fasting_${email ?? 'anon'}`;
-
-  const [state, setState] = useState<FastingState>({ mode: '16:8', active: false, startTime: null, history: [] });
-  const [elapsed, setElapsed] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    AsyncStorage.getItem(FASTING_KEY).then((raw) => {
-      if (!raw) return;
-      try { setState(JSON.parse(raw)); }
-      catch { void AsyncStorage.removeItem(FASTING_KEY); }
-    });
-  }, [visible]);
-
-  useEffect(() => {
-    if (!state.active || !state.startTime) { clearInterval(intervalRef.current!); return; }
-    function tick() { setElapsed(Date.now() - new Date(state.startTime!).getTime()); }
-    tick();
-    intervalRef.current = setInterval(tick, 1000);
-    return () => clearInterval(intervalRef.current!);
-  }, [state.active, state.startTime]);
-
-  function save(next: FastingState) {
-    setState(next);
-    AsyncStorage.setItem(FASTING_KEY, JSON.stringify(next));
-  }
-
-  function toggleFast() {
-    const modeInfo = IF_MODES.find(m => m.id === state.mode)!;
-    if (state.active) {
-      const endTime = new Date().toISOString();
-      const duration = elapsed / 3600000;
-      const completed = duration >= modeInfo.fasting;
-      const record: FastingRecord = { startTime: state.startTime!, endTime, mode: state.mode, completed };
-      save({ ...state, active: false, startTime: null, history: [record, ...state.history].slice(0, 14) });
-      setElapsed(0);
-    } else {
-      save({ ...state, active: true, startTime: new Date().toISOString() });
-    }
-  }
-
-  const modeInfo = IF_MODES.find(m => m.id === state.mode) ?? IF_MODES[1];
-  const fastingMs = modeInfo.fasting * 3600000;
-  const eatingMs = modeInfo.eating * 3600000;
-  const progress = Math.min(1, elapsed / fastingMs);
-  const progressPct = Math.round(progress * 100);
-  const elapsedHrs = elapsed / 3600000;
-  const remainingHrs = Math.max(0, modeInfo.fasting - elapsedHrs);
-  const inEatingWindow = state.active && elapsedHrs >= modeInfo.fasting;
-  const statusColor = inEatingWindow ? colors.green : state.active ? colors.purple : colors.ink3;
-
-  // Computed times
-  const fastEndIso = state.startTime
-    ? new Date(new Date(state.startTime).getTime() + fastingMs).toISOString() : null;
-  const eatEndIso = state.startTime
-    ? new Date(new Date(state.startTime).getTime() + fastingMs + eatingMs).toISOString() : null;
-
-  // Weekly stats
-  const oneWeekAgo = Date.now() - 7 * 24 * 3600000;
-  const weekFasts = state.history.filter(r => new Date(r.endTime).getTime() > oneWeekAgo);
-  const weekCompleted = weekFasts.filter(r => r.completed).length;
-  const longestFastHrs = state.history.length > 0
-    ? Math.max(...state.history.map(r => (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 3600000))
-    : 0;
-
-  function fmtHM(hrs: number) {
-    const h = Math.floor(hrs);
-    const mm = Math.floor((hrs - h) * 60);
-    return `${h}h ${String(mm).padStart(2, '0')}m`;
-  }
-
-  function fmtHMS(ms: number) {
-    const totalSec = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-
-  // Live countdowns
-  const fastRemainingMs    = Math.max(0, fastingMs - elapsed);
-  const eatingRemainingMs  = Math.max(0, fastingMs + eatingMs - elapsed);
-  const countdownDisplay   = state.active
-    ? (inEatingWindow ? fmtHMS(eatingRemainingMs) : fmtHMS(fastRemainingMs))
-    : `${String(modeInfo.fasting).padStart(2, '0')}:00:00`;
-  const countdownLabel = state.active
-    ? (inEatingWindow ? 'EATING ENDS IN' : 'FASTING ENDS IN')
-    : 'READY TO START';
-
-  const strokeDashoffset = RING_CIRCUMFERENCE * (1 - progress);
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={24} color={colors.ink2} />
-          </TouchableOpacity>
-          <Text style={{ flex: 1, textAlign: 'center', fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Intermittent Fasting</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
-          {/* Mode selector */}
-          <View style={{ gap: spacing.xs }}>
-            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 }}>FASTING PROTOCOL</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
-              {IF_MODES.map((m) => {
-                const sel = state.mode === m.id;
-                return (
-                  <TouchableOpacity
-                    key={m.id}
-                    onPress={() => { if (!state.active) save({ ...state, mode: m.id }); }}
-                    style={{ backgroundColor: sel ? colors.purpleTint : colors.layer1, borderWidth: 1, borderColor: sel ? colors.line3 : colors.line, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, alignItems: 'center', minWidth: 72 }}
-                  >
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: sel ? colors.purple : colors.ink }}>{m.label}</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: sel ? colors.purple : colors.ink3, marginTop: 2 }}>{m.desc}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* SVG Timer ring */}
-          <View style={{ alignItems: 'center', paddingVertical: spacing.sm }}>
-            {/* Phase badge */}
-            <View style={{
-              backgroundColor: inEatingWindow ? colors.green + '22' : state.active ? colors.purple + '22' : colors.line,
-              borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-              marginBottom: spacing.md, borderWidth: 1,
-              borderColor: inEatingWindow ? colors.green + '55' : state.active ? colors.purple + '55' : colors.line2,
-            }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '800', letterSpacing: 1.2, color: inEatingWindow ? colors.green : state.active ? colors.purple : colors.ink3 }}>
-                {inEatingWindow ? 'EATING WINDOW' : state.active ? 'FASTING' : 'READY'}
-              </Text>
-            </View>
-
-            <View style={{ width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-              <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} style={{ position: 'absolute' }}>
-                <Circle
-                  cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_R}
-                  stroke={colors.line} strokeWidth={RING_STROKE} fill="none"
-                />
-                {state.active && (
-                  <Circle
-                    cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_R}
-                    stroke={statusColor} strokeWidth={RING_STROKE} fill="none"
-                    strokeDasharray={RING_CIRCUMFERENCE}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    rotation="-90"
-                    origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
-                  />
-                )}
-              </Svg>
-              <View style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: RING_R * 2 - RING_STROKE * 2,
-                height: RING_R * 2 - RING_STROKE * 2,
-              }}>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                  style={{
-                    fontSize: fontSize.xl,
-                    fontWeight: '800',
-                    color: statusColor,
-                    fontVariant: ['tabular-nums'],
-                    letterSpacing: 0,
-                  }}
-                >
-                  {countdownDisplay}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: fontSize.xs,
-                    fontWeight: '700',
-                    color: colors.ink3,
-                    letterSpacing: 1.1,
-                    marginTop: 4,
-                  }}
-                >
-                  {countdownLabel}
-                </Text>
-                {state.active && (
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}
-                  >
-                    {progressPct}% · {inEatingWindow ? `${fmtHM(elapsedHrs - modeInfo.fasting)} eaten` : `${fmtHM(elapsedHrs)} fasted`}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Time stats row */}
-            {state.active && (
-              <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.lg }}>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.purple, fontVariant: ['tabular-nums'] }}>{fmtHM(elapsedHrs)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>Fasted</Text>
-                </View>
-                {!inEatingWindow && (
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.honey, fontVariant: ['tabular-nums'] }}>{fmtHM(remainingHrs)}</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>Remaining</Text>
-                  </View>
-                )}
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.teal }}>
-                    {inEatingWindow ? fmtHM(Math.max(0, modeInfo.fasting + modeInfo.eating - elapsedHrs)) : `${modeInfo.eating}h`}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>
-                    {inEatingWindow ? 'Eating left' : 'Eating window'}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Scheduled times */}
-            {state.active && fastEndIso && eatEndIso && (
-              <View style={{ marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Started</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.ink, marginTop: 2 }}>{fmtTime(state.startTime!)}</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: inEatingWindow ? colors.green + '44' : colors.line, padding: spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Eat from</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: inEatingWindow ? colors.green : colors.ink, marginTop: 2 }}>{fmtTime(fastEndIso)}</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Window ends</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.ink, marginTop: 2 }}>{fmtTime(eatEndIso)}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Start / Stop button */}
-          <TouchableOpacity onPress={toggleFast} activeOpacity={0.8} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-            {state.active ? (
-              <View style={{ backgroundColor: colors.rose + '18', borderRadius: radius.md, borderWidth: 1, borderColor: colors.rose + '44', paddingVertical: spacing.md, alignItems: 'center' }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.rose }}>End Fast</Text>
-              </View>
-            ) : (
-              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.white }}>Start Fast</Text>
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
-
-          {/* Weekly stats */}
-          {state.history.length > 0 && (
-            <View style={{ gap: spacing.sm }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 }}>THIS WEEK</Text>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.purple }}>{weekFasts.length}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>Fasts</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.green }}>{weekCompleted}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>Goals met</Text>
-                </View>
-                <View style={{ flex: 1, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.teal }}>{Math.round(longestFastHrs)}h</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>Best fast</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* History */}
-          {state.history.length > 0 && (
-            <View style={{ gap: spacing.sm }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 }}>RECENT FASTS</Text>
-              {state.history.slice(0, 7).map((rec, i) => {
-                const dur = (new Date(rec.endTime).getTime() - new Date(rec.startTime).getTime()) / 3600000;
-                const mInfo = IF_MODES.find(m => m.id === rec.mode) ?? IF_MODES[1];
-                return (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.sm }}>
-                    <Text style={{ fontSize: fontSize.md }}>{rec.completed ? '✅' : '⭕'}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: colors.ink }}>{mInfo.label} — {fmtHM(dur)}</Text>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>{new Date(rec.startTime).toLocaleDateString()}</Text>
-                    </View>
-                    <View style={{ backgroundColor: rec.completed ? colors.green + '22' : colors.honey + '22', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: rec.completed ? colors.green : colors.honey }}>{rec.completed ? 'Goal met' : 'Partial'}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={{ height: 32 }} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -6402,7 +8801,6 @@ const m = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
   },
-
   // Title + stat + date chip stack — tight typography below the hero.
   qsAchDetailTitleWrap: {
     alignItems: 'center',
@@ -7278,6 +9676,372 @@ const m = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.ink2,
     fontWeight: '700',
+  },
+
+  // ── Rescue (in-the-moment craving) CTA on cravings list ───────────────────
+  qsRescueBtnWrap: {
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    shadowColor: colors.rose,
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  qsRescueBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm2,
+    paddingVertical: spacing.sm2,
+    paddingHorizontal: spacing.md,
+  },
+  qsRescueBtnIcon: {
+    width: 38, height: 38,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line3,
+  },
+  qsRescueBtnTitle: {
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: 0.2,
+    lineHeight: fontSize.base + 4,
+  },
+  qsRescueBtnSub: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.white,
+    opacity: 0.9,
+    marginTop: 2,
+    letterSpacing: 0.2,
+  },
+
+  // ── Rescue view · "Remember why" reasons card ─────────────────────────────
+  qsRescueReasonCard: {
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm2,
+  },
+  qsRescueReasonHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  qsRescueReasonHeadTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    color: colors.ink3,
+    letterSpacing: 1.1,
+  },
+  qsRescueReasonTxt: {
+    fontSize: fontSize.base,
+    color: colors.ink,
+    fontWeight: '600',
+    lineHeight: fontSize.base + 6,
+    fontStyle: 'italic',
+  },
+
+  // ── Rescue view · timer display (replaces the phase label) ────────────────
+  qsRescueTimer: {
+    fontSize: fontSize.xl,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: 0.5,
+    lineHeight: fontSize.xl + 2,
+  },
+
+  // ── Rescue view · success / "you rode it out" state ───────────────────────
+  qsRescueDoneHero: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  qsRescueDoneTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '800',
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  qsRescueDoneBody: {
+    fontSize: fontSize.sm,
+    color: colors.ink2,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: fontSize.sm + 6,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  qsRescueAgainBtn: {
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  qsRescueAgainBtnTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.ink2,
+    letterSpacing: 0.3,
+  },
+
+  // ── Patterns view · empty hint + cards ────────────────────────────────────
+  qsPatternsEmpty: {
+    fontSize: fontSize.sm,
+    color: colors.ink3,
+    fontWeight: '600',
+    lineHeight: fontSize.sm + 4,
+    paddingVertical: spacing.sm,
+  },
+  qsPatternsCard: {
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+
+  // ── Patterns · horizontal bar chart (triggers, coping) ────────────────────
+  qsPatternsBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+  qsPatternsBarIcon: {
+    fontSize: fontSize.md,
+    width: 22,
+    textAlign: 'center',
+  },
+  qsPatternsBarLbl: {
+    fontSize: fontSize.sm,
+    color: colors.ink,
+    fontWeight: '700',
+    flex: 1,
+  },
+  qsPatternsBarTrack: {
+    flex: 1.6,
+    height: 10,
+    backgroundColor: colors.layer2,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  qsPatternsBarFill: {
+    height: '100%',
+    borderRadius: radius.pill,
+  },
+  qsPatternsBarCount: {
+    fontSize: fontSize.sm,
+    color: colors.ink2,
+    fontWeight: '800',
+    minWidth: 22,
+    textAlign: 'right',
+  },
+
+  // ── Patterns · 6-slot hour-of-day histogram ───────────────────────────────
+  qsPatternsHistRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+    height: 132,
+  },
+  qsPatternsHistCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  qsPatternsHistBarWrap: {
+    width: '100%',
+    height: 80,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: colors.layer2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  qsPatternsHistBar: {
+    width: '70%',
+    borderTopLeftRadius: radius.sm,
+    borderTopRightRadius: radius.sm,
+  },
+  qsPatternsHistLbl: {
+    fontSize: fontSize.xs,
+    color: colors.ink3,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  qsPatternsHistCount: {
+    fontSize: fontSize.xs,
+    color: colors.ink2,
+    fontWeight: '800',
+  },
+  qsPatternsHistCaption: {
+    fontSize: fontSize.xs,
+    color: colors.ink3,
+    fontWeight: '600',
+    lineHeight: fontSize.xs + 4,
+    marginTop: spacing.sm,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+
+  // ── Money-saved goal card (progress detail) ───────────────────────────────
+  qsGoalCard: {
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  qsGoalHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  qsGoalLabel: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: -0.1,
+    lineHeight: fontSize.md + 4,
+  },
+  qsGoalSub: {
+    fontSize: fontSize.xs,
+    color: colors.ink3,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  qsGoalBadge: {
+    width: 32, height: 32,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.layer2,
+    borderWidth: 1,
+    borderColor: colors.line2,
+  },
+  qsGoalBarTrack: {
+    height: 12,
+    backgroundColor: colors.layer2,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  qsGoalBarFill: {
+    height: '100%',
+    borderRadius: radius.pill,
+  },
+  qsGoalFootnote: {
+    fontSize: fontSize.sm,
+    color: colors.ink2,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  qsGoalActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  qsGoalActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.layer2,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.pill,
+  },
+  qsGoalActionTxt: {
+    fontSize: fontSize.xs,
+    color: colors.ink2,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  // ── Goal · empty (no goal set yet) entry card ─────────────────────────────
+  qsGoalEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm2,
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderStyle: 'dashed',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+  },
+  qsGoalEmptyIcon: {
+    width: 38, height: 38,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.layer2,
+    borderWidth: 1,
+    borderColor: colors.line2,
+  },
+  qsGoalEmptyTitle: {
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: -0.1,
+    lineHeight: fontSize.base + 4,
+  },
+  qsGoalEmptySub: {
+    fontSize: fontSize.xs,
+    color: colors.ink3,
+    fontWeight: '600',
+    marginTop: 2,
+    lineHeight: fontSize.xs + 4,
+  },
+
+  // ── Resilience strip (main view · slips + personal best) ──────────────────
+  qsResilienceStrip: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: colors.layer1,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm2,
+    marginTop: spacing.sm,
+  },
+  qsResilienceCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  qsResilienceLbl: {
+    fontSize: fontSize.xs,
+    color: colors.ink3,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 1,
+  },
+  qsResilienceVal: {
+    fontSize: fontSize.sm,
+    color: colors.ink,
+    fontWeight: '800',
+    letterSpacing: -0.1,
+  },
+  qsResilienceDiv: {
+    width: 1,
+    backgroundColor: colors.line2,
+    marginHorizontal: spacing.sm,
   },
 });
 

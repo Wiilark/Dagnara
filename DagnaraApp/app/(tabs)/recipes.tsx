@@ -14,6 +14,7 @@ import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { FOOD_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { addRecipesToGrocery } from '../../src/lib/grocery';
+import { fmt } from '../../src/lib/format';
 
 // Map of recipe id → bundled hero photo. Recipes without an entry fall back
 // to the emoji icon. Add more ids here to give any other recipe a photo.
@@ -457,7 +458,7 @@ export default function RecipesScreen() {
           <View style={styles.budgetBanner}>
             <View style={styles.budgetLeft}>
               <Text style={styles.budgetLabel}>CALORIE BUDGET</Text>
-              <Text style={styles.budgetVal}><Text style={styles.budgetNum}>{remaining}</Text> kcal remaining</Text>
+              <Text style={styles.budgetVal}><Text style={styles.budgetNum}>{fmt(remaining)}</Text> kcal remaining</Text>
             </View>
             <View style={styles.budgetRing}>
               <Text style={styles.budgetPct}>{Math.round((totalKcal / calorieGoal) * 100)}%</Text>
@@ -534,7 +535,7 @@ export default function RecipesScreen() {
               {filter === 'All' && !recipeSearch
                 ? 'All Recipes'
                 : filter === 'For your goal'
-                  ? `Fits your remaining ${remaining} kcal · ${filtered.length} recipe${filtered.length !== 1 ? 's' : ''}`
+                  ? `Fits your remaining ${fmt(remaining)} kcal · ${filtered.length} recipe${filtered.length !== 1 ? 's' : ''}`
                   : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
             </Text>
             <View style={styles.grid}>

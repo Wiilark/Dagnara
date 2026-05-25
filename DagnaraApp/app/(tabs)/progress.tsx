@@ -13,6 +13,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
+import { fmt } from '../../src/lib/format';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
 const LS_QUESTIONS = [
@@ -214,9 +215,9 @@ function WeightChart({
               stroke={colors.line} strokeWidth={1} />
           ))}
           {/* Y-axis labels */}
-          <SvgText x={PAD_L - 4} y={8} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(maxKg * 10) / 10}</SvgText>
-          <SvgText x={PAD_L - 4} y={CHART_H / 2 + 3} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(midKg * 10) / 10}</SvgText>
-          <SvgText x={PAD_L - 4} y={CHART_H - 2} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{Math.round(minKg * 10) / 10}</SvgText>
+          <SvgText x={PAD_L - 4} y={8} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{fmt(maxKg, 1)}</SvgText>
+          <SvgText x={PAD_L - 4} y={CHART_H / 2 + 3} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{fmt(midKg, 1)}</SvgText>
+          <SvgText x={PAD_L - 4} y={CHART_H - 2} textAnchor="end" fill={colors.ink3} fontSize={fontSize.xs - 2}>{fmt(minKg, 1)}</SvgText>
           {/* Fill */}
           {fillD !== '' && <Path d={fillD} fill="url(#wFill)" />}
           {/* Line */}
@@ -315,7 +316,7 @@ function StatisticsModal({ visible, onClose, entries }: {
           <View style={stat.summaryRow}>
             {[
               { label: 'Avg daily', val: avg > 0 ? `${avg}` : '—', unit: 'kcal' },
-              { label: 'Total', val: total > 0 ? `${(total / 1000).toFixed(1)}k` : '—', unit: 'kcal' },
+              { label: 'Total', val: total > 0 ? `${fmt(total / 1000, 1)}k` : '—', unit: 'kcal' },
               { label: 'Days logged', val: String(loggedDays), unit: `/ ${days}` },
             ].map(s => (
               <View key={s.label} style={stat.summaryTile}>
@@ -479,7 +480,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
             <View key={lbl} style={dp2.intakeRow}>
               <View style={dp2.intakeMeta}>
                 <Text style={dp2.intakeLbl}>{lbl}</Text>
-                <Text style={dp2.intakeVal}>{Math.round(val)} / {goal} {unit.toUpperCase()}</Text>
+                <Text style={dp2.intakeVal}>{fmt(val)} / {fmt(goal)} {unit.toUpperCase()}</Text>
               </View>
               <View style={dp2.intakeTrack}>
                 <View style={[dp2.intakeFill, {
@@ -780,14 +781,14 @@ function generateInsights(
     const kgPerWeek = ((recent[recent.length - 1].kg - recent[0].kg) / daySpan) * 7;
     if (Math.abs(kgPerWeek) > 0.05) {
       const dir = kgPerWeek < 0 ? 'losing' : 'gaining';
-      const rate = Math.abs(kgPerWeek).toFixed(2);
+      const rate = fmt(Math.abs(kgPerWeek), 2);
       const healthy = Math.abs(kgPerWeek) <= 0.75;
       insights.push({
         id: 'weight_rate', emoji: '⚖️',
         title: `${dir === 'losing' ? '↓' : '↑'} ${rate} kg/week`,
         body: healthy
           ? `${dir === 'losing' ? 'Healthy loss rate' : 'Solid lean-gain pace'} — keep your current intake and activity level.`
-          : `${Math.abs(kgPerWeek).toFixed(1)} kg/week is ${dir === 'losing' ? 'aggressive — monitor energy and muscle retention' : 'fast — some may be fat, not muscle'}.`,
+          : `${fmt(Math.abs(kgPerWeek), 1)} kg/week is ${dir === 'losing' ? 'aggressive — monitor energy and muscle retention' : 'fast — some may be fat, not muscle'}.`,
         color: healthy ? colors.green : colors.honey,
       });
     }
@@ -877,7 +878,7 @@ export default function ProgressScreen() {
     else if (val < 25)   { category = 'Healthy';     color = colors.green; }
     else if (val < 30)   { category = 'Overweight';  color = colors.honey; }
     else                 { category = 'Obese';        color = colors.rose; }
-    return { val: val.toFixed(1), category, color };
+    return { val: fmt(val, 1), category, color };
   }, [latestWeight, profile?.height]);
 
   function startQuiz() { setLsAnswers(Array(LS_QUESTIONS.length).fill(0)); setLsStep(0); setLsResult(null); setLsVisible(true); }
@@ -1076,7 +1077,7 @@ export default function ProgressScreen() {
               <View style={st.macroTrack}>
                 <View style={[st.macroBar, { width: `${(val / totalMacros) * 100}%` as any, backgroundColor: color }]} />
               </View>
-              <Text style={[st.macroVal, { color }]}>{Math.round(val)}g</Text>
+              <Text style={[st.macroVal, { color }]}>{fmt(val)}g</Text>
             </View>
           ))}
         </View>
@@ -1210,17 +1211,22 @@ export default function ProgressScreen() {
       {/* Life Score Quiz Modal */}
       <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
+          {/* Header — shared by quiz and result screens */}
+          <View style={st.lsHeader}>
+            <TouchableOpacity onPress={() => setLsVisible(false)} style={st.lsCloseIconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="close" size={22} color={colors.ink2} />
+            </TouchableOpacity>
+            <Text style={st.lsHeaderTitle}>{lsResult === null ? 'Weekly Check-In' : 'Your Life Score'}</Text>
+            {lsResult === null
+              ? <Text style={st.lsStepTxt}>{lsStep + 1} / {LS_QUESTIONS.length}</Text>
+              : <View style={{ width: 34 }} />
+            }
+          </View>
+
           {lsResult === null ? (
             <>
-              {/* Progress bar */}
               <View style={st.lsProgressTrack}>
                 <View style={[st.lsProgressBar, { width: `${progress}%` as any }]} />
-              </View>
-              <View style={st.lsTopRow}>
-                <TouchableOpacity onPress={() => setLsVisible(false)} style={st.lsCloseBtn}>
-                  <Text style={{ color: colors.ink3, fontSize: fontSize.sm }}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={st.lsStepTxt}>{lsStep + 1} / {LS_QUESTIONS.length}</Text>
               </View>
 
               <ScrollView contentContainerStyle={st.lsContent} showsVerticalScrollIndicator={false}>
@@ -1264,7 +1270,6 @@ export default function ProgressScreen() {
           ) : (
             <View style={st.lsResultWrap}>
               <Text style={st.lsResultEmoji}>🏆</Text>
-              <Text style={st.lsResultTitle}>Your Life Score</Text>
               <Text style={[st.lsResultScore, { color: scoreColor(lsResult) }]}>{lsResult}</Text>
               <Text style={st.lsResultMax}>/ 150</Text>
               <Text style={[st.lsResultGrade, { color: scoreColor(lsResult) }]}>
@@ -1360,10 +1365,11 @@ const st = StyleSheet.create({
   statLabel: { color: colors.ink2, fontSize: fontSize.sm, marginTop: 2 },
   // Life Score Quiz Modal
   lsModal: { flex: 1, backgroundColor: colors.bg },
+  lsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
+  lsHeaderTitle: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  lsCloseIconBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
   lsProgressTrack: { height: 3, backgroundColor: colors.layer2 },
   lsProgressBar: { height: 3, backgroundColor: colors.purple },
-  lsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  lsCloseBtn: { padding: spacing.xs },
   lsStepTxt: { color: colors.ink3, fontSize: fontSize.sm },
   lsContent: { paddingHorizontal: spacing.lg, paddingBottom: 20, alignItems: 'center' },
   lsEmoji: { fontSize: fontSize['2xl'] + 26, marginBottom: spacing.md, marginTop: spacing.lg },
@@ -1382,7 +1388,6 @@ const st = StyleSheet.create({
   // Result
   lsResultWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   lsResultEmoji: { fontSize: fontSize['2xl'] + 34 },
-  lsResultTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink },
   lsResultScore: { fontSize: fontSize['2xl'] * 2, fontWeight: '800' },
   lsResultMax: { fontSize: fontSize.lg, color: colors.ink3, marginTop: -16 },
   lsResultGrade: { fontSize: fontSize.base, fontWeight: '600', textAlign: 'center' },

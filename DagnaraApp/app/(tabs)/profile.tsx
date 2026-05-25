@@ -17,6 +17,7 @@ import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
 import { COUNTRIES, getCountry } from '../../src/lib/currency';
+import { fmt } from '../../src/lib/format';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
 import { useDiaryStore } from '../../src/store/diaryStore';
 
@@ -35,7 +36,32 @@ export default function ProfileScreen() {
   const [macrosModal, setMacrosModal] = useState(false);
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
-  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health'>('');
+  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health' | 'privacy'>('');
+
+  async function handleDeleteAccount() {
+    Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete Everything', style: 'destructive', onPress: async () => {
+        try {
+          const { error } = await supabase.rpc('delete_user_data');
+          if (error) throw error;
+          await logout();
+          router.replace('/(auth)/login');
+        } catch (err: any) {
+          Alert.alert('Error', 'Could not delete account automatically. Please contact support.');
+        }
+      }}
+    ]);
+  }
+
+  async function handleUnsubscribe() {
+    try {
+      await setProfile({ ...profile, marketing_opt_in: 'false' });
+      Alert.alert('Unsubscribed', 'You will no longer receive marketing emails.');
+    } catch {
+      Alert.alert('Error', 'Update failed. Try again.');
+    }
+  }
   const [language, setLanguage] = useState('English');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
   const [acFirstName, setAcFirstName] = useState('');
@@ -190,7 +216,7 @@ export default function ProfileScreen() {
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setHealthLastSync(now);
       await AsyncStorage.setItem(`${p}_health_last_sync`, now);
-      Alert.alert('Synced', `Health data updated.\nSteps: ${data.steps.toLocaleString()}${healthSyncCalories ? `\nCalories burned: ${data.activeCalories} kcal` : ''}${healthSyncSleep ? `\nSleep: ${Math.floor(data.sleepMinutes / 60)}h ${data.sleepMinutes % 60}m` : ''}`);
+      Alert.alert('Synced', `Health data updated.\nSteps: ${fmt(data.steps)}${healthSyncCalories ? `\nCalories burned: ${fmt(data.activeCalories)} kcal` : ''}${healthSyncSleep ? `\nSleep: ${Math.floor(data.sleepMinutes / 60)}h ${data.sleepMinutes % 60}m` : ''}`);
     } catch {
       Alert.alert('Sync failed', 'Could not read health data. Try again.');
     } finally {
@@ -400,9 +426,9 @@ export default function ProfileScreen() {
             { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
             { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'bar-chart-outline', label: 'Adjust Macronutrients', color: colors.sky, value: '', onPress: () => setMacrosModal(true) },
-            { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${calorieGoal} kcal`, onPress: () => setTdeeModal(true) },
+            { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${waterGoal} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
+            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${fmt(parseInt(waterGoal, 10) || 0)} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
@@ -443,7 +469,7 @@ export default function ProfileScreen() {
               return (
                 <View style={styles.bmiCard}>
                   <Text style={styles.bmiSectionLbl}>Body Mass Index</Text>
-                  <Text style={[styles.bmiNum, { color: bmiColor }]}>{bmi ? bmi.toFixed(1) : '--'}</Text>
+                  <Text style={[styles.bmiNum, { color: bmiColor }]}>{bmi ? fmt(bmi, 1) : '--'}</Text>
                   <Text style={styles.bmiLbl}>{bmiLabel}</Text>
                   <View style={styles.bmiScale}>
                     <View style={[styles.bmiSeg, { backgroundColor: colors.sky }]} />
@@ -548,7 +574,7 @@ export default function ProfileScreen() {
                       />
                       <Text style={[mst.macroPct, { color }]}>%</Text>
                     </View>
-                    <Text style={mst.macroG}>{grams}g</Text>
+                    <Text style={mst.macroG}>{fmt(grams)}g</Text>
                   </View>
                 </View>
               );
@@ -560,14 +586,14 @@ export default function ProfileScreen() {
               return (
                 <View style={[mst.calCard, { borderColor: ok ? colors.line2 : colors.rose + '55' }]}>
                   <Text style={mst.calLbl}>Total</Text>
-                  <Text style={[mst.calVal, { color: ok ? colors.green : colors.rose }]}>{total}%</Text>
+                  <Text style={[mst.calVal, { color: ok ? colors.green : colors.rose }]}>{fmt(total)}%</Text>
                 </View>
               );
             })()}
 
             <View style={mst.calCard}>
               <Text style={mst.calLbl}>Daily Calorie Goal</Text>
-              <Text style={mst.calVal}>{calorieGoal} kcal</Text>
+              <Text style={mst.calVal}>{fmt(calorieGoal)} kcal</Text>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -1011,15 +1037,18 @@ export default function ProfileScreen() {
                 { key: 'paleo', label: 'Paleo' },
                 { key: 'halal', label: 'Halal' },
                 { key: 'kosher', label: 'Kosher' },
-              ].map(({ key, label }, i, arr) => (
-                <TouchableOpacity key={key} style={[dp.prefRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                  onPress={() => setSelectedFoodPref(key)}>
-                  <Text style={dp.prefLabel}>{label}</Text>
-                  <View style={[dp.radio, selectedFoodPref === key && dp.radioSel]}>
-                    {selectedFoodPref === key && <Text style={{ color: colors.white, fontSize: fontSize.xs, fontWeight: '700' }}>✓</Text>}
-                  </View>
-                </TouchableOpacity>
-              ))}
+              ].map(({ key, label }, i, arr) => {
+                const isOn = selectedFoodPref === key;
+                return (
+                  <TouchableOpacity key={key} style={[dp.prefRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() => setSelectedFoodPref(key)}>
+                    <Text style={dp.prefLabel}>{label}</Text>
+                    <View style={[dp.toggle, isOn && dp.toggleOn]}>
+                      <View style={[dp.toggleThumb, isOn && { transform: [{ translateX: 22 }] }]} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             {/* Allergies — multi select */}
             <Text style={dp.sectionLbl}>ALLERGIES</Text>
@@ -1141,7 +1170,7 @@ export default function ProfileScreen() {
               return (
                 <View style={{ backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, alignItems: 'center', gap: 4 }}>
                   <Text style={{ color: colors.ink3, fontSize: fontSize.xs, textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Daily Calories</Text>
-                  <Text style={{ color: colors.lavender, fontSize: fontSize['2xl'] - 2, fontWeight: '800' }}>{cal}</Text>
+                  <Text style={{ color: colors.lavender, fontSize: fontSize['2xl'] - 2, fontWeight: '800' }}>{fmt(cal)}</Text>
                   <Text style={{ color: colors.ink2, fontSize: fontSize.sm }}>kcal / day</Text>
                 </View>
               );

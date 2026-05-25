@@ -136,7 +136,9 @@ export function localToUsd(amountLocal: number, country: string | null | undefin
 export function formatMoney(amount: number, country: string | null | undefined, decimals?: number): string {
   const c = getCountry(country);
   const places = decimals ?? minorUnits(country);
-  const num = amount.toLocaleString(c.locale, {
+  // Force en-US numerics app-wide ("2,495.31") regardless of country.
+  // We still keep the country-specific symbol + position (e.g. "kr" after, "$" before).
+  const num = amount.toLocaleString('en-US', {
     minimumFractionDigits: places,
     maximumFractionDigits: places,
   });

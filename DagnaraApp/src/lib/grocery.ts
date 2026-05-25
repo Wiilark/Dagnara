@@ -143,12 +143,73 @@ export function categorize(name: string): string {
   return 'other';
 }
 
+/** 
+ * Smartly sums a list of quantity strings. 
+ * Handles fractions (1/2), decimals (0.5), and units (g, ml, cups).
+ * If units differ or are unparseable, falls back to joining with ' + '.
+ */
+function sumQtys(qtys: string[]): string {
+  const filtered = qtys.map(q => q.trim()).filter(Boolean);
+  if (filtered.length === 0) return '';
+  if (filtered.length === 1) return filtered[0];
+
+  // Try to parse each qty into { value, unit }
+  const parsed = filtered.map(q => {
+    // Regex for: [number or fraction] [unit]
+    // Group 1: Whole number or decimal
+    // Group 2: Fraction (e.g. 1/2)
+    // Group 3: Unit (remaining text)
+    const match = q.match(/^(\d+\.?\d*|)?\s*(\d+\/\d+)?\s*(.*)$/i);
+    if (!match) return { val: 0, unit: q, ok: false };
+
+    let val = 0;
+    if (match[1]) val += parseFloat(match[1]);
+    if (match[2]) {
+      const [num, den] = match[2].split('/').map(Number);
+      if (den !== 0) val += num / den;
+    }
+    const unit = (match[3] || '').trim().toLowerCase();
+    
+    // If no numeric part found, it's not parseable as a sum
+    return { val, unit, ok: val > 0 || !!match[1] || !!match[2] };
+  });
+
+  // If any failed to parse or if units aren't consistent, fallback to string join
+  const firstUnit = parsed[0].unit;
+  const isConsistent = parsed.every(p => p.ok && p.unit === firstUnit);
+
+  if (!isConsistent) {
+    return filtered.join(' + ');
+  }
+
+  const total = parsed.reduce((acc, p) => acc + p.val, 0);
+  
+  // Format total: if whole number, use it; if ends in .5, use 1/2; else use decimal
+  let displayVal: string;
+  if (Number.isInteger(total)) {
+    displayVal = total.toString();
+  } else if (Math.abs((total % 1) - 0.5) < 0.001) {
+    const whole = Math.floor(total);
+    displayVal = whole > 0 ? `${whole} 1/2` : '1/2';
+  } else if (Math.abs((total % 1) - 0.25) < 0.001) {
+    const whole = Math.floor(total);
+    displayVal = whole > 0 ? `${whole} 1/4` : '1/4';
+  } else if (Math.abs((total % 1) - 0.75) < 0.001) {
+    const whole = Math.floor(total);
+    displayVal = whole > 0 ? `${whole} 3/4` : '3/4';
+  } else {
+    displayVal = parseFloat(total.toFixed(2)).toString();
+  }
+
+  return firstUnit ? `${displayVal} ${firstUnit}` : displayVal;
+}
+
 // ── Add recipes → grocery list ────────────────────────────────────────────────
 /**
  * Appends ingredients from `recipes` to the user's grocery list.
  *
  * Behaviour:
- *   - Within the batch: combines same-name ingredients across recipes (qty joined with ' + ').
+ *   - Within the batch: combines same-name ingredients across recipes (sums numeric qtys).
  *   - Versus existing list: if an UNCHECKED item with the same lowercase name already
  *     exists, its qty is appended to. Otherwise a new item is added.
  *   - Checked items are NEVER touched (user already bought them; new-need is separate).
@@ -167,7 +228,6 @@ export async function addRecipesToGrocery(
   }
 
   // Step 1: combine within incoming batch by lowercase name.
-  // Map: lc-name → { name (display), qtys[], category }
   const incoming = new Map<string, { name: string; qtys: string[]; category: string }>();
   for (const r of recipes) {
     for (const ing of r.ingredients) {
@@ -192,12 +252,13 @@ export async function addRecipesToGrocery(
   let i = 0;
   for (const [lc, entry] of incoming) {
     const idx = next.findIndex(e => !e.checked && e.name.trim().toLowerCase() === lc);
-    const qtyStr = entry.qtys.join(' + ');
+    const qtyStr = sumQtys(entry.qtys);
+    
     if (idx >= 0) {
       const oldQty = next[idx].qty;
       next[idx] = {
         ...next[idx],
-        qty: oldQty ? (qtyStr ? `${oldQty} + ${qtyStr}` : oldQty) : qtyStr,
+        qty: sumQtys(oldQty ? [oldQty, qtyStr] : [qtyStr]),
       };
       merged++;
     } else {

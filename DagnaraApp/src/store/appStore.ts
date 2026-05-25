@@ -110,26 +110,31 @@ function pick(s: AppState): PersistedData {
   };
 }
 
+// Debounced sync to prevent excessive Supabase writes
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+async function queueAppSync(data: PersistedData, email: string | null) {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    if (!email) return;
+    try {
+      await supabase.from('dagnara_app_state').upsert(
+        { email, state_data: data, updated_at: new Date().toISOString() },
+        { onConflict: 'email' }
+      );
+    } catch (e) {
+      // Retry logic or fail silently (AsyncStorage still has it)
+      // eslint-disable-next-line no-console
+      console.error('[appStore] cloud sync failed:', e);
+    }
+  }, 5000); // 5s debounce
+}
+
 // Save to AsyncStorage AND Supabase (fire-and-forget on cloud, never blocks local)
 async function persist(data: PersistedData, email: string | null) {
   const key = email ? `app_store_${email}` : 'app_store_anon';
   await AsyncStorage.setItem(key, JSON.stringify(data));
   if (email) {
-    const push = () => supabase.from('dagnara_app_state').upsert(
-      { email, state_data: data, updated_at: new Date().toISOString() },
-      { onConflict: 'email' }
-    );
-    void (async () => {
-      try { await push(); } catch (e1: any) {
-        try {
-          await new Promise(r => setTimeout(r, 4000));
-          await push();
-        } catch (e2: any) {
-          // eslint-disable-next-line no-console
-          console.error('[appStore.persist] cloud sync failed after retry:', e2?.message ?? e1?.message ?? 'unknown');
-        }
-      }
-    })();
+    queueAppSync(data, email);
   }
 }
 
@@ -304,5 +309,7 @@ export function calcTDEE(age: number, weightKg: number, heightCm: number, sex: '
   const multipliers: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
   const tdee = bmr * (multipliers[activityLevel] ?? 1.55);
   const goalOffset: Record<string, number> = { lose: -500, maintain: 0, gain: 300 };
-  return Math.round(tdee + (goalOffset[weightGoal] ?? 0));
+  const rawGoal = Math.round(tdee + (goalOffset[weightGoal] ?? 0));
+  // Clamp between 800 and 8000 to prevent UI layout explosions
+  return Math.min(8000, Math.max(800, rawGoal));
 }

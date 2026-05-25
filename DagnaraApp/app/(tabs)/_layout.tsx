@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight } from '../../src/lib/units';
+import { fmt } from '../../src/lib/format';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
 
@@ -470,7 +471,7 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
     await logSteps(TODAY(), steps);
     const xpEarned = Math.round(steps / 100);
     addXp(xpEarned);
-    Alert.alert('Steps logged!', `${steps.toLocaleString()} steps saved. +${xpEarned} XP`);
+    Alert.alert('Steps logged!', `${fmt(steps)} steps saved. +${fmt(xpEarned)} XP`);
     setSteps(0);
     onClose();
   }
@@ -492,8 +493,8 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
           {/* Progress display */}
           <View style={al.progressCard}>
             <Text style={al.stepsEmoji}>👟</Text>
-            <Text style={al.stepsNum}>{steps.toLocaleString()}</Text>
-            <Text style={al.stepsGoal}>of {STEP_GOAL.toLocaleString()} goal</Text>
+            <Text style={al.stepsNum}>{fmt(steps)}</Text>
+            <Text style={al.stepsGoal}>of {fmt(STEP_GOAL)} goal</Text>
             <View style={al.progressBarBg}>
               <View style={[al.progressBarFill, { width: `${pct * 100}%` as any }]} />
             </View>

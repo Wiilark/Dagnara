@@ -13,6 +13,7 @@ import { useAppStore, calcTDEE } from '../src/store/appStore';
 import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput, type UnitSystem } from '../src/lib/units';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, scheduleDailySummaryReminder } from '../src/lib/notifications';
 import { COUNTRIES, getCountry } from '../src/lib/currency';
+import { fmt } from '../src/lib/format';
 import { colors, spacing, fontSize, radius } from '../src/theme';
 
 const { width } = Dimensions.get('window');
@@ -414,7 +415,7 @@ export default function OnboardingScreen() {
               style={s.summaryCard}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             >
-              <Text style={s.calNum}>{calorieGoal.toLocaleString()}</Text>
+              <Text style={s.calNum}>{fmt(calorieGoal)}</Text>
               <Text style={s.calLabel}>kcal / day</Text>
               <View style={s.macroRow}>
                 <View style={s.macroBox}>

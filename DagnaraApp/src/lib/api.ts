@@ -1,3 +1,6 @@
+import { supabase } from './supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Points to the deployed Express backend (server.js in the repo root).
 // Deploy that server to Railway / Render / Fly.io, then set:
 //   EXPO_PUBLIC_API_URL=https://your-deployed-url.com
@@ -28,6 +31,10 @@ async function postJson<T>(
 ): Promise<T> {
   if (!API_BASE) throw new Error('SETUP_REQUIRED');
 
+  // Get current session token for authentication
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -35,7 +42,10 @@ async function postJson<T>(
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -70,6 +80,37 @@ export async function analyzeFood(imageData: string, mediaType: string): Promise
 }
 
 export async function estimateNutrition(description: string): Promise<any> {
-  return postJson('/api/estimate-nutrition', { description });
+  const clean = description.trim().toLowerCase();
+  if (clean.length < 2) return null;
+
+  const CACHE_KEY = `ai_cache_est_${clean}`;
+  try {
+    const cached = await AsyncStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, expires } = JSON.parse(cached);
+      if (Date.now() < expires) return data;
+    }
+  } catch { /* cache miss */ }
+
+  const data = await postJson('/api/estimate-nutrition', { description });
+  
+  if (data) {
+    try {
+      // Cache results for 7 days
+      const expires = Date.now() + 7 * 24 * 3600_000;
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ data, expires }));
+    } catch { /* storage full */ }
+  }
+  
+  return data;
 }
 
+export async function getBarcodeProduct(code: string): Promise<any> {
+  if (!API_BASE) throw new Error('SETUP_REQUIRED');
+  const res = await fetch(`${API_BASE}/api/barcode/${code}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || 'SERVER_ERROR');
+  }
+  return res.json();
+}
