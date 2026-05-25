@@ -139,10 +139,10 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
            </View>
            <ScrollView contentContainerStyle={qs.scroll}>
              <Text style={qs.setupTxt}>Ready to quit? Enter your details to track your progress and money saved.</Text>
-             <TouchableOpacity style={qs.startBtn} onPress={() => {
+             <TouchableOpacity style={qs.startBtn} onPress={async () => {
                 const newData = { quitDate: new Date().toISOString(), cigsPerDay: 20, costPerPack: 12, cigsPerPack: 20, productType: 'cigarettes' as QsProduct };
                 setData(newData);
-                AsyncStorage.setItem(FASTING_KEY, JSON.stringify(newData));
+                await AsyncStorage.setItem(FASTING_KEY, JSON.stringify(newData));
              }}>
                 <Text style={qs.startBtnTxt}>Start Tracking</Text>
              </TouchableOpacity>
@@ -158,7 +158,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
         <View style={qs.header}>
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink} /></TouchableOpacity>
           <Text style={qs.title}>Smoke Free</Text>
-          <TouchableOpacity onPress={() => { Alert.alert('Reset Data', 'Start over?', [{ text: 'Cancel' }, { text: 'Reset', style: 'destructive', onPress: () => { setData(null); AsyncStorage.removeItem(FASTING_KEY); } }]) }}>
+          <TouchableOpacity onPress={() => { Alert.alert('Reset Data', 'Start over?', [{ text: 'Cancel' }, { text: 'Reset', style: 'destructive', onPress: async () => { setData(null); await AsyncStorage.removeItem(FASTING_KEY); } }]) }}>
             <Ionicons name="refresh" size={20} color={colors.ink3} />
           </TouchableOpacity>
         </View>

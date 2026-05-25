@@ -128,9 +128,9 @@ export function StressBreathingModal({ visible, onClose, onSave }: {
           <Text style={sbst.sectionLbl}>HOW STRESSED ARE YOU?</Text>
           <View style={sbst.emojiRow}>
             {STRESS_EMOJIS.map((em, i) => (
-              <TouchableOpacity key={i} style={[sbst.emojiBtn, stressLevel === i + 1 && sbst.emojiBtnSel]} onPress={() => setStressLevel(i + 1)}>
+              <TouchableOpacity key={i} style={[sbst.emojiBtn, stressLevel === i && sbst.emojiBtnSel]} onPress={() => setStressLevel(i)}>
                 <Text style={sbst.emoji}>{em}</Text>
-                <Text style={[sbst.emojiLbl, stressLevel === i + 1 && { color: colors.ink }]}>{STRESS_LABELS[i]}</Text>
+                <Text style={[sbst.emojiLbl, stressLevel === i && { color: colors.ink }]}>{STRESS_LABELS[i]}</Text>
               </TouchableOpacity>
             ))}
           </View>

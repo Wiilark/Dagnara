@@ -84,10 +84,10 @@ export function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onCl
            </View>
            <ScrollView contentContainerStyle={qd.scroll}>
              <Text style={qd.setupTxt}>Take control of your health. Track your sobriety and money saved from avoiding alcohol.</Text>
-             <TouchableOpacity style={qd.startBtn} onPress={() => {
+             <TouchableOpacity style={qd.startBtn} onPress={async () => {
                 const newData = { quitDate: new Date().toISOString(), drinksPerDay: 2, costPerDrink: 8 };
                 setData(newData);
-                AsyncStorage.setItem(QD_KEY, JSON.stringify(newData));
+                await AsyncStorage.setItem(QD_KEY, JSON.stringify(newData));
              }}>
                 <Text style={qd.startBtnTxt}>Start Sobriety Journey</Text>
              </TouchableOpacity>
@@ -103,7 +103,7 @@ export function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onCl
         <View style={qd.header}>
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink} /></TouchableOpacity>
           <Text style={qd.title}>Sober Time</Text>
-          <TouchableOpacity onPress={() => { Alert.alert('Reset Sobriety', 'Start over?', [{ text: 'Cancel' }, { text: 'Reset', style: 'destructive', onPress: () => { setData(null); AsyncStorage.removeItem(QD_KEY); } }]) }}>
+          <TouchableOpacity onPress={() => { Alert.alert('Reset Sobriety', 'Start over?', [{ text: 'Cancel' }, { text: 'Reset', style: 'destructive', onPress: async () => { setData(null); await AsyncStorage.removeItem(QD_KEY); } }]) }}>
             <Ionicons name="refresh" size={20} color={colors.ink3} />
           </TouchableOpacity>
         </View>

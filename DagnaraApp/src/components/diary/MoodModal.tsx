@@ -30,9 +30,9 @@ export function MoodModal({ visible, onClose, onSave }: {
           <Text style={moodst.question}>How are you feeling?</Text>
           <View style={moodst.emojiRow}>
             {MOOD_EMOJIS.map((em, i) => (
-              <TouchableOpacity key={i} style={[moodst.emojiBtn, mood === i + 1 && moodst.emojiBtnSel]} onPress={() => setMood(i + 1)}>
+              <TouchableOpacity key={i} style={[moodst.emojiBtn, mood === i && moodst.emojiBtnSel]} onPress={() => setMood(i)}>
                 <Text style={moodst.emoji}>{em}</Text>
-                <Text style={[moodst.emojiLbl, mood === i + 1 && { color: colors.ink }]}>{MOOD_LABELS[i]}</Text>
+                <Text style={[moodst.emojiLbl, mood === i && { color: colors.ink }]}>{MOOD_LABELS[i]}</Text>
               </TouchableOpacity>
             ))}
           </View>

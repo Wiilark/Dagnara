@@ -79,9 +79,10 @@ export function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSe
   function removeSet(exIdx: number, setIdx: number) {
     setStrengthExercises(prev => prev.map((ex, i) => {
       if (i !== exIdx) return ex;
+      if (setIdx === -1) return null as unknown as StrengthExercise;
       const sets = ex.sets.filter((_, si) => si !== setIdx);
       return sets.length === 0 ? null as unknown as StrengthExercise : { ...ex, sets };
-    }).filter(Boolean));
+    }).filter(Boolean) as StrengthExercise[]);
   }
 
   function updateSet(exIdx: number, setIdx: number, field: 'reps' | 'weight', val: string) {

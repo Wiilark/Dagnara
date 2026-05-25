@@ -62,9 +62,9 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [state.active, state.startTime]);
 
-  function save(next: FastingState) {
+  async function save(next: FastingState) {
     setState(next);
-    AsyncStorage.setItem(FASTING_KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(FASTING_KEY, JSON.stringify(next));
   }
 
   function deleteHistoryItem(index: number) {
