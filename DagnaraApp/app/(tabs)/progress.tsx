@@ -1229,7 +1229,7 @@ export default function ProgressScreen() {
                 <View style={[st.lsProgressBar, { width: `${progress}%` as any }]} />
               </View>
 
-              <ScrollView contentContainerStyle={st.lsContent} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={st.lsContent} showsVerticalScrollIndicator={false}>
                 <Text style={st.lsEmoji}>{q.emoji}</Text>
                 <Text style={st.lsQuestion}>{q.q}</Text>
                 {q.hint ? <Text style={st.lsHint}>{q.hint}</Text> : null}
@@ -1371,7 +1371,7 @@ const st = StyleSheet.create({
   lsProgressTrack: { height: 3, backgroundColor: colors.layer2 },
   lsProgressBar: { height: 3, backgroundColor: colors.purple },
   lsStepTxt: { color: colors.ink3, fontSize: fontSize.sm },
-  lsContent: { paddingHorizontal: spacing.lg, paddingBottom: 20, alignItems: 'center' },
+  lsContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, alignItems: 'center' },
   lsEmoji: { fontSize: fontSize['2xl'] + 26, marginBottom: spacing.md, marginTop: spacing.lg },
   lsQuestion: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: spacing.xs },
   lsHint: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', marginBottom: spacing.lg },

@@ -150,7 +150,7 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
           {/* Mode selector */}
           <View style={{ gap: spacing.xs }}>
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.1 }}>FASTING PROTOCOL</Text>

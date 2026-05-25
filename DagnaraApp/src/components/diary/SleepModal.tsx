@@ -59,7 +59,7 @@ export function SleepModal({ visible, onClose, onSave }: {
             <Text style={sl.title}>Log Sleep</Text>
             <View style={{ width: 34 }} />
           </View>
-          <ScrollView contentContainerStyle={sl.content}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={sl.content}>
             <View style={sl.durationDisplay}>
               <Text style={sl.durNum}>{calcDuration()}</Text>
               <Text style={sl.durLbl}>Sleep duration</Text>

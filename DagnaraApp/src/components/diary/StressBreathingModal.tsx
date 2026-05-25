@@ -124,7 +124,7 @@ export function StressBreathingModal({ visible, onClose, onSave }: {
           <Text style={sbst.title}>Stress & Breathing</Text>
           <View style={{ width: 34 }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
           <Text style={sbst.sectionLbl}>HOW STRESSED ARE YOU?</Text>
           <View style={sbst.emojiRow}>
             {STRESS_EMOJIS.map((em, i) => (

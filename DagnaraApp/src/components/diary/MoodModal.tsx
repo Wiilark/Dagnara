@@ -26,7 +26,7 @@ export function MoodModal({ visible, onClose, onSave }: {
           <Text style={moodst.title}>Log Mood</Text>
           <View style={{ width: 34 }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
           <Text style={moodst.question}>How are you feeling?</Text>
           <View style={moodst.emojiRow}>
             {MOOD_EMOJIS.map((em, i) => (

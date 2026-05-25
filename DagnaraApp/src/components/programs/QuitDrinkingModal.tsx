@@ -82,7 +82,7 @@ export function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onCl
              <Text style={qd.title}>Quit Drinking</Text>
              <View style={{width: 24}} />
            </View>
-           <ScrollView contentContainerStyle={qd.scroll}>
+           <ScrollView style={{ flex: 1 }} contentContainerStyle={qd.scroll}>
              <Text style={qd.setupTxt}>Take control of your health. Track your sobriety and money saved from avoiding alcohol.</Text>
              <TouchableOpacity style={qd.startBtn} onPress={async () => {
                 const newData = { quitDate: new Date().toISOString(), drinksPerDay: 2, costPerDrink: 8 };

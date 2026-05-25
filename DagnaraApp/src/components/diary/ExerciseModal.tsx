@@ -152,7 +152,7 @@ export function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSe
         </View>
 
         {tab === 'list' ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Text style={ex.sectionHdr}>All Exercises</Text>
             {filtered.map((e) => (
               <TouchableOpacity key={e.name} style={[ex.exRow, selectedExercise?.name === e.name && ex.exRowSelected]} onPress={() => {

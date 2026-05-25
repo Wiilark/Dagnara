@@ -88,7 +88,7 @@ export function AiConfirmModal({ visible, items, onConfirm, onClose }: AiConfirm
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView contentContainerStyle={st.scrollContent}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scrollContent}>
           {list.map((item, idx) => (
             <View key={idx} style={st.aiItemCard}>
               <View style={st.aiItemHeader}>

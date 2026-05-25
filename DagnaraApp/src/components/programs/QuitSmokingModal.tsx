@@ -137,7 +137,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
              <Text style={qs.title}>Quit Smoking</Text>
              <View style={{width: 24}} />
            </View>
-           <ScrollView contentContainerStyle={qs.scroll}>
+           <ScrollView style={{ flex: 1 }} contentContainerStyle={qs.scroll}>
              <Text style={qs.setupTxt}>Ready to quit? Enter your details to track your progress and money saved.</Text>
              <TouchableOpacity style={qs.startBtn} onPress={async () => {
                 const newData = { quitDate: new Date().toISOString(), cigsPerDay: 20, costPerPack: 12, cigsPerPack: 20, productType: 'cigarettes' as QsProduct };
