@@ -1228,13 +1228,17 @@ export default function ProgressScreen() {
               </ScrollView>
 
               <View style={st.lsNav}>
-                {lsStep > 0 && (
+                {lsStep > 0 ? (
                   <TouchableOpacity style={st.lsBackBtn} onPress={() => setLsStep(s => s - 1)}>
                     <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>← Back</Text>
                   </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={st.lsBackBtn} onPress={() => setLsVisible(false)}>
+                    <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>Cancel</Text>
+                  </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  style={[st.lsNextBtn, { flex: lsStep === 0 ? 1 : undefined }]}
+                  style={st.lsNextBtn}
                   onPress={() => { if (lsStep < LS_QUESTIONS.length - 1) setLsStep(s => s + 1); else finishQuiz(); }}
                 >
                   <Text style={st.lsNextTxt}>{lsStep < LS_QUESTIONS.length - 1 ? 'Next →' : 'See Results ✨'}</Text>
