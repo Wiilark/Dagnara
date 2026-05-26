@@ -356,17 +356,11 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color={colors.ink} />
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setMessagesOpen(true)}>
-                <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-                {hasUnread && <View style={styles.bellDot} />}
-              </TouchableOpacity>
-              <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
-                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-                  <Ionicons name="diamond" size={14} color={colors.white} />
-                  <Text style={styles.upgradeTxt}>Upgrade</Text>
-                </LinearGradient>
-              </View>
+            <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
+              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
+                <Ionicons name="diamond" size={14} color={colors.white} />
+                <Text style={styles.upgradeTxt}>Upgrade</Text>
+              </LinearGradient>
             </View>
           </View>
 
@@ -418,6 +412,7 @@ export default function ProfileScreen() {
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
             { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${fmt(parseInt(waterGoal, 10) || 0)} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
+            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
