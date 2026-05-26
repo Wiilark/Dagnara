@@ -61,6 +61,9 @@ interface PersistedData {
   macroPcts: { carbs: number; protein: number; fat: number };
   savedRecipes: LocalFood[];
   country: string;  // ISO 3166-1 alpha-2 (e.g. 'US', 'SE'). Drives currency in Programs / money widgets.
+  fastingWindow: string | null;       // e.g. '16:8', '18:6', '14:10' — null = not set
+  dietaryPreferences: string | null;  // maps to a DIET_FILTERS value: 'High Protein', 'Vegan', etc.
+  pillDefaultTime: string | null;     // 'HH:MM' 24h, e.g. '07:30'
 }
 
 interface AppState extends PersistedData {
@@ -79,6 +82,9 @@ interface AppState extends PersistedData {
   setGoals: (activityLevel: AppState['activityLevel'], weightGoal: AppState['weightGoal'], calorieGoal: number) => Promise<void>;
   setUnitSystem: (system: AppState['unitSystem']) => Promise<void>;
   setCountry: (code: string) => Promise<void>;
+  setFastingWindow: (window: string | null) => Promise<void>;
+  setDietaryPreferences: (pref: string | null) => Promise<void>;
+  setPillDefaultTime: (time: string | null) => Promise<void>;
   setMacroPcts: (pcts: { carbs: number; protein: number; fat: number }) => Promise<void>;
   saveRecipe: (recipe: LocalFood) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
@@ -107,6 +113,9 @@ function pick(s: AppState): PersistedData {
     macroPcts: s.macroPcts,
     savedRecipes: s.savedRecipes,
     country: s.country,
+    fastingWindow: s.fastingWindow,
+    dietaryPreferences: s.dietaryPreferences,
+    pillDefaultTime: s.pillDefaultTime,
   };
 }
 
@@ -153,6 +162,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   macroPcts: { carbs: 45, protein: 30, fat: 25 },
   savedRecipes: [],
   country: 'US',
+  fastingWindow: null,
+  dietaryPreferences: null,
+  pillDefaultTime: null,
   userEmail: null,
   messagesOpen: false,
   hasUnread: false,
@@ -204,6 +216,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             macroPcts: cloud.macroPcts ?? local.macroPcts ?? { carbs: 45, protein: 30, fat: 25 },
             savedRecipes: cloud.savedRecipes?.length ? cloud.savedRecipes : (local.savedRecipes ?? []),
             country: cloud.country ?? local.country ?? 'US',
+            fastingWindow: cloud.fastingWindow ?? local.fastingWindow ?? null,
+            dietaryPreferences: cloud.dietaryPreferences ?? local.dietaryPreferences ?? null,
+            pillDefaultTime: cloud.pillDefaultTime ?? local.pillDefaultTime ?? null,
           };
           set(merged);
           await AsyncStorage.setItem(localKey, JSON.stringify(merged));
@@ -273,6 +288,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     await persist(pick({ ...get(), country: code }), get().userEmail);
   },
 
+  setFastingWindow: async (fastingWindow) => {
+    set({ fastingWindow });
+    await persist(pick({ ...get(), fastingWindow }), get().userEmail);
+  },
+
+  setDietaryPreferences: async (dietaryPreferences) => {
+    set({ dietaryPreferences });
+    await persist(pick({ ...get(), dietaryPreferences }), get().userEmail);
+  },
+
+  setPillDefaultTime: async (pillDefaultTime) => {
+    set({ pillDefaultTime });
+    await persist(pick({ ...get(), pillDefaultTime }), get().userEmail);
+  },
+
   setMacroPcts: async (pcts) => {
     set({ macroPcts: pcts });
     await persist(pick({ ...get(), macroPcts: pcts }), get().userEmail);
@@ -293,7 +323,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () => set({
     lifeScore: null, lifeScoreDate: null, streak: 0, lastLoggedDate: null,
     programs: { nutrition: true, hydration: true, movement: false, sleep: false, stress: false, quit_smoking: false, quit_drinking: false, pill_reminder: false },
-    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', userEmail: null, messagesOpen: false,
+    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, userEmail: null, messagesOpen: false,
   }),
 }));
 
