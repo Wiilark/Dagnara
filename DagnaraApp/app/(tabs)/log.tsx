@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { fmt } from '../../src/lib/format';
 
 const DAYS = 7;
 const SCREEN_W = Dimensions.get('window').width;
@@ -226,7 +227,7 @@ export default function LogScreen() {
                   {d.kcal > 0 && (
                     <View style={st.kcalRow}>
                       <Text style={[st.kcalNum, { color: kcalColor }]}>{d.kcal}</Text>
-                      <Text style={st.kcalGoal}> / {calorieGoal} kcal</Text>
+                      <Text style={st.kcalGoal}> / {fmt(calorieGoal)} kcal</Text>
                     </View>
                   )}
                   {d.kcal > 0 && (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -315,7 +315,7 @@ function StatisticsModal({ visible, onClose, entries }: {
           {/* Summary row */}
           <View style={stat.summaryRow}>
             {[
-              { label: 'Avg daily', val: avg > 0 ? `${avg}` : '—', unit: 'kcal' },
+              { label: 'Avg daily', val: avg > 0 ? fmt(avg) : '—', unit: 'kcal' },
               { label: 'Total', val: total > 0 ? `${fmt(total / 1000, 1)}k` : '—', unit: 'kcal' },
               { label: 'Days logged', val: String(loggedDays), unit: `/ ${days}` },
             ].map(s => (
@@ -343,7 +343,7 @@ function StatisticsModal({ visible, onClose, entries }: {
             </View>
             {avg > 0 && (
               <View style={stat.avgLine}>
-                <Text style={stat.avgTxt}>Daily avg: {avg} kcal</Text>
+                <Text style={stat.avgTxt}>Daily avg: {fmt(avg)} kcal</Text>
               </View>
             )}
           </View>
@@ -749,8 +749,8 @@ function generateInsights(
         id: 'weekend_pattern', emoji: '📅',
         title: diff > 0 ? `+${diff} kcal on weekends` : `${Math.abs(diff)} kcal less on weekends`,
         body: diff > 0
-          ? `Weekday avg ${wdAvg} kcal → weekend avg ${weAvg}. Social eating and late-night snacking are the usual culprits.`
-          : `Weekday avg ${wdAvg} kcal → weekend avg ${weAvg}. Make sure you're fuelling rest-day recovery properly.`,
+          ? `Weekday avg ${fmt(wdAvg)} kcal → weekend avg ${fmt(weAvg)}. Social eating and late-night snacking are the usual culprits.`
+          : `Weekday avg ${fmt(wdAvg)} kcal → weekend avg ${fmt(weAvg)}. Make sure you're fuelling rest-day recovery properly.`,
         color: diff > 0 ? colors.honey : colors.sky,
       });
     }

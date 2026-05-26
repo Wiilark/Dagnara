@@ -375,7 +375,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <View style={styles.xpMeta}>
                 <Text style={styles.xpName}>{xpInfo.name}</Text>
-                <Text style={styles.xpPts}>{xp} XP</Text>
+                <Text style={styles.xpPts}>{fmt(xp)} XP</Text>
               </View>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
             </View>

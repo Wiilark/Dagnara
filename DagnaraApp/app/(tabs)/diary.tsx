@@ -25,6 +25,7 @@ import { skipMealReminderToday } from '../../src/lib/notifications';
 import { ClockPickerModal } from '../../src/components/ClockPickerModal';
 import { BackChevron } from '../../src/components/BackChevron';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { fmt } from '../../src/lib/format';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 type Meal = typeof MEALS[number];
@@ -871,7 +872,7 @@ function FoodRow({ food, onDelete, onFavorite }: { food: FoodItem; onDelete: () 
           </View>
         )}
       </View>
-      <Text style={[fr.kcal, isQuickEntry ? { color: colors.ink2, backgroundColor: colors.line, borderColor: colors.line2 } : { color: grade.color, backgroundColor: grade.color + '18', borderColor: grade.color + '44' }]}>+{food.kcal} kcal</Text>
+      <Text style={[fr.kcal, isQuickEntry ? { color: colors.ink2, backgroundColor: colors.line, borderColor: colors.line2 } : { color: grade.color, backgroundColor: grade.color + '18', borderColor: grade.color + '44' }]}>+{fmt(food.kcal)} kcal</Text>
       {!isQuickEntry && (
         <View style={[fr.gradeBadge, { backgroundColor: grade.color, borderColor: grade.color }]}>
           <Text style={fr.gradeText}>{grade.grade}</Text>
@@ -937,7 +938,7 @@ function ActivityRow({ emoji, name, detail, kcal, onDelete }: {
           </View>
         )}
       </View>
-      <Text style={[fr.kcal, { color: colors.teal, backgroundColor: colors.teal + '18', borderColor: colors.teal + '44' }]}>−{kcal} kcal</Text>
+      <Text style={[fr.kcal, { color: colors.teal, backgroundColor: colors.teal + '18', borderColor: colors.teal + '44' }]}>−{fmt(kcal)} kcal</Text>
       <TouchableOpacity
         style={fr.trash}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onDelete(); }}
@@ -1036,7 +1037,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
 
         <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg, paddingBottom: spacing.xl, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
           <Text style={{ color: colors.ink3, fontSize: fontSize.xs, textAlign: 'center', marginBottom: spacing.sm }}>
-            Total: {totalKcal} kcal · {list.length} item{list.length !== 1 ? 's' : ''} to {meal}
+            Total: {fmt(totalKcal)} kcal · {list.length} item{list.length !== 1 ? 's' : ''} to {meal}
           </Text>
           <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
             <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -1709,7 +1710,7 @@ export default function DiaryScreen() {
   }
 
   async function handleShareDay() {
-    const kcalLine = `🔥 ${totalKcal} / ${KCAL_GOAL} kcal`;
+    const kcalLine = `🔥 ${fmt(totalKcal)} / ${fmt(KCAL_GOAL)} kcal`;
     const macroLine = `🥩 ${Math.round(totalProtein)}g protein · 🍞 ${Math.round(totalCarbs)}g carbs · 🧈 ${Math.round(totalFat)}g fat`;
     const waterLine = `💧 ${water}/${WATER_GOAL} glasses`;
     const streakLine = streak > 0 ? `🔥 ${streak}-day streak` : '';
@@ -1876,7 +1877,7 @@ export default function DiaryScreen() {
           <View style={st.calStatsRow}>
             {[{ val: totalKcal, lbl: 'Eaten', color: colors.lavender }, { val: caloriesBurned, lbl: 'Burned', color: colors.honey }, { val: netKcal, lbl: 'Net', color: colors.green }].map(({ val, lbl, color }) => (
               <View key={lbl} style={st.calStat}>
-                <Text style={[st.calStatVal, { color }]}>{val}</Text>
+                <Text style={[st.calStatVal, { color }]}>{fmt(val)}</Text>
                 <Text style={st.calStatLbl}>{lbl}</Text>
               </View>
             ))}
