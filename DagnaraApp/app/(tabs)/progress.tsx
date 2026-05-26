@@ -1234,7 +1234,7 @@ export default function ProgressScreen() {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  style={[st.lsNextBtn, { flex: lsStep === 0 ? 1 : undefined }]}
+                  style={st.lsNextBtn}
                   onPress={() => { if (lsStep < LS_QUESTIONS.length - 1) setLsStep(s => s + 1); else finishQuiz(); }}
                 >
                   <Text style={st.lsNextTxt}>{lsStep < LS_QUESTIONS.length - 1 ? 'Next →' : 'See Results ✨'}</Text>
@@ -1357,7 +1357,7 @@ const st = StyleSheet.create({
   lsOptionTxt: { color: colors.ink2, fontSize: fontSize.base },
   lsNav: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
   lsBackBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.layer2, borderRadius: radius.md, paddingVertical: spacing.sm },
-  lsNextBtn: { flex: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm },
+  lsNextBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm },
   lsNextTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
   // Result
   lsResultWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
