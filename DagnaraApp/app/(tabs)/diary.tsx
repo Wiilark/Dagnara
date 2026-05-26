@@ -104,9 +104,12 @@ interface AiItem {
 }
 
 interface ProgramsCardData {
-  qsDays?: number;   // days since quit smoking
-  qdDays?: number;   // days since quit drinking
-  pillsCount?: number; // number of meds tracked
+  qsDays?: number;
+  qdDays?: number;
+  pillsCount?: number;
+  fastingActive?: boolean;
+  fastingElapsedHrs?: number;
+  fastingMode?: string;
 }
 
 /** Grade a logged FoodItem — returns Nutri-Score A–E with official colors */
@@ -1072,6 +1075,12 @@ export default function DiaryScreen() {
   // Programs card data
   const [programsCardData, setProgramsCardData] = useState<ProgramsCardData>({});
 
+  // Pill card state
+  const [pillMeds, setPillMeds] = useState<Array<{ id: string; name: string; color: string; times: string[] }>>([]);
+  const [pillTakenToday, setPillTakenToday] = useState(false);
+  const [pillStreak, setPillStreak] = useState(0);
+  const pillFlashAnim = useRef(new Animated.Value(0)).current;
+
   // Goal celebration
   const celebrateAnim = useRef(new Animated.Value(0)).current;
   const celebratedRef = useRef<string | null>(null);
@@ -1213,24 +1222,29 @@ export default function DiaryScreen() {
     ImagePicker.getMediaLibraryPermissionsAsync().then(r => { galleryGrantedRef.current = r.granted; });
   }, []);
 
-  // Programs card: load quit/pill stats from AsyncStorage
+  // Programs card: load quit/pill/fasting stats from AsyncStorage
   useEffect(() => {
     if (!email) return;
-    const QS_KEY  = `dagnara_quit_smoking_${email}`;
-    const QD_KEY  = `dagnara_quit_drinking_${email}`;
-    const PIL_KEY = `dagnara_pill_meds_${email}`;
+    const QS_KEY      = `dagnara_quit_smoking_${email}`;
+    const QD_KEY      = `dagnara_quit_drinking_${email}`;
+    const PIL_KEY     = `dagnara_pill_meds_${email}`;
+    const FASTING_KEY = `dagnara_fasting_${email}`;
     (async () => {
       try {
-        const [qsRaw, qdRaw, pilRaw] = await Promise.all([
+        const [qsRaw, qdRaw, pilRaw, fastRaw] = await Promise.all([
           AsyncStorage.getItem(QS_KEY),
           AsyncStorage.getItem(QD_KEY),
           AsyncStorage.getItem(PIL_KEY),
+          AsyncStorage.getItem(FASTING_KEY),
         ]);
         const now = Date.now();
         const dayMs = 86400000;
         let qsDays: number | undefined;
         let qdDays: number | undefined;
         let pillsCount: number | undefined;
+        let fastingActive: boolean | undefined;
+        let fastingElapsedHrs: number | undefined;
+        let fastingMode: string | undefined;
         if (qsRaw) {
           const d = JSON.parse(qsRaw);
           if (d?.quitDate) qsDays = Math.floor((now - new Date(d.quitDate).getTime()) / dayMs);
@@ -1243,7 +1257,40 @@ export default function DiaryScreen() {
           const meds = JSON.parse(pilRaw);
           if (Array.isArray(meds)) pillsCount = meds.length;
         }
-        setProgramsCardData({ qsDays, qdDays, pillsCount });
+        if (fastRaw) {
+          const f = JSON.parse(fastRaw);
+          if (f?.active && f?.startTime) {
+            fastingActive = true;
+            fastingElapsedHrs = (now - new Date(f.startTime).getTime()) / 3600000;
+            fastingMode = f.mode ?? '16:8';
+          }
+        }
+        setProgramsCardData({ qsDays, qdDays, pillsCount, fastingActive, fastingElapsedHrs, fastingMode });
+        if (pilRaw) {
+          const meds: Array<{ id: string; name: string; color: string; times: string[] }> = JSON.parse(pilRaw);
+          if (Array.isArray(meds) && meds.length > 0) {
+            setPillMeds(meds);
+            const today = dateStr(new Date());
+            const logRaw = await AsyncStorage.getItem(`dagnara_pill_log_${today}_${email}`);
+            const pillLog: Record<string, { takenCount: number; takenTimes: string[] }> = logRaw ? JSON.parse(logRaw) : {};
+            const allTaken = meds.every(m => (pillLog[m.id]?.takenCount ?? 0) >= 1);
+            setPillTakenToday(allTaken);
+            let streak = allTaken ? 1 : 0;
+            if (allTaken) {
+              const d = new Date();
+              for (let i = 1; i <= 30; i++) {
+                d.setDate(d.getDate() - 1);
+                const dayKey = dateStr(d);
+                const pastRaw = await AsyncStorage.getItem(`dagnara_pill_log_${dayKey}_${email}`);
+                if (!pastRaw) break;
+                const pastLog: Record<string, { takenCount: number }> = JSON.parse(pastRaw);
+                if (meds.every(m => (pastLog[m.id]?.takenCount ?? 0) >= 1)) streak++;
+                else break;
+              }
+            }
+            setPillStreak(streak);
+          }
+        }
       } catch {}
     })();
   }, [email]);
@@ -1282,6 +1329,29 @@ export default function DiaryScreen() {
       catch { AsyncStorage.removeItem(favKey); }
     });
   }, [email]);
+
+  async function markAllPillsTaken() {
+    if (!email || pillMeds.length === 0 || pillTakenToday) return;
+    const today = dateStr(new Date());
+    const logKey = `dagnara_pill_log_${today}_${email}`;
+    const now = new Date().toISOString();
+    const existing = await AsyncStorage.getItem(logKey);
+    const log: Record<string, { takenCount: number; takenTimes: string[] }> = existing ? JSON.parse(existing) : {};
+    for (const med of pillMeds) {
+      if ((log[med.id]?.takenCount ?? 0) < 1) {
+        log[med.id] = { takenCount: 1, takenTimes: [now] };
+      }
+    }
+    await AsyncStorage.setItem(logKey, JSON.stringify(log));
+    setPillTakenToday(true);
+    setPillStreak(s => s === 0 ? 1 : s);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Animated.sequence([
+      Animated.timing(pillFlashAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
+      Animated.delay(600),
+      Animated.timing(pillFlashAnim, { toValue: 0, duration: 400, useNativeDriver: false }),
+    ]).start();
+  }
 
   async function saveFavorite(food: FoodItem) {
     const alreadySaved = favorites.some(f => f.name === food.name);
@@ -2018,8 +2088,70 @@ export default function DiaryScreen() {
           </View>
         </View>
 
+        {/* ── Pill Card ── */}
+        {pillMeds.length > 0 && (
+          <View style={{
+            backgroundColor: colors.layer1,
+            borderWidth: 1, borderColor: colors.line2,
+            borderRadius: radius.lg,
+            padding: spacing.lg,
+            marginTop: spacing.md,
+            shadowColor: colors.purple, shadowOpacity: 0.12,
+            shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6,
+            overflow: 'hidden',
+          }}>
+            <Animated.View style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: colors.green,
+              opacity: pillFlashAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.18] }),
+            }} pointerEvents="none" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text style={{ fontSize: fontSize.lg }}>💊</Text>
+                <View>
+                  <Text style={{ fontSize: fontSize.base, fontWeight: '700', color: colors.ink }}>
+                    {pillMeds.length === 1 ? pillMeds[0].name : `${pillMeds.length} medications`}
+                  </Text>
+                  {pillStreak > 0 && (
+                    <Text style={{ fontSize: fontSize.xs, color: colors.green, fontWeight: '600' }}>
+                      🔥 {pillStreak}-day streak
+                    </Text>
+                  )}
+                </View>
+              </View>
+              {pillTakenToday ? (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+                  backgroundColor: colors.green + '22',
+                  borderRadius: radius.pill,
+                  paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+                }}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.green} />
+                  <Text style={{ fontSize: fontSize.sm, color: colors.green, fontWeight: '600' }}>Taken</Text>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={markAllPillsTaken} activeOpacity={0.8}
+                  style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+                  <ExpoLinearGradient
+                    colors={[colors.green, colors.teal]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 }}
+                  >
+                    <Text style={{ color: colors.white, fontSize: fontSize.sm, fontWeight: '700' }}>Mark Taken</Text>
+                  </ExpoLinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>
+              {pillTakenToday
+                ? 'All medications logged for today ✓'
+                : `Due: ${pillMeds.flatMap(m => m.times).slice(0, 3).join(' · ')}`}
+            </Text>
+          </View>
+        )}
+
         {/* ── Programs moat card ── */}
-        {(programs?.quit_smoking || programs?.quit_drinking || programs?.pill_reminder) && (
+        {(programs?.quit_smoking || programs?.quit_drinking || programs?.pill_reminder || programsCardData.fastingActive) && (
           <TouchableOpacity style={{ backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginTop: spacing.md }} activeOpacity={0.8} onPress={() => router.push('/(tabs)/programs')}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' }}>Programs</Text>
@@ -2045,6 +2177,15 @@ export default function DiaryScreen() {
                   <Text style={{ fontSize: fontSize.lg }}>💊</Text>
                   <Text style={{ color: colors.green, fontSize: fontSize.md, fontWeight: '800' }}>{programsCardData.pillsCount}</Text>
                   <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>med{programsCardData.pillsCount !== 1 ? 's' : ''} tracked</Text>
+                </View>
+              )}
+              {programsCardData.fastingActive && programsCardData.fastingElapsedHrs != null && (
+                <View style={{ flex: 1, backgroundColor: colors.purpleTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line3, padding: spacing.sm, alignItems: 'center', gap: 2 }}>
+                  <Text style={{ fontSize: fontSize.lg }}>⏱️</Text>
+                  <Text style={{ color: colors.honey, fontSize: fontSize.md, fontWeight: '800' }}>
+                    {Math.floor(programsCardData.fastingElapsedHrs)}h {Math.floor((programsCardData.fastingElapsedHrs % 1) * 60)}m
+                  </Text>
+                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{programsCardData.fastingMode ?? '16:8'} fast</Text>
                 </View>
               )}
             </View>
