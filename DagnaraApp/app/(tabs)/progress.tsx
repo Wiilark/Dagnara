@@ -1110,7 +1110,7 @@ export default function ProgressScreen() {
                 <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.green }}>Goal reached! Target {formatWeight(tgt, unitSystem)}</Text>
               </View>
             );
-            const label = unitSystem === 'Imperial' ? `${(absDiff * 2.205).toFixed(1)} lb` : `${absDiff.toFixed(1)} kg`;
+            const label = unitSystem !== 'Metric' ? `${(absDiff * 2.205).toFixed(1)} lb` : `${absDiff.toFixed(1)} kg`;
             const arrow = diff > 0 ? '↑' : '↓';
             const color = weightGoal === 'gain' ? (diff > 0 ? colors.green : colors.honey) : (diff < 0 ? colors.green : colors.honey);
             return (
