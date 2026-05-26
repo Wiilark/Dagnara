@@ -18,6 +18,32 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
   supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 }
 
+// ── Auth Middleware ──────────────────────────────────────────────────────────
+async function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: { message: 'Authentication required' } });
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (!supabaseAdmin) {
+    console.error('[auth] SUPABASE_SERVICE_KEY not configured');
+    return res.status(503).json({ error: { message: 'Auth service unavailable' } });
+  }
+
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: { message: 'Invalid or expired session' } });
+    }
+    req.user = user; // Attach user to request
+    next();
+  } catch (err) {
+    console.error('[auth] verification error:', err.message);
+    res.status(401).json({ error: { message: 'Session verification failed' } });
+  }
+}
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet());
 
@@ -207,7 +233,7 @@ app.get('/api/config', configLimiter, (req, res) => {
 
 // ── Food photo analysis proxy ────────────────────────────────────────────────
 // Anthropic API key stays on the server — never sent to the browser.
-app.post('/api/analyze-food', analyzeLimiter, async (req, res) => {
+app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => {
   const { imageData, mediaType } = req.body;
 
   if (!imageData || !mediaType) {
@@ -267,7 +293,7 @@ const recipeLimiter = rateLimit({
   message: { error: { message: 'Too many recipe imports — please wait a moment.' } }
 });
 
-app.post('/api/import-recipe', recipeLimiter, async (req, res) => {
+app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => {
   const { url } = req.body ?? {};
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: { message: 'url is required' } });
@@ -353,6 +379,26 @@ const barcodeLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+app.get('/api/food-search', barcodeLimiter, async (req, res) => {
+  const q = (req.query.q ?? '').trim();
+  if (!q || q.length < 2) return res.status(400).json({ error: 'Query too short' });
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,nutriments,serving_size,brands,id`;
+    const off = await fetch(url, {
+      headers: { 'User-Agent': 'Dagnara/1.0 (nutrition tracking app)' },
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    const json = await off.json();
+    res.json(json);
+  } catch (err) {
+    console.error('[food-search]', err.message);
+    res.status(502).json({ error: 'Could not reach food database' });
+  }
+});
+
 app.get('/api/barcode/:code', barcodeLimiter, async (req, res) => {
   const { code } = req.params;
   if (!/^\d{4,14}$/.test(code)) {
@@ -379,7 +425,7 @@ app.get('/api/barcode/:code', barcodeLimiter, async (req, res) => {
 });
 
 // ── AI text nutrition estimation ─────────────────────────────────────────────
-app.post('/api/estimate-nutrition', estimateLimiter, async (req, res) => {
+app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, res) => {
   const { description } = req.body ?? {};
   if (!description || typeof description !== 'string' || description.trim().length < 2) {
     return res.status(400).json({ error: { message: 'description is required' } });
@@ -424,7 +470,7 @@ const coachLimiter = rateLimit({
   message: { error: { message: 'Too many messages — please wait a moment.' } }
 });
 
-app.post('/api/coach', coachLimiter, async (req, res) => {
+app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   const { messages, context } = req.body ?? {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: { message: 'messages is required' } });

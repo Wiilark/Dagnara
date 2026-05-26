@@ -1413,8 +1413,29 @@ export default function DiaryScreen() {
     if (!q.trim()) { setSearchResults([]); setSearching(false); return; }
     setSearching(true);
     setSearchResults([]);
-    const results = await searchFoods(q);
-    setSearchResults(results);
+    const local = searchFoods(q);
+    setSearchResults(local);
+    if (local.length < 5) {
+      try {
+        const apiBase = process.env.EXPO_PUBLIC_API_URL ?? '';
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(`${apiBase}/api/food-search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        clearTimeout(fetchTimeout);
+        if (res.ok) {
+          const json = await res.json();
+          const products: OFFProduct[] = json.products ?? [];
+          const offResults = products.map(offToResult).filter((r): r is FoodSearchResult => r !== null);
+          const localNames = new Set(local.map(r => r.name.toLowerCase()));
+          const unique = offResults.filter(r => !localNames.has(r.name.toLowerCase()));
+          if (searchQueryRef.current === q && unique.length > 0) {
+            setSearchResults([...local, ...unique]);
+          }
+        }
+      } catch {
+        // OFF search failure is non-fatal — local results already shown
+      }
+    }
     setSearching(false);
   }
 
