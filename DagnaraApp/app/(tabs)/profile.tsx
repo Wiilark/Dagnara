@@ -330,7 +330,10 @@ export default function ProfileScreen() {
     await setProfile({ ...profile, photoUri: dataUri });
   }
 
-  const initial = (profile.name ?? email ?? '?')[0].toUpperCase();
+  const nameParts = (profile.name ?? '').trim().split(/\s+/).filter(Boolean);
+  const initials = nameParts.length >= 2
+    ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+    : (nameParts[0]?.[0] ?? email?.[0] ?? '?').toUpperCase();
 
   async function handleSaveAccount() {
     const newName = [acFirstName.trim(), acLastName.trim()].filter(Boolean).join(' ');
@@ -347,35 +350,34 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* ── Header ── */}
-        <View style={styles.headerRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <BackChevron size={22} />
-            </TouchableOpacity>
-            <Text style={styles.heading}>Profile</Text>
-          </View>
-          <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsModal(true)}>
-            <Ionicons name="settings-outline" size={18} color={colors.ink2} />
+        {/* ── Top bar ── */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+            <Ionicons name="close" size={20} color={colors.ink} />
           </TouchableOpacity>
+          <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
+              <Ionicons name="flash" size={13} color={colors.white} />
+              <Text style={styles.upgradeTxt}>Upgrade</Text>
+            </LinearGradient>
+          </View>
         </View>
 
-        {/* ── Avatar card ── */}
-        <View style={styles.avatarCard}>
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
           <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
             {profile.photoUri
               ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
               : <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initial}</Text>
+                  <Text style={styles.avatarText}>{initials}</Text>
                 </View>
             }
             <View style={styles.avatarAdd}>
-              <Ionicons name="camera" size={13} color={colors.white} />
+              <Ionicons name="camera" size={12} color={colors.white} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.name}>{profile.name ?? 'Your Name'}</Text>
-          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
-          {/* XP level */}
+          <Text style={styles.heroName}>{profile.name ?? 'Your Name'}</Text>
+          <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
           <View style={styles.xpRow}>
             <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
             <View style={{ flex: 1 }}>
@@ -386,19 +388,45 @@ export default function ProfileScreen() {
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
             </View>
           </View>
-          {/* Stats row */}
-          <View style={styles.statsRow}>
-            {[
-              { val: streak, lbl: 'Day streak', color: colors.honey },
-              { val: selectedDiet, lbl: 'Active diet', color: colors.lavender },
-              { val: calorieGoal, lbl: 'kcal goal', color: colors.green },
-            ].map(({ val, lbl, color }) => (
-              <View key={lbl} style={styles.statChip}>
-                <Text style={[styles.statChipVal, { color }]}>{val}</Text>
-                <Text style={styles.statChipLbl}>{lbl}</Text>
-              </View>
-            ))}
+        </View>
+
+        {/* ── Quick cards ── */}
+        <View style={styles.quickRow}>
+          <View style={[styles.quickCard, { flex: 1 }]}>
+            <View style={[styles.menuIcon, { backgroundColor: colors.purple + '22' }]}>
+              <Ionicons name="diamond-outline" size={16} color={colors.purple} />
+            </View>
+            <Text style={styles.quickVal}>Free</Text>
+            <Text style={styles.quickLbl}>Current plan</Text>
           </View>
+          <View style={[styles.quickCard, { flex: 1 }]}>
+            <Text style={{ fontSize: fontSize.xl }}>🔥</Text>
+            <Text style={styles.quickVal}>{streak}</Text>
+            <Text style={styles.quickLbl}>Day streak</Text>
+          </View>
+        </View>
+
+        {/* ── Customization ── */}
+        <Text style={styles.sectionHdr}>CUSTOMIZATION</Text>
+        <View style={styles.menuCard}>
+          {[
+            { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
+            { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
+            { icon: 'bar-chart-outline', label: 'Adjust Macronutrients', color: colors.sky, value: '', onPress: () => setMacrosModal(true) },
+            { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
+            { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
+            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${fmt(parseInt(waterGoal, 10) || 0)} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
+            { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
+          ].map(({ icon, label, color, value, onPress }) => (
+            <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
+              <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
+                <Ionicons name={icon as any} size={16} color={color} />
+              </View>
+              <Text style={styles.menuLabel}>{label}</Text>
+              {value ? <Text style={styles.menuValue}>{value}</Text> : null}
+              <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* ── Achievements ── */}
@@ -425,29 +453,26 @@ export default function ProfileScreen() {
           ))}
         </ScrollView>
 
-        {/* ── Customization ── */}
-        <Text style={styles.sectionHdr}>CUSTOMIZATION</Text>
+        {/* ── Account ── */}
+        <Text style={styles.sectionHdr}>ACCOUNT</Text>
         <View style={styles.menuCard}>
-          {[
-            { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
-            { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
-            { icon: 'bar-chart-outline', label: 'Adjust Macronutrients', color: colors.sky, value: '', onPress: () => setMacrosModal(true) },
-            { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
-            { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'water-outline', label: 'Water Habits', color: colors.sky, value: `${fmt(parseInt(waterGoal, 10) || 0)} glasses/day`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
-            { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
-          ].map(({ icon, label, color, value, onPress }) => (
-            <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
-              <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
-                <Ionicons name={icon as any} size={16} color={color} />
-              </View>
-              <Text style={styles.menuLabel}>{label}</Text>
-              {value ? <Text style={styles.menuValue}>{value}</Text> : null}
-              <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={styles.menuRow} onPress={() => setSettingsModal(true)}>
+            <View style={[styles.menuIcon, { backgroundColor: colors.ink3 + '22' }]}>
+              <Ionicons name="settings-outline" size={16} color={colors.ink2} />
+            </View>
+            <Text style={styles.menuLabel}>Account Settings</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuRow, { borderBottomWidth: 0 }]} onPress={handleLogout}>
+            <View style={[styles.menuIcon, { backgroundColor: colors.rose + '22' }]}>
+              <Ionicons name="log-out-outline" size={16} color={colors.rose} />
+            </View>
+            <Text style={[styles.menuLabel, { color: colors.rose }]}>Log out</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+          </TouchableOpacity>
         </View>
 
+        <Text style={styles.footer}>Version 1.0.0 · Dagnara</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -1314,7 +1339,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: 24 },
+  scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
 
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
