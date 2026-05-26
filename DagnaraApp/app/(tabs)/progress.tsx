@@ -1183,16 +1183,18 @@ export default function ProgressScreen() {
       <InsightDetailModal visible={insightDetailVisible} onClose={() => setInsightDetailVisible(false)} />
 
       {/* Life Score Quiz Modal */}
-      <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" hardwareAccelerated onRequestClose={() => setLsVisible(false)}>
+      <Modal visible={lsVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
-          {/* Header — title + step counter only; close is in the bottom nav */}
+          {/* Header */}
           <View style={st.lsHeader}>
-            <View style={{ width: 34 }} />
             <Text style={st.lsHeaderTitle}>{lsResult === null ? 'Weekly Check-In' : 'Your Life Score'}</Text>
             {lsResult === null
               ? <Text style={st.lsStepTxt}>{lsStep + 1} / {LS_QUESTIONS.length}</Text>
               : <View style={{ width: 34 }} />
             }
+            <TouchableOpacity onPress={() => setLsVisible(false)} style={st.lsCloseIconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="close" size={22} color={colors.ink2} />
+            </TouchableOpacity>
           </View>
 
           {lsResult === null ? (
@@ -1226,9 +1228,6 @@ export default function ProgressScreen() {
               </ScrollView>
 
               <View style={st.lsNav}>
-                <TouchableOpacity style={st.lsCloseIconBtn} onPress={() => setLsVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Ionicons name="close" size={22} color={colors.ink2} />
-                </TouchableOpacity>
                 {lsStep > 0 && (
                   <TouchableOpacity style={st.lsBackBtn} onPress={() => setLsStep(s => s - 1)}>
                     <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>← Back</Text>
