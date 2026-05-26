@@ -353,16 +353,16 @@ export default function ProfileScreen() {
         {/* ── Top bar ── */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={20} color={colors.ink} />
+            <Ionicons name="close" size={18} color={colors.ink} />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <TouchableOpacity style={styles.closeBtn} onPress={() => setMessagesOpen(true)}>
-              <Ionicons name="notifications-outline" size={20} color={colors.ink} />
+              <Ionicons name="notifications-outline" size={18} color={colors.ink} />
               {hasUnread && <View style={styles.bellDot} />}
             </TouchableOpacity>
-            <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+            <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
               <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-                <Ionicons name="flash" size={13} color={colors.white} />
+                <Ionicons name="diamond" size={14} color={colors.white} />
                 <Text style={styles.upgradeTxt}>Upgrade</Text>
               </LinearGradient>
             </View>
@@ -379,7 +379,7 @@ export default function ProfileScreen() {
                 </View>
             }
             <View style={styles.avatarAdd}>
-              <Ionicons name="camera" size={12} color={colors.white} />
+              <Ionicons name="camera" size={14} color={colors.white} />
             </View>
           </TouchableOpacity>
           <Text style={styles.heroName}>{profile.name ?? 'Your Name'}</Text>
@@ -399,16 +399,22 @@ export default function ProfileScreen() {
         {/* ── Quick cards ── */}
         <View style={styles.quickRow}>
           <View style={[styles.quickCard, { flex: 1 }]}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.purple + '22' }]}>
-              <Ionicons name="diamond-outline" size={16} color={colors.purple} />
+            <View style={styles.quickIconWrap}>
+              <Ionicons name="diamond-outline" size={20} color={colors.purple} />
             </View>
-            <Text style={styles.quickVal}>Free</Text>
-            <Text style={styles.quickLbl}>Current plan</Text>
+            <View style={styles.quickTexts}>
+              <Text style={styles.quickVal}>Free</Text>
+              <Text style={styles.quickLbl}>Your plan</Text>
+            </View>
           </View>
           <View style={[styles.quickCard, { flex: 1 }]}>
-            <Text style={{ fontSize: fontSize.xl }}>🔥</Text>
-            <Text style={styles.quickVal}>{streak}</Text>
-            <Text style={styles.quickLbl}>Day streak</Text>
+            <View style={styles.quickIconWrap}>
+              <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
+            </View>
+            <View style={styles.quickTexts}>
+              <Text style={styles.quickVal}>{streak} days</Text>
+              <Text style={styles.quickLbl}>Current streak</Text>
+            </View>
           </View>
         </View>
 
@@ -1353,13 +1359,13 @@ const styles = StyleSheet.create({
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
-  hero: { backgroundColor: colors.layer1, borderRadius: radius.xl, padding: spacing.lg, alignItems: 'center', gap: spacing.sm, shadowColor: colors.purple, shadowOpacity: 0.13, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+  hero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
-  avatarImg: { width: 88, height: 88, borderRadius: radius.pill },
-  avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.layer1 },
-  heroName: { color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', marginTop: 2 },
+  avatarImg: { width: 96, height: 96, borderRadius: radius.pill },
+  avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  heroName: { color: colors.ink, fontSize: fontSize['2xl'], fontWeight: '800', marginTop: 2 },
   heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220 },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
@@ -1372,7 +1378,9 @@ const styles = StyleSheet.create({
   xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
   quickRow: { flexDirection: 'row', gap: spacing.sm },
-  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center', gap: spacing.xs, shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, minHeight: 104, justifyContent: 'space-between', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  quickIconWrap: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
+  quickTexts: { gap: 2 },
   quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
   quickLbl: { fontSize: fontSize.xs, color: colors.ink3 },
 
@@ -1384,7 +1392,7 @@ const styles = StyleSheet.create({
 
   menuCard: { backgroundColor: colors.layer1, borderRadius: radius.xl, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md + 2 },
-  menuIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  menuIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
 
