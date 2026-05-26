@@ -384,16 +384,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <Text style={styles.heroName}>{profile.name ?? 'Your Name'}</Text>
           <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
-          <View style={styles.xpRow}>
-            <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.xpMeta}>
-                <Text style={styles.xpName}>{xpInfo.name}</Text>
-                <Text style={styles.xpPts}>{fmt(xp)} XP</Text>
-              </View>
-              <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
-            </View>
-          </View>
         </View>
 
         {/* ── Quick cards ── */}
@@ -443,6 +433,16 @@ export default function ProfileScreen() {
 
         {/* ── Achievements ── */}
         <Text style={styles.sectionHdr}>ACHIEVEMENTS</Text>
+        <View style={styles.xpRow}>
+          <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.xpMeta}>
+              <Text style={styles.xpName}>{xpInfo.name}</Text>
+              <Text style={styles.xpPts}>{fmt(xp)} XP</Text>
+            </View>
+            <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
+          </View>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.sm, gap: spacing.sm }}>
           {([
             { id: 'streak3',   icon: '🔥', label: '3-day\nstreak',   unlocked: streak >= 3 },
