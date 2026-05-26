@@ -3013,7 +3013,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     const setupLabels = QS_PRODUCT_LABELS[formProduct];
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-          <SafeAreaView style={m.sheet} edges={['bottom']}>
+          <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
             <View style={m.sheetHeader}>
               <Text style={m.sheetTitle}>🚭 Quit Setup</Text>
               <TouchableOpacity onPress={() => (data ? setShowSetup(false) : onClose())}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
@@ -3075,7 +3075,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   return (
     <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         {/* ── Header: back-arrow on detail views, X close on main ─────────── */}
         <View style={m.sheetHeader}>
           {qsView === 'main' ? (
@@ -5054,7 +5054,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       presentationStyle="pageSheet"
       onRequestClose={() => setCravingFormOpen(false)}
     >
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>Log a craving</Text>
           <TouchableOpacity onPress={() => setCravingFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -5210,7 +5210,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       presentationStyle="pageSheet"
       onRequestClose={() => setNrtFormOpen(false)}
     >
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>Log NRT</Text>
           <TouchableOpacity onPress={() => setNrtFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -5835,7 +5835,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   if (showSetup) {
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-          <SafeAreaView style={m.sheet} edges={['bottom']}>
+          <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
             <View style={m.sheetHeader}>
               <Text style={m.sheetTitle}>🍺 Quit Drinking Setup</Text>
               <TouchableOpacity onPress={() => (data ? setShowSetup(false) : onClose())}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
@@ -5872,7 +5872,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   return (
     <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         {/* ── Header: edit + X on main; back-arrow + dynamic title on detail ── */}
         <View style={m.sheetHeader}>
           {qdView === 'main' ? (
@@ -7243,7 +7243,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
       presentationStyle="pageSheet"
       onRequestClose={() => setCravingFormOpen(false)}
     >
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>Log a craving</Text>
           <TouchableOpacity onPress={() => setCravingFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -7724,7 +7724,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         <View style={m.sheetHeader}>
           <Text style={m.sheetTitle}>💊 Pill Reminder</Text>
           <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
@@ -7732,7 +7732,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
 
         {/* Add medication sheet */}
         <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditSheet(false)}>
-            <SafeAreaView style={m.sheet} edges={['bottom']}>
+            <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
               <View style={m.sheetHeader}>
                 <Text style={m.sheetTitle}>{editMed ? 'Edit Medication' : 'Add Medication'}</Text>
                 <TouchableOpacity onPress={() => setEditSheet(false)}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
@@ -8222,7 +8222,7 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={m.sheet} edges={['bottom']}>
+      <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={m.sheetHeader}>
           <TouchableOpacity onPress={onClose} style={{ padding: spacing.xs }}>
