@@ -17,21 +17,21 @@ import { fmt } from '../../src/lib/format';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
 const LS_QUESTIONS = [
-  { q: 'Whole fruit', hint: 'Fresh, frozen, or dried', emoji: '🍎', type: 'positive' },
-  { q: 'Leafy green vegetables', hint: 'Spinach, kale, salad greens', emoji: '🥬', type: 'positive' },
-  { q: 'Colourful vegetables', hint: 'Peppers, carrots, beetroot', emoji: '🌈', type: 'positive' },
+  { q: 'Whole fruit', hint: 'Fresh, frozen, or dried', emoji: '🍓', type: 'positive' },
+  { q: 'Leafy green vegetables', hint: 'Spinach, kale, salad greens', emoji: '🥦', type: 'positive' },
+  { q: 'Colourful vegetables', hint: 'Peppers, carrots, beetroot', emoji: '🫑', type: 'positive' },
   { q: 'Nuts and seeds', hint: 'Almonds, walnuts, chia', emoji: '🥜', type: 'positive' },
   { q: 'Healthy cooking oils', hint: 'Olive oil, avocado oil', emoji: '🫒', type: 'positive' },
   { q: 'Plain oats / whole grains', hint: 'Oatmeal, brown rice', emoji: '🌾', type: 'positive' },
-  { q: 'Processed meat', hint: 'Sausages, bacon, deli meat', emoji: '🌭', type: 'negative' },
+  { q: 'Processed meat', hint: 'Sausages, bacon, deli meat', emoji: '🥩', type: 'negative' },
   { q: 'Fast food', hint: 'Takeaway, fried food', emoji: '🍔', type: 'negative' },
-  { q: 'Sugary drinks', hint: 'Soda, juice, energy drinks', emoji: '🥤', type: 'negative' },
+  { q: 'Sugary drinks', hint: 'Soda, juice, energy drinks', emoji: '🧃', type: 'negative' },
   { q: 'Plain water', hint: '8+ glasses per day', emoji: '💧', type: 'positive' },
-  { q: 'Exercise (any)', hint: 'Walking, cycling, sports', emoji: '🏃', type: 'positive' },
+  { q: 'Exercise (any)', hint: 'Walking, cycling, sports', emoji: '🚶', type: 'positive' },
   { q: 'Vigorous exercise', hint: 'Running, HIIT, intense gym', emoji: '💪', type: 'positive' },
-  { q: 'Sitting >8 hours', hint: 'Desk work, screen time', emoji: '🪑', type: 'negative' },
+  { q: 'Sitting >8 hours', hint: 'Desk work, screen time', emoji: '🛋️', type: 'negative' },
   { q: 'Sleep 7-9 hours', hint: 'Quality uninterrupted sleep', emoji: '😴', type: 'positive' },
-  { q: 'Felt stressed', hint: 'Work, relationships, finances', emoji: '😰', type: 'negative' },
+  { q: 'Felt stressed', hint: 'Work, relationships, finances', emoji: '😤', type: 'negative' },
 ] as const;
 
 const LS_LABELS = ['Never', 'Rarely', 'Once/week', '2×/week', '3-4×/week', '5-6×/week', 'Daily'];
