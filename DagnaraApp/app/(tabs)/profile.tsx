@@ -463,7 +463,7 @@ export default function ProfileScreen() {
             <Text style={styles.menuLabel}>Account Settings</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.menuRow, { borderBottomWidth: 0 }]} onPress={handleLogout}>
+          <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
             <View style={[styles.menuIcon, { backgroundColor: colors.rose + '22' }]}>
               <Ionicons name="log-out-outline" size={16} color={colors.rose} />
             </View>
@@ -1346,7 +1346,7 @@ const styles = StyleSheet.create({
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
-  hero: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
+  hero: { backgroundColor: colors.layer1, borderRadius: radius.xl, padding: spacing.lg, alignItems: 'center', gap: spacing.sm, shadowColor: colors.purple, shadowOpacity: 0.13, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   avatarWrap: { position: 'relative' },
   avatar: { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
@@ -1365,18 +1365,18 @@ const styles = StyleSheet.create({
   xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
   quickRow: { flexDirection: 'row', gap: spacing.sm },
-  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md, alignItems: 'center', gap: spacing.xs },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center', gap: spacing.xs, shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
   quickLbl: { fontSize: fontSize.xs, color: colors.ink3 },
 
-  sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, marginBottom: -6 },
+  sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: spacing.xs },
 
   achieveBadge: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   achieveLbl: { fontSize: fontSize.xs, color: colors.ink2, textAlign: 'center' },
   achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
 
-  menuCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  menuCard: { backgroundColor: colors.layer1, borderRadius: radius.xl, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md + 2 },
   menuIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
