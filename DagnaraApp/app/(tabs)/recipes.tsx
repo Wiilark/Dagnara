@@ -310,11 +310,13 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
 
 export default function RecipesScreen() {
   const { entries, addFood, loadEntry } = useDiaryStore();
-  const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak } = useAppStore();
+  const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak, dietaryPreferences } = useAppStore();
   const email = useAuthStore(s => s.email);
   const [recipeSearch, setRecipeSearch] = useState('');
   const [foodSearch, setFoodSearch] = useState('');
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState(
+    (dietaryPreferences && DIET_FILTERS.includes(dietaryPreferences)) ? dietaryPreferences : 'All'
+  );
   const [selected, setSelected] = useState<typeof RECIPES[0] | null>(null);
   const [mealPickerOpen, setMealPickerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'recipes' | 'foods'>('recipes');
