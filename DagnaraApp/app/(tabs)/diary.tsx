@@ -1211,7 +1211,7 @@ export default function DiaryScreen() {
   const insightTip = useMemo(() => {
     if (!isToday || totalKcal <= 0) return null;
     const proteinPct = totalProtein * 4 / totalKcal * 100;
-    if (proteinPct < 20) return { icon: '💪', text: 'Protein is low today — aim for 30% of calories from protein to preserve muscle.' };
+    if (proteinPct < 20) return { icon: '💪', text: `Protein is low today — aim for 30% of calories from protein to ${weightGoal === 'gain' ? 'build muscle' : 'preserve muscle'}.` };
     if (totalSodium > 2300) return { icon: '🧂', text: 'Sodium is high today. Consider more whole foods and less processed items.' };
     if (totalFiber < 10 && totalKcal > 500) return { icon: '🥦', text: 'Fiber is low — add veggies, legumes, or whole grains to support gut health.' };
     if (netKcal > KCAL_GOAL * 1.1) return { icon: '⚠️', text: 'You\'re over your calorie goal. A short walk can help offset the difference.' };

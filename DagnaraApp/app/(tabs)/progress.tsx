@@ -1092,6 +1092,28 @@ export default function ProgressScreen() {
               ))}
             </View>
           )}
+          {(() => {
+            const tgt = parseFloat((profile as any).targetWeight ?? '');
+            const latest = weightHistory[weightHistory.length - 1]?.kg;
+            if (!tgt || !latest) return null;
+            const diff = tgt - latest;
+            const absDiff = Math.abs(diff);
+            if (absDiff < 0.1) return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingTop: spacing.sm }}>
+                <Text style={{ fontSize: fontSize.sm }}>🏆</Text>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.green }}>Goal reached! Target {formatWeight(tgt, unitSystem)}</Text>
+              </View>
+            );
+            const label = unitSystem === 'Imperial' ? `${(absDiff * 2.205).toFixed(1)} lb` : `${absDiff.toFixed(1)} kg`;
+            const arrow = diff > 0 ? '↑' : '↓';
+            const color = weightGoal === 'gain' ? (diff > 0 ? colors.green : colors.honey) : (diff < 0 ? colors.green : colors.honey);
+            return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line, marginTop: spacing.sm }}>
+                <Text style={{ fontSize: fontSize.xs, color: colors.ink3, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' }}>Goal</Text>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color }}>{arrow} {label} to {formatWeight(tgt, unitSystem)}</Text>
+              </View>
+            );
+          })()}
         </View>
 
         {/* BMI Card */}
