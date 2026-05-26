@@ -350,40 +350,41 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* ── Top bar ── */}
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={18} color={colors.ink} />
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setMessagesOpen(true)}>
-              <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-              {hasUnread && <View style={styles.bellDot} />}
+        {/* ── Top bar + Hero (grouped so no large gap between them) ── */}
+        <View style={{ gap: spacing.xs }}>
+          <View style={styles.topBar}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+              <Ionicons name="close" size={18} color={colors.ink} />
             </TouchableOpacity>
-            <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
-              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-                <Ionicons name="diamond" size={14} color={colors.white} />
-                <Text style={styles.upgradeTxt}>Upgrade</Text>
-              </LinearGradient>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => setMessagesOpen(true)}>
+                <Ionicons name="notifications-outline" size={18} color={colors.ink} />
+                {hasUnread && <View style={styles.bellDot} />}
+              </TouchableOpacity>
+              <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
+                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
+                  <Ionicons name="diamond" size={14} color={colors.white} />
+                  <Text style={styles.upgradeTxt}>Upgrade</Text>
+                </LinearGradient>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* ── Hero ── */}
-        <View style={styles.hero}>
-          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
-            {profile.photoUri
-              ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
-              : <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials}</Text>
-                </View>
-            }
-            <View style={styles.avatarAdd}>
-              <Ionicons name="camera" size={14} color={colors.white} />
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
-          <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
+          <View style={styles.hero}>
+            <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
+              {profile.photoUri
+                ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
+                : <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials}</Text>
+                  </View>
+              }
+              <View style={styles.avatarAdd}>
+                <Ionicons name="camera" size={14} color={colors.white} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
+            <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
+          </View>
         </View>
 
         {/* ── Quick cards ── */}
@@ -1356,7 +1357,7 @@ const styles = StyleSheet.create({
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   upgradeTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700' },
 
-  hero: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.md },
+  hero: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
   avatarWrap: { position: 'relative' },
   avatar: { width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
