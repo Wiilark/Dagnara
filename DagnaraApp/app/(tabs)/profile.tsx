@@ -350,7 +350,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* ── Top bar + Hero (grouped so no large gap between them) ── */}
+        {/* ── Top bar + Hero + Quick cards (grouped, tight spacing) ── */}
         <View style={{ gap: spacing.xs }}>
           <View style={styles.topBar}>
             <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
@@ -379,26 +379,25 @@ export default function ProfileScreen() {
             <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
             <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
           </View>
-        </View>
 
-        {/* ── Quick cards ── */}
-        <View style={styles.quickRow}>
-          <View style={[styles.quickCard, { flex: 1 }]}>
-            <View style={styles.quickIconWrap}>
-              <Ionicons name="diamond-outline" size={20} color={colors.purple} />
+          <View style={styles.quickRow}>
+            <View style={[styles.quickCard, { flex: 1 }]}>
+              <View style={styles.quickIconWrap}>
+                <Ionicons name="diamond-outline" size={20} color={colors.purple} />
+              </View>
+              <View style={styles.quickTexts}>
+                <Text style={styles.quickVal}>Free</Text>
+                <Text style={styles.quickLbl}>Your plan</Text>
+              </View>
             </View>
-            <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>Free</Text>
-              <Text style={styles.quickLbl}>Your plan</Text>
-            </View>
-          </View>
-          <View style={[styles.quickCard, { flex: 1 }]}>
-            <View style={styles.quickIconWrap}>
-              <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
-            </View>
-            <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>{streak} days</Text>
-              <Text style={styles.quickLbl}>Current streak</Text>
+            <View style={[styles.quickCard, { flex: 1 }]}>
+              <View style={styles.quickIconWrap}>
+                <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
+              </View>
+              <View style={styles.quickTexts}>
+                <Text style={styles.quickVal}>{streak} days</Text>
+                <Text style={styles.quickLbl}>Current streak</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -1352,7 +1351,7 @@ const styles = StyleSheet.create({
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   upgradeTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700' },
 
-  hero: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
+  hero: { alignItems: 'center', gap: spacing.sm },
   avatarWrap: { position: 'relative' },
   avatar: { width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
