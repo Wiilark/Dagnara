@@ -226,7 +226,7 @@ export default function LogScreen() {
                 <>
                   {d.kcal > 0 && (
                     <View style={st.kcalRow}>
-                      <Text style={[st.kcalNum, { color: kcalColor }]}>{d.kcal}</Text>
+                      <Text style={[st.kcalNum, { color: kcalColor }]}>{fmt(d.kcal)}</Text>
                       <Text style={st.kcalGoal}> / {fmt(calorieGoal)} kcal</Text>
                     </View>
                   )}

@@ -3200,7 +3200,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                     <View style={[m.qsProgCircle, { backgroundColor: colors.sky }]}>
                       <Ionicons name="calendar" size={22} color={colors.white} />
                     </View>
-                    <Text style={m.qsProgNum}>{triDays}</Text>
+                    <Text style={m.qsProgNum}>{fmt(triDays)}</Text>
                     <Text style={m.qsProgLbl}>days{'\n'}quit</Text>
                   </View>
                   <View style={m.qsProgStat}>
@@ -5948,7 +5948,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
           <TouchableOpacity activeOpacity={0.85} onPress={() => setQdView('progress')}>
             <View style={m.statsRow}>
               <View style={m.statCard}>
-                <Text style={m.statVal}>{drinksAvoided}</Text>
+                <Text style={m.statVal}>{fmt(drinksAvoided)}</Text>
                 <Text style={m.statLbl}>drinks avoided</Text>
               </View>
               <View style={m.statCard}>
@@ -5956,7 +5956,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
                 <Text style={m.statLbl}>money saved</Text>
               </View>
               <View style={m.statCard}>
-                <Text style={m.statVal}>{calsAvoided}</Text>
+                <Text style={m.statVal}>{fmt(calsAvoided)}</Text>
                 <Text style={m.statLbl}>kcal avoided</Text>
               </View>
             </View>

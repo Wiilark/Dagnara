@@ -1831,7 +1831,7 @@ export default function DiaryScreen() {
             <View style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
                 <Text style={st.xpName}>{fmt(stepCount)}</Text>
-                <Text style={st.xpPts}>/ {STEP_GOAL.toLocaleString()}</Text>
+                <Text style={st.xpPts}>/ {fmt(STEP_GOAL)}</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}>
                 <View style={[st.xpFill, { width: `${Math.min(100, (stepCount / STEP_GOAL) * 100)}%` as any, backgroundColor: stepCount >= STEP_GOAL ? colors.green : colors.honey }]} />
@@ -1845,7 +1845,7 @@ export default function DiaryScreen() {
             <View style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
                 <Text style={st.xpName}>{fmt(xp)}</Text>
-                <Text style={st.xpPts}>/ {xpInfo.nextMin.toLocaleString()} XP</Text>
+                <Text style={st.xpPts}>/ {fmt(xpInfo.nextMin)} XP</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
             </View>
