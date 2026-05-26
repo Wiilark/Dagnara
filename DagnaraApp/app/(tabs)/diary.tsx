@@ -1418,7 +1418,18 @@ export default function DiaryScreen() {
     setSearching(false);
   }
 
-  function openFoodSearch(meal: Meal) { setSearchMeal(meal); setSearchQuery(''); searchQueryRef.current = ''; setSearchResults([]); setFoodTab('search'); setSearchVisible(true); }
+  function openFoodSearch(meal: Meal) {
+    if (programsCardData.fastingActive) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        '⏱️ Fast in progress',
+        `You started a ${programsCardData.fastingMode ?? '16:8'} fast. End your fast in Programs before logging food.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    setSearchMeal(meal); setSearchQuery(''); searchQueryRef.current = ''; setSearchResults([]); setFoodTab('search'); setSearchVisible(true);
+  }
 
   useEffect(() => {
     if (pendingAddMeal) {
@@ -1505,6 +1516,15 @@ export default function DiaryScreen() {
   }
 
   async function handleBarcodePress() {
+    if (programsCardData.fastingActive) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        '⏱️ Fast in progress',
+        `You started a ${programsCardData.fastingMode ?? '16:8'} fast. End your fast in Programs before logging food.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     if (!barcodePermission?.granted) {
       const result = await requestBarcodePermission();
       if (!result.granted) { Alert.alert('Permission needed', 'Allow camera access for barcode scanning.'); return; }
@@ -1922,6 +1942,19 @@ export default function DiaryScreen() {
           <View style={st.emptyState}>
             <Text style={st.emptyStateIcon}>🍽️</Text>
             <Text style={st.emptyStateTxt}>Nothing logged on this day</Text>
+          </View>
+        )}
+
+        {/* ── Fasting lock banner ── */}
+        {programsCardData.fastingActive && (
+          <View style={st.fastingBanner}>
+            <Text style={st.fastingBannerIcon}>⏱️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={st.fastingBannerTitle}>Fast in progress</Text>
+              <Text style={st.fastingBannerSub}>
+                {programsCardData.fastingMode ?? '16:8'} · {programsCardData.fastingElapsedHrs?.toFixed(1) ?? '0.0'} hrs elapsed · food logging locked
+              </Text>
+            </View>
           </View>
         )}
 
@@ -2882,6 +2915,12 @@ const st = StyleSheet.create({
 
   // Section header
   sectionHdr: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 4, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.32, textTransform: 'uppercase', color: colors.ink3 },
+
+  // Fasting lock banner
+  fastingBanner: { marginHorizontal: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.honey + '18', borderWidth: 1, borderColor: colors.honey + '44', borderRadius: radius.md, padding: spacing.md },
+  fastingBannerIcon: { fontSize: fontSize.lg },
+  fastingBannerTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.honey },
+  fastingBannerSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
 
   // Calorie ring
   calCard: {
