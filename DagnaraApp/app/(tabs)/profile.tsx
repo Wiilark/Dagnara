@@ -1354,10 +1354,10 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
 
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  closeBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
-  bellDot: { position: 'absolute', top: 7, right: 7, width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
-  upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700' },
+  closeBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  bellDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
+  upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  upgradeTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700' },
 
   hero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   avatarWrap: { position: 'relative' },
@@ -1365,8 +1365,8 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
   avatarImg: { width: 96, height: 96, borderRadius: radius.pill },
   avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
-  heroName: { color: colors.ink, fontSize: fontSize['2xl'], fontWeight: '800', marginTop: 2 },
-  heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220 },
+  heroName: { color: colors.ink, fontSize: fontSize['2xl'], fontWeight: '800', marginTop: 2, textAlign: 'center' },
+  heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220, textAlign: 'center' },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
   xpBadge: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
