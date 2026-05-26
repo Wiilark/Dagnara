@@ -1341,18 +1341,19 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  backBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
-  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  closeBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 
-  avatarCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
+  hero: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 80, height: 80, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.white, fontSize: fontSize['2xl'] - 6, fontWeight: '800' },
-  avatarImg: { width: 80, height: 80, borderRadius: radius.pill },
+  avatar: { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
+  avatarImg: { width: 88, height: 88, borderRadius: radius.pill },
   avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.layer1 },
-  name: { color: colors.ink, fontSize: fontSize.lg, fontWeight: '700' },
-  emailText: { color: colors.ink3, fontSize: fontSize.sm },
+  heroName: { color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', marginTop: 2 },
+  heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220 },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
   xpBadge: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
@@ -1363,22 +1364,24 @@ const styles = StyleSheet.create({
   xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden' },
   xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
-  statsRow: { flexDirection: 'row', width: '100%', gap: spacing.xs },
-  statChip: { flex: 1, backgroundColor: colors.layer2, borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
-  statChipVal: { fontSize: fontSize.base, fontWeight: '700' },
-  statChipLbl: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
+  quickRow: { flexDirection: 'row', gap: spacing.sm },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md, alignItems: 'center', gap: spacing.xs },
+  quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
+  quickLbl: { fontSize: fontSize.xs, color: colors.ink3 },
 
   sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, marginBottom: -6 },
 
   achieveBadge: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   achieveLbl: { fontSize: fontSize.xs, color: colors.ink2, textAlign: 'center' },
   achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
+
   menuCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   menuIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
 
+  footer: { textAlign: 'center', color: colors.ink3, fontSize: fontSize.xs, marginTop: spacing.xs },
 
   dietOption: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
@@ -1391,7 +1394,6 @@ const styles = StyleSheet.create({
   modalScroll: { padding: spacing.md, gap: spacing.sm },
   inputLabel: { color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.xs },
   input: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, color: colors.ink, fontSize: fontSize.base },
-  // BMI card
   bmiCard: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs + 2 },
   bmiSectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
   bmiNum: { fontSize: fontSize['2xl'] + 10, fontWeight: '800', lineHeight: 52 },
@@ -1400,13 +1402,11 @@ const styles = StyleSheet.create({
   bmiSeg: { flex: 1, height: '100%', borderRadius: spacing.xs / 3 },
   bmiScaleLbls: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
   bmiScaleLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  // Measurement rows
   measureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm + 2, padding: spacing.sm + 2, marginBottom: 4 },
   measureLbl: { fontSize: fontSize.sm + 1, fontWeight: '500', color: colors.ink, flex: 1 },
   measureInput: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   measureField: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink, minWidth: 60, textAlign: 'right' },
   measureUnit: { fontSize: fontSize.xs, color: colors.ink3, width: 24 },
-  // Settings button
   settingsBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
 });
 
