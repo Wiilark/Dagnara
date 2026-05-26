@@ -409,7 +409,6 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Customization ── */}
-        <Text style={styles.sectionHdr}>CUSTOMIZATION</Text>
         <View style={styles.menuCard}>
           {[
             { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
@@ -432,7 +431,6 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Achievements ── */}
-        <Text style={styles.sectionHdr}>ACHIEVEMENTS</Text>
         <View style={styles.xpRow}>
           <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
           <View style={{ flex: 1 }}>
@@ -466,7 +464,6 @@ export default function ProfileScreen() {
         </ScrollView>
 
         {/* ── Account ── */}
-        <Text style={styles.sectionHdr}>ACCOUNT</Text>
         <View style={styles.menuCard}>
           <TouchableOpacity style={styles.menuRow} onPress={() => setSettingsModal(true)}>
             <View style={[styles.menuIcon, { backgroundColor: colors.ink3 + '22' }]}>
