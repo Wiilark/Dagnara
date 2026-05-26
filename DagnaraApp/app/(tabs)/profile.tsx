@@ -68,6 +68,8 @@ export default function ProfileScreen() {
   const [acLastName,  setAcLastName]  = useState('');
   const [acEmail,     setAcEmail]     = useState('');
   const [acPassword,  setAcPassword]  = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName,  setEditLastName]  = useState('');
   const [dietaryModal, setDietaryModal] = useState(false);
   const [tdeeModal, setTdeeModal] = useState(false);
   const [selectedFoodPref, setSelectedFoodPref] = useState('none');
@@ -164,9 +166,11 @@ export default function ProfileScreen() {
     }
   }, [macrosModal]);
 
-  // Populate display-unit weight/height inputs when Personal Details modal opens
+  // Populate display-unit weight/height inputs and name fields when Personal Details modal opens
   useEffect(() => {
     if (!editing) return;
+    setEditFirstName(profile.name?.split(' ')[0] ?? '');
+    setEditLastName(profile.name?.split(' ').slice(1).join(' ') ?? '');
     setDraftWeightInput(draft.weight ? kgToInput(parseFloat(draft.weight), unitSystem) : '');
     setDraftHeightInput(draft.height ? cmToInput(parseFloat(draft.height), unitSystem) : '');
   }, [editing]);
@@ -242,8 +246,10 @@ export default function ProfileScreen() {
       Alert.alert('Invalid height', `Height must be between ${bounds}.`);
       return;
     }
+    const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
     await setProfile({
       ...draft,
+      ...(newName ? { name: newName } : {}),
       ...(wKg != null ? { weight: String(Math.round(wKg * 10) / 10) } : {}),
       ...(hCm != null ? { height: String(Math.round(hCm)) } : {}),
     });
@@ -368,7 +374,7 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
           <Text style={styles.name}>{profile.name ?? 'Your Name'}</Text>
-          <Text style={styles.emailText}>{email}</Text>
+          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
           {/* XP level */}
           <View style={styles.xpRow}>
             <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
@@ -625,12 +631,8 @@ export default function ProfileScreen() {
                 <View style={[sst.icon, { backgroundColor: colors.purple2 + '22' }]}>
                   <Ionicons name="mail-outline" size={16} color={colors.purple2} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <TextInput style={[act.fieldInput, { color: colors.ink3 }]} value={acEmail}
-                    editable={false} keyboardType="email-address" autoCapitalize="none"
-                    placeholderTextColor={colors.ink3} placeholder="email@example.com" />
-                  <Text style={{ fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 }}>To change your email, contact support.</Text>
-                </View>
+                <Text style={act.fieldLbl}>Email</Text>
+                <Text style={[act.fieldInput, { color: colors.ink3 }]} numberOfLines={1} ellipsizeMode="middle">{acEmail}</Text>
               </View>
               <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
                 <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
@@ -1188,8 +1190,31 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+            <View>
+              <Text style={styles.inputLabel}>First Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editFirstName}
+                onChangeText={setEditFirstName}
+                placeholderTextColor={colors.ink3}
+                placeholder="First name"
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
+            <View>
+              <Text style={styles.inputLabel}>Last Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editLastName}
+                onChangeText={setEditLastName}
+                placeholderTextColor={colors.ink3}
+                placeholder="Last name"
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
             {[
-              { label: 'Name', key: 'name' },
               { label: 'Age', key: 'age', keyboard: 'numeric' as const },
               { label: 'Goal', key: 'goal' },
             ].map(({ label, key, keyboard }) => (
