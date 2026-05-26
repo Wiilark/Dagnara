@@ -1185,11 +1185,9 @@ export default function ProgressScreen() {
       {/* Life Score Quiz Modal */}
       <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" hardwareAccelerated onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
-          {/* Header — shared by quiz and result screens */}
+          {/* Header — title + step counter only; close is in the bottom nav */}
           <View style={st.lsHeader}>
-            <TouchableOpacity onPress={() => setLsVisible(false)} style={st.lsCloseIconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="close" size={22} color={colors.ink2} />
-            </TouchableOpacity>
+            <View style={{ width: 34 }} />
             <Text style={st.lsHeaderTitle}>{lsResult === null ? 'Weekly Check-In' : 'Your Life Score'}</Text>
             {lsResult === null
               ? <Text style={st.lsStepTxt}>{lsStep + 1} / {LS_QUESTIONS.length}</Text>
@@ -1228,17 +1226,16 @@ export default function ProgressScreen() {
               </ScrollView>
 
               <View style={st.lsNav}>
-                {lsStep > 0 ? (
+                <TouchableOpacity style={st.lsCloseIconBtn} onPress={() => setLsVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name="close" size={22} color={colors.ink2} />
+                </TouchableOpacity>
+                {lsStep > 0 && (
                   <TouchableOpacity style={st.lsBackBtn} onPress={() => setLsStep(s => s - 1)}>
                     <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>← Back</Text>
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={st.lsBackBtn} onPress={() => setLsVisible(false)}>
-                    <Text style={{ color: colors.ink2, fontSize: fontSize.base }}>Cancel</Text>
-                  </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  style={st.lsNextBtn}
+                  style={[st.lsNextBtn, { flex: lsStep === 0 ? 1 : undefined }]}
                   onPress={() => { if (lsStep < LS_QUESTIONS.length - 1) setLsStep(s => s + 1); else finishQuiz(); }}
                 >
                   <Text style={st.lsNextTxt}>{lsStep < LS_QUESTIONS.length - 1 ? 'Next →' : 'See Results ✨'}</Text>
