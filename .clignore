@@ -1,0 +1,9 @@
+node_modules/
+DagnaraApp/node_modules/
+DagnaraApp/.expo/
+dist/
+build/
+.expo/
+Screenshots/
+public/
+*.lock
