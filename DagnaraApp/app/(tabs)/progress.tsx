@@ -1183,7 +1183,7 @@ export default function ProgressScreen() {
       <InsightDetailModal visible={insightDetailVisible} onClose={() => setInsightDetailVisible(false)} />
 
       {/* Life Score Quiz Modal */}
-      <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setLsVisible(false)}>
+      <Modal visible={lsVisible} animationType="slide" presentationStyle="fullScreen" hardwareAccelerated onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
           {/* Header — shared by quiz and result screens */}
           <View style={st.lsHeader}>
@@ -1242,7 +1242,7 @@ export default function ProgressScreen() {
               </View>
             </>
           ) : (
-            <View style={st.lsResultWrap}>
+            <ScrollView contentContainerStyle={st.lsResultWrap} showsVerticalScrollIndicator={false}>
               <Text style={st.lsResultEmoji}>🏆</Text>
               <Text style={[st.lsResultScore, { color: scoreColor(lsResult) }]}>{lsResult}</Text>
               <Text style={st.lsResultMax}>/ 150</Text>
@@ -1252,7 +1252,7 @@ export default function ProgressScreen() {
               <TouchableOpacity style={st.lsDoneBtn} onPress={() => setLsVisible(false)}>
                 <Text style={st.lsDoneTxt}>Done</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           )}
         </SafeAreaView>
       </Modal>
@@ -1360,9 +1360,9 @@ const st = StyleSheet.create({
   lsNextBtn: { flex: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm },
   lsNextTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
   // Result
-  lsResultWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
-  lsResultEmoji: { fontSize: fontSize['2xl'] + 34 },
-  lsResultScore: { fontSize: fontSize['2xl'] * 2, fontWeight: '800' },
+  lsResultWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+  lsResultEmoji: { fontSize: fontSize['2xl'] + 12 },
+  lsResultScore: { fontSize: fontSize['2xl'] + 20, fontWeight: '800' },
   lsResultMax: { fontSize: fontSize.lg, color: colors.ink3, marginTop: -16 },
   lsResultGrade: { fontSize: fontSize.base, fontWeight: '600', textAlign: 'center' },
   lsDoneBtn: { backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.xl, marginTop: spacing.md },
