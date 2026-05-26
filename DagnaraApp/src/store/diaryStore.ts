@@ -57,6 +57,15 @@ export interface SleepLog {
   duration: string;  // e.g. "7h 30m"
 }
 
+export interface FastingInterval {
+  startTime: string;   // ISO
+  endTime: string;     // ISO
+  mode: string;        // '16:8', '18:6', etc.
+  targetHours: number;
+  actualHours: number;
+  completed: boolean;
+}
+
 export interface DiaryEntry {
   date: string;
   foods: FoodItem[];
@@ -70,6 +79,7 @@ export interface DiaryEntry {
   skippedMeals?: Record<string, boolean>;
   strengthSessions?: StrengthSession[];
   cardioSessions?: CardioSession[];
+  fastingIntervals?: FastingInterval[];
   _savedAt?: string;
 }
 
@@ -95,6 +105,7 @@ interface DiaryState {
   removeStrengthSession: (date: string, id: string) => Promise<void>;
   addCardioSession: (date: string, session: CardioSession) => Promise<void>;
   removeCardioSession: (date: string, id: string) => Promise<void>;
+  logFastingInterval: (date: string, interval: FastingInterval) => Promise<void>;
   syncEntry: (date: string, email: string) => Promise<void>;
   restoreFromCloud: (email: string) => Promise<void>;
   reset: () => void;
@@ -349,6 +360,14 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
       cardioSessions: (entry.cardioSessions ?? []).filter(s => s.id !== id),
       calories_burned: Math.max(0, entry.calories_burned - (removed?.kcal ?? 0)),
     };
+    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    await saveEntry(date, updated, getEmail(), get);
+  },
+
+  logFastingInterval: async (date, interval) => {
+    const entries = get().entries;
+    const entry = entries[date] ?? emptyEntry(date);
+    const updated = { ...entry, fastingIntervals: [...(entry.fastingIntervals ?? []), interval] };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
     await saveEntry(date, updated, getEmail(), get);
   },

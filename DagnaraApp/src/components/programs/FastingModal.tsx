@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing, fontSize, radius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
+import { useDiaryStore } from '../../store/diaryStore';
 
 // ── Intermittent Fasting Constants ───────────────────────────────────────────
 const IF_MODES = [
@@ -39,6 +40,7 @@ interface FastingState {
 
 export function FastingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { email } = useAuthStore();
+  const logFastingInterval = useDiaryStore((s) => s.logFastingInterval);
   const FASTING_KEY = `dagnara_fasting_${email ?? 'anon'}`;
 
   const [state, setState] = useState<FastingState>({ mode: '16:8', active: false, startTime: null, history: [] });
@@ -78,10 +80,20 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
     const modeInfo = IF_MODES.find(m => m.id === state.mode)!;
     if (state.active) {
       const endTime = new Date().toISOString();
-      const duration = elapsed / 3600000;
-      const completed = duration >= modeInfo.fasting;
+      const actualHours = elapsed / 3600000;
+      const completed = actualHours >= modeInfo.fasting;
       const record: FastingRecord = { startTime: state.startTime!, endTime, mode: state.mode, completed };
       save({ ...state, active: false, startTime: null, history: [record, ...state.history].slice(0, 14) });
+      // Log to today's DiaryEntry so fasting is part of the unified daily timeline
+      const date = new Date(state.startTime!).toLocaleDateString('en-CA');
+      logFastingInterval(date, {
+        startTime: state.startTime!,
+        endTime,
+        mode: state.mode,
+        targetHours: modeInfo.fasting,
+        actualHours,
+        completed,
+      });
       setElapsed(0);
     } else {
       save({ ...state, active: true, startTime: new Date().toISOString() });
