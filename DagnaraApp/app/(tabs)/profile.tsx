@@ -382,7 +382,7 @@ export default function ProfileScreen() {
               <Ionicons name="camera" size={14} color={colors.white} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.heroName}>{profile.name ?? 'Your Name'}</Text>
+          <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
           <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
         </View>
 
@@ -1351,7 +1351,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
+  scroll: { padding: spacing.md, gap: spacing.lg, paddingBottom: spacing.lg },
 
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   closeBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
@@ -1359,13 +1359,13 @@ const styles = StyleSheet.create({
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   upgradeTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700' },
 
-  hero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  hero: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.md },
   avatarWrap: { position: 'relative' },
   avatar: { width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
   avatarImg: { width: 96, height: 96, borderRadius: radius.pill },
   avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
-  heroName: { color: colors.ink, fontSize: fontSize['2xl'], fontWeight: '800', marginTop: 2, textAlign: 'center' },
+  heroName: { color: colors.ink, fontSize: fontSize.xl, fontWeight: '800', marginTop: 2, textAlign: 'center' },
   heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220, textAlign: 'center' },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
@@ -1378,7 +1378,7 @@ const styles = StyleSheet.create({
   xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
 
   quickRow: { flexDirection: 'row', gap: spacing.sm },
-  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, minHeight: 104, justifyContent: 'space-between', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, minHeight: 128, justifyContent: 'space-between', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   quickIconWrap: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
   quickTexts: { gap: 2 },
   quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
@@ -1391,7 +1391,7 @@ const styles = StyleSheet.create({
   achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
 
   menuCard: { backgroundColor: colors.layer1, borderRadius: radius.xl, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md + 2 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md + 6 },
   menuIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
   menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
