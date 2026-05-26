@@ -8414,7 +8414,7 @@ export default function ProgramsScreen() {
       <View style={st.appHeader}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
           <View style={st.avatarThumb}>
-            <Text style={st.avatarInitial}>{(profile?.name ?? authEmail ?? '?')[0].toUpperCase()}</Text>
+            <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? authEmail?.[0] ?? '?').toUpperCase(); })()}</Text>
           </View>
         </TouchableOpacity>
         <Text style={st.appTitle}>Programs</Text>

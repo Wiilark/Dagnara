@@ -904,7 +904,7 @@ export default function ProgressScreen() {
         <View style={st.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
             <View style={st.avatarThumb}>
-              <Text style={st.avatarInitial}>{(profile?.name ?? email ?? '?')[0].toUpperCase()}</Text>
+              <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
             </View>
           </TouchableOpacity>
           <Text style={st.heading}>Progress</Text>
