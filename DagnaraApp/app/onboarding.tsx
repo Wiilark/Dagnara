@@ -18,7 +18,7 @@ import { colors, spacing, fontSize, radius } from '../src/theme';
 
 const { width } = Dimensions.get('window');
 
-const STEPS = 6;
+const STEPS = 9;
 
 type Goal = 'lose' | 'maintain' | 'gain';
 type Activity = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
@@ -41,7 +41,8 @@ const ACTIVITIES: { key: Activity; label: string; desc: string }[] = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const { email, profile, setProfile } = useAuthStore();
-  const { setGoals, unitSystem, setUnitSystem, country: persistedCountry, setCountry } = useAppStore();
+  const { setGoals, unitSystem, setUnitSystem, country: persistedCountry, setCountry,
+          setFastingWindow, setDietaryPreferences, setPillDefaultTime } = useAppStore();
 
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState<Goal>('maintain');
@@ -54,6 +55,9 @@ export default function OnboardingScreen() {
   const [country, setCountryState] = useState(persistedCountry || 'US');
   const [countrySearch, setCountrySearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fastingWindow, setFastingWindowLocal] = useState<string | null>(null);
+  const [pillDefaultTime, setPillDefaultTimeLocal] = useState('07:30');
+  const [dietaryPref, setDietaryPref] = useState<string | null>(null);
   // `saving` state updates async — a ref blocks synchronous double-taps between
   // the press handler and the next render.
   const submittingRef = useRef(false);
@@ -81,6 +85,9 @@ export default function OnboardingScreen() {
 
     try {
       await setGoals(activity, goal, calorieGoal);
+      await setFastingWindow(fastingWindow);
+      await setDietaryPreferences(dietaryPref);
+      await setPillDefaultTime(pillDefaultTime);
       // Persist country selection — drives currency in Programs (money saved, etc.)
       await setCountry(country);
       // Update profile with body stats — always stored in metric (kg, cm)
@@ -142,7 +149,7 @@ export default function OnboardingScreen() {
     : null;
 
   const canAdvance = () => {
-    if (step === 4) {
+    if (step === 7) {
       if (!age || !weight || !height) return false;
       if (isNaN(ageNum) || ageNum < 16 || ageNum > 100) return false;
       if (!wKg || wKg < 30 || wKg > 300) return false;
@@ -201,7 +208,7 @@ export default function OnboardingScreen() {
         {/* Step 1: Goal */}
         {step === 1 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 1 OF 5</Text>
+            <Text style={s.stepLabel}>STEP 1 OF 8</Text>
             <Text style={s.heading}>What's your main goal?</Text>
             <Text style={s.body}>This sets your daily calorie target.</Text>
             <View style={s.optionList}>
@@ -227,7 +234,7 @@ export default function OnboardingScreen() {
         {/* Step 2: Activity */}
         {step === 2 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 2 OF 5</Text>
+            <Text style={s.stepLabel}>STEP 2 OF 8</Text>
             <Text style={s.heading}>How active are you?</Text>
             <Text style={s.body}>Used to calculate your energy expenditure.</Text>
             <View style={s.optionList}>
@@ -249,10 +256,138 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* Step 3: Country (drives currency + locale across the app) */}
+        {/* Step 3: Fasting Window */}
         {step === 3 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 3 OF 5</Text>
+            <Text style={s.stepLabel}>STEP 3 OF 8</Text>
+            <Text style={s.heading}>Do you fast?</Text>
+            <Text style={s.body}>
+              Intermittent fasting can support your calorie goal. Pick your preferred window — you can change this any time.
+            </Text>
+            <View style={s.optionList}>
+              {([
+                { key: '16:8',  label: '16:8',  desc: 'Fast 16 hrs · eat within 8 hrs (most popular)' },
+                { key: '18:6',  label: '18:6',  desc: 'Fast 18 hrs · eat within 6 hrs' },
+                { key: '14:10', label: '14:10', desc: 'Fast 14 hrs · eat within 10 hrs (gentle start)' },
+                { key: '12:12', label: '12:12', desc: 'Fast 12 hrs · balanced, great for beginners' },
+              ] as const).map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.option, fastingWindow === opt.key && s.optionSelected]}
+                  onPress={() => setFastingWindowLocal(fastingWindow === opt.key ? null : opt.key)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.optionIcon}>⏱️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.optionLabel, fastingWindow === opt.key && s.optionLabelSelected]}>{opt.label}</Text>
+                    <Text style={s.optionDesc}>{opt.desc}</Text>
+                  </View>
+                  <View style={[s.radio, fastingWindow === opt.key && s.radioSelected]} />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[s.option, fastingWindow === null && s.optionSelected]}
+                onPress={() => setFastingWindowLocal(null)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.optionIcon}>🚫</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.optionLabel, fastingWindow === null && s.optionLabelSelected]}>Skip for now</Text>
+                  <Text style={s.optionDesc}>I don't fast or will decide later</Text>
+                </View>
+                <View style={[s.radio, fastingWindow === null && s.radioSelected]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Step 4: Pill / Medication Timing */}
+        {step === 4 && (
+          <View style={s.section}>
+            <Text style={s.stepLabel}>STEP 4 OF 8</Text>
+            <Text style={s.heading}>Do you take a daily pill or supplement?</Text>
+            <Text style={s.body}>
+              Set a default reminder time — we'll prompt you on the diary dashboard to mark it taken. Skip if not applicable.
+            </Text>
+            <View style={s.optionList}>
+              {([
+                { key: '07:00', label: '7:00 AM',  desc: 'Morning with breakfast' },
+                { key: '08:00', label: '8:00 AM',  desc: 'After breakfast' },
+                { key: '12:00', label: '12:00 PM', desc: 'Lunchtime' },
+                { key: '21:00', label: '9:00 PM',  desc: 'Evening before bed' },
+              ] as const).map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.option, pillDefaultTime === opt.key && s.optionSelected]}
+                  onPress={() => setPillDefaultTimeLocal(opt.key)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.optionIcon}>💊</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.optionLabel, pillDefaultTime === opt.key && s.optionLabelSelected]}>{opt.label}</Text>
+                    <Text style={s.optionDesc}>{opt.desc}</Text>
+                  </View>
+                  <View style={[s.radio, pillDefaultTime === opt.key && s.radioSelected]} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[s.body, { marginTop: spacing.sm }]}>
+              You can configure your exact medications in the Programs tab after onboarding.
+            </Text>
+          </View>
+        )}
+
+        {/* Step 5: Dietary Preferences */}
+        {step === 5 && (
+          <View style={s.section}>
+            <Text style={s.stepLabel}>STEP 5 OF 8</Text>
+            <Text style={s.heading}>Any dietary preferences?</Text>
+            <Text style={s.body}>
+              We'll filter recipes to match your style by default. You can always browse everything.
+            </Text>
+            <View style={s.optionList}>
+              {([
+                { key: 'High Protein',  label: 'High Protein',  icon: '💪', desc: 'Prioritise protein at every meal' },
+                { key: 'Low Carb',      label: 'Low Carb',      icon: '🥩', desc: 'Reduce carbohydrates and grains' },
+                { key: 'Vegan',         label: 'Vegan',         icon: '🌱', desc: 'No animal products' },
+                { key: 'Vegetarian',    label: 'Vegetarian',    icon: '🥦', desc: 'No meat — dairy and eggs OK' },
+                { key: 'Keto',          label: 'Keto',          icon: '🥑', desc: 'Very low carb, high fat' },
+                { key: 'Mediterranean', label: 'Mediterranean', icon: '🫒', desc: 'Olive oil, fish, legumes, whole grains' },
+              ] as const).map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.option, dietaryPref === opt.key && s.optionSelected]}
+                  onPress={() => setDietaryPref(dietaryPref === opt.key ? null : opt.key)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.optionIcon}>{opt.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.optionLabel, dietaryPref === opt.key && s.optionLabelSelected]}>{opt.label}</Text>
+                    <Text style={s.optionDesc}>{opt.desc}</Text>
+                  </View>
+                  <View style={[s.radio, dietaryPref === opt.key && s.radioSelected]} />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[s.option, dietaryPref === null && s.optionSelected]}
+                onPress={() => setDietaryPref(null)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.optionIcon}>🍽️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.optionLabel, dietaryPref === null && s.optionLabelSelected]}>No preference</Text>
+                  <Text style={s.optionDesc}>Show me everything</Text>
+                </View>
+                <View style={[s.radio, dietaryPref === null && s.radioSelected]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Step 6: Country (drives currency + locale across the app) */}
+        {step === 6 && (
+          <View style={s.section}>
+            <Text style={s.stepLabel}>STEP 6 OF 8</Text>
             <Text style={s.heading}>Where are you based?</Text>
             <Text style={s.body}>
               Sets your currency in Programs (e.g. money saved when quitting smoking). You can change it any time in Preferences.
@@ -316,10 +451,10 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* Step 4: Body stats */}
-        {step === 4 && (
+        {/* Step 7: Body stats */}
+        {step === 7 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 4 OF 5</Text>
+            <Text style={s.stepLabel}>STEP 7 OF 8</Text>
             <Text style={s.heading}>Your body stats</Text>
             <Text style={s.body}>Used in the Harris-Benedict formula to calculate your BMR.</Text>
 
@@ -403,10 +538,10 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* Step 5: Summary */}
-        {step === 5 && (
+        {/* Step 8: Summary */}
+        {step === 8 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 5 OF 5</Text>
+            <Text style={s.stepLabel}>STEP 8 OF 8</Text>
             <Text style={s.heading}>Your personal plan</Text>
             <Text style={s.body}>Based on your stats, here's what we recommend:</Text>
 
@@ -437,7 +572,10 @@ export default function OnboardingScreen() {
               {([
                 ['🎯 Goal',          GOALS.find(g => g.key === goal)?.label ?? goal],
                 ['⚡ Activity',      ACTIVITIES.find(a => a.key === activity)?.label ?? activity],
-                ['🌍 Country',       `${getCountry(country).flag}  ${getCountry(country).name} · ${getCountry(country).currency}`],
+                ['⏱️ Fasting',        fastingWindow ?? 'None'],
+                ['💊 Pill reminder',  pillDefaultTime ? `Daily at ${pillDefaultTime}` : 'Not set'],
+                ['🥗 Diet',           dietaryPref ?? 'No preference'],
+                ['🌍 Country',        `${getCountry(country).flag}  ${getCountry(country).name} · ${getCountry(country).currency}`],
                 ['👤 Sex',           sex === 'male' ? 'Male' : 'Female'],
                 ['📅 Age',           age ? `${age} years` : '—'],
                 ['⚖️ Weight',        wKg > 0 ? formatWeight(wKg, unitSystem) : '—'],
