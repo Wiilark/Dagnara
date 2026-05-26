@@ -116,19 +116,45 @@ interface ProgramsCardData {
 /** Grade a logged FoodItem — returns Nutri-Score A–E with official colors */
 function gradeFoodItem(f: FoodItem): { grade: string; color: string } {
   if (!f.kcal || f.kcal <= 0) return { grade: '?', color: colors.ink3 };
-  const pPct = ((f.protein ?? 0) * 4 / f.kcal) * 100;
-  let score = 42;
-  score += Math.min(30, pPct * 0.7);
-  if ((f.fiber  ?? 0) > 0) score += Math.min(10, (f.fiber  ?? 0) * 3);
-  if (f.kcal < 150) score += Math.min(8, (150 - f.kcal) / 12);
-  if ((f.sugar  ?? 0) > 15) score -= Math.min(15, ((f.sugar  ?? 0) - 15) * 0.5);
-  if ((f.sodium ?? 0) > 500) score -= Math.min(10, ((f.sodium ?? 0) - 500) / 100);
-  score -= Math.min(10, Math.max(0, (f.kcal - 400) / 50));
-  if (score >= 70) return { grade: 'A', color: colors.nutriA };
-  if (score >= 57) return { grade: 'B', color: colors.nutriB };
-  if (score >= 43) return { grade: 'C', color: colors.nutriC };
-  if (score >= 30) return { grade: 'D', color: colors.nutriD };
-  return { grade: 'E', color: colors.nutriE };
+
+  const fiber   = f.fiber   ?? 0;
+  const sugar   = f.sugar   ?? 0;
+  const sodium  = f.sodium  ?? 0;
+  const protein = f.protein ?? 0;
+
+  let score = 50;
+
+  // Calorie density (whole foods are low-cal; ultra-processed are high-cal)
+  if      (f.kcal <= 50)  score += 18;
+  else if (f.kcal <= 100) score += 12;
+  else if (f.kcal <= 200) score += 4;
+  else if (f.kcal >  400) score -= Math.min(12, (f.kcal - 400) / 40);
+
+  // Fiber — strong positive signal for whole foods
+  score += Math.min(18, fiber * 3);
+
+  // Protein as % of calories — moderate positive
+  score += Math.min(14, (protein * 4 / f.kcal) * 40);
+
+  // Sugar penalty — reduced when fiber is present (natural fruit sugars)
+  if (sugar > 8) {
+    const naturalFactor = Math.min(0.6, fiber / 5);
+    score -= Math.min(22, (sugar - 8) * 1.2 * (1 - naturalFactor));
+  }
+
+  // Sodium penalty
+  if (sodium > 400) score -= Math.min(18, (sodium - 400) / 60);
+
+  // Micronutrient bonuses
+  if ((f.vitaminC  ?? 0) > 0) score += 3;
+  if ((f.iron      ?? 0) > 0) score += 2;
+  if ((f.potassium ?? 0) > 0) score += 2;
+
+  if (score >= 65) return { grade: 'A', color: colors.nutriA };
+  if (score >= 52) return { grade: 'B', color: colors.nutriB };
+  if (score >= 38) return { grade: 'C', color: colors.nutriC };
+  if (score >= 24) return { grade: 'D', color: colors.nutriD };
+  return                { grade: 'E', color: colors.nutriE };
 }
 
 /** Returns kcal per 100g — used only by barcode (OFF) lookups */
