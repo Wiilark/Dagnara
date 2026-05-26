@@ -1800,15 +1800,12 @@ export default function DiaryScreen() {
           <View style={st.avatarThumb}>
             <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
           </View>
+          {hasUnread && <View style={st.avatarDot} />}
         </TouchableOpacity>
         <Text style={st.appTitle}>Diary</Text>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
             <Ionicons name="share-outline" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-          <TouchableOpacity style={st.iconBtn} onPress={() => setMessagesOpen(true)}>
-            <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
-            {hasUnread && <View style={st.notifDot} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -2942,6 +2939,7 @@ const st = StyleSheet.create({
   browseItemKcalLbl: { fontSize: fontSize.xs, color: colors.ink3 },
   iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: spacing.xs / 2, backgroundColor: colors.rose },
+  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
 
   // XP / Achievement
   achieveBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer2, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6, borderWidth: 1, borderColor: colors.line2 },

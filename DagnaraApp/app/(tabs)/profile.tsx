@@ -27,7 +27,7 @@ const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts, country, setCountry } = useAppStore();
+  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts, country, setCountry, setMessagesOpen, hasUnread } = useAppStore();
   const xpInfo = getXpLevel(xp);
 
   const [editing, setEditing] = useState(false);
@@ -355,11 +355,17 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
             <Ionicons name="close" size={20} color={colors.ink} />
           </TouchableOpacity>
-          <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-              <Ionicons name="flash" size={13} color={colors.white} />
-              <Text style={styles.upgradeTxt}>Upgrade</Text>
-            </LinearGradient>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setMessagesOpen(true)}>
+              <Ionicons name="notifications-outline" size={20} color={colors.ink} />
+              {hasUnread && <View style={styles.bellDot} />}
+            </TouchableOpacity>
+            <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
+                <Ionicons name="flash" size={13} color={colors.white} />
+                <Text style={styles.upgradeTxt}>Upgrade</Text>
+              </LinearGradient>
+            </View>
           </View>
         </View>
 
@@ -1343,6 +1349,7 @@ const styles = StyleSheet.create({
 
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   closeBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  bellDot: { position: 'absolute', top: 7, right: 7, width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700' },
 

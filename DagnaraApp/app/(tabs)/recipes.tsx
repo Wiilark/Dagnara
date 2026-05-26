@@ -418,6 +418,7 @@ export default function RecipesScreen() {
             <View style={styles.avatarThumb}>
               <Text style={styles.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
             </View>
+            {hasUnread && <View style={styles.avatarDot} />}
           </TouchableOpacity>
           <Text style={styles.heading}>Recipes</Text>
           <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
@@ -439,10 +440,6 @@ export default function RecipesScreen() {
                 )}
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setMessagesOpen(true)}>
-              <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
-              {hasUnread && <View style={styles.notifDot} />}
-            </TouchableOpacity>
           </View>
         </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -940,6 +937,7 @@ const styles = StyleSheet.create({
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
+  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
   avatarBtn: { width: 36, height: 36, zIndex: 1 },
   avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
