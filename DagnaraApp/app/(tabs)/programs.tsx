@@ -8401,6 +8401,7 @@ function ProgramRow({ icon, name, description, color, isLast = false, onPress }:
 // ── Main Programs Screen ──────────────────────────────────────────────────────
 export default function ProgramsScreen() {
   const { setMessagesOpen, hasUnread } = useAppStore();
+  const { email: authEmail, profile } = useAuthStore();
   const [qsVisible, setQsVisible] = useState(false);
   const [qdVisible, setQdVisible] = useState(false);
   const [pillVisible, setPillVisible] = useState(false);
@@ -8411,14 +8412,16 @@ export default function ProgramsScreen() {
     <SafeAreaView style={st.safe} edges={['top']}>
       {/* App header — matches Diary / Recipes / Progress pattern */}
       <View style={st.appHeader}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
+          <View style={st.avatarThumb}>
+            <Text style={st.avatarInitial}>{(profile?.name ?? authEmail ?? '?')[0].toUpperCase()}</Text>
+          </View>
+        </TouchableOpacity>
         <Text style={st.appTitle}>Programs</Text>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={() => setMessagesOpen(true)}>
             <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
             {hasUnread && <View style={st.notifDot} />}
-          </TouchableOpacity>
-          <TouchableOpacity style={st.iconBtn} onPress={() => router.push('/(tabs)/profile')}>
-            <Ionicons name="person-outline" size={22} color={colors.ink2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -8488,7 +8491,10 @@ export default function ProgramsScreen() {
 const st = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.bg },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  appTitle:  { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
+  appTitle:  { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
+  avatarBtn: { width: 36, height: 36, zIndex: 1 },
+  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   iconBtn:   { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot:  { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },

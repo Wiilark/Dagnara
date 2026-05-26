@@ -1082,7 +1082,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
 // ── Main Diary Screen ─────────────────────────────────────────────────────────
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
-  const { email } = useAuthStore();
+  const { email, profile } = useAuthStore();
   const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, addWater, removeWater, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, logSleep, addStrengthSession, addCardioSession } = useDiaryStore();
   const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
@@ -1796,6 +1796,11 @@ export default function DiaryScreen() {
 
       {/* ── App Header ── */}
       <View style={st.appHeader}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
+          <View style={st.avatarThumb}>
+            <Text style={st.avatarInitial}>{(profile?.name ?? email ?? '?')[0].toUpperCase()}</Text>
+          </View>
+        </TouchableOpacity>
         <Text style={st.appTitle}>Diary</Text>
         <View style={st.headerRight}>
           <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
@@ -1804,9 +1809,6 @@ export default function DiaryScreen() {
           <TouchableOpacity style={st.iconBtn} onPress={() => setMessagesOpen(true)}>
             <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
             {hasUnread && <View style={st.notifDot} />}
-          </TouchableOpacity>
-          <TouchableOpacity style={st.iconBtn} onPress={() => router.push('/(tabs)/profile')}>
-            <Ionicons name="person-outline" size={22} color={colors.ink2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -2897,7 +2899,10 @@ const st = StyleSheet.create({
   // Header
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
+  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
+  avatarBtn: { width: 36, height: 36, zIndex: 1 },
+  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   upgradeBadge: { backgroundColor: colors.purple + '2e', borderWidth: 1, borderColor: colors.purple + '66', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
   upgradeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },

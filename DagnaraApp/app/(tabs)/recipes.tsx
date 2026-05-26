@@ -311,7 +311,7 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
 export default function RecipesScreen() {
   const { entries, addFood, loadEntry } = useDiaryStore();
   const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak, dietaryPreferences } = useAppStore();
-  const email = useAuthStore(s => s.email);
+  const { email, profile } = useAuthStore();
   const [recipeSearch, setRecipeSearch] = useState('');
   const [foodSearch, setFoodSearch] = useState('');
   const [filter, setFilter] = useState(
@@ -414,6 +414,11 @@ export default function RecipesScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
         {/* Header */}
         <View style={styles.appHeader}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn}>
+            <View style={styles.avatarThumb}>
+              <Text style={styles.avatarInitial}>{(profile?.name ?? email ?? '?')[0].toUpperCase()}</Text>
+            </View>
+          </TouchableOpacity>
           <Text style={styles.heading}>Recipes</Text>
           <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
             {/* Plan Shopping toggle — only visible in Recipes view */}
@@ -437,9 +442,6 @@ export default function RecipesScreen() {
             <TouchableOpacity style={styles.iconBtn} onPress={() => setMessagesOpen(true)}>
               <Ionicons name="notifications-outline" size={22} color={colors.ink2} />
               {hasUnread && <View style={styles.notifDot} />}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.iconBtn}>
-              <Ionicons name="person-outline" size={22} color={colors.ink2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -938,7 +940,10 @@ const styles = StyleSheet.create({
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
-  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
+  avatarBtn: { width: 36, height: 36, zIndex: 1 },
+  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
 
   // Budget banner
   budgetBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.green + '14', borderWidth: 1, borderColor: colors.green + '33', borderRadius: radius.lg, padding: spacing.md },
