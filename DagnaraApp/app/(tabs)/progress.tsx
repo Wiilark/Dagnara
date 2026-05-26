@@ -674,15 +674,15 @@ function generateInsights(
     insights.push({
       id: 'kcal_over', emoji: '⚡',
       title: `${kcalDiff} kcal above goal daily`,
-      body: `7-day average: ${avg7kcal} kcal vs ${calorieGoal} goal. ${weightGoal === 'lose' ? 'This slows fat loss — try cutting one snack.' : 'Supports your muscle-gain goal.'}`,
+      body: `7-day average: ${avg7kcal} kcal vs ${calorieGoal} goal. ${weightGoal === 'lose' ? 'This slows fat loss — try cutting one snack.' : weightGoal === 'maintain' ? 'Eating above maintenance — watch the trend if you want to stay steady.' : 'Supports your muscle-gain goal.'}`,
       color: kcalDiff > 400 ? colors.rose : colors.honey,
     });
   } else if (kcalDiff < -250) {
     insights.push({
       id: 'kcal_under', emoji: '📉',
       title: `${Math.abs(kcalDiff)} kcal under goal daily`,
-      body: `Averaging ${avg7kcal} kcal vs ${calorieGoal} goal. ${weightGoal === 'lose' ? 'Healthy deficit — stay consistent.' : 'Under-eating stunts muscle growth and energy.'}`,
-      color: weightGoal === 'lose' ? colors.green : colors.honey,
+      body: `Averaging ${avg7kcal} kcal vs ${calorieGoal} goal. ${weightGoal === 'lose' ? 'Healthy deficit — stay consistent.' : weightGoal === 'maintain' ? 'Slightly under maintenance — fine short-term, but avoid under-fuelling consistently.' : 'Under-eating stunts muscle growth and energy.'}`,
+      color: weightGoal === 'lose' ? colors.green : weightGoal === 'maintain' ? colors.sky : colors.honey,
     });
   } else {
     insights.push({
@@ -760,10 +760,14 @@ function generateInsights(
       insights.push({
         id: 'weight_rate', emoji: '⚖️',
         title: `${dir === 'losing' ? '↓' : '↑'} ${rate} kg/week`,
-        body: healthy
-          ? `${dir === 'losing' ? 'Healthy loss rate' : 'Solid lean-gain pace'} — keep your current intake and activity level.`
-          : `${fmt(Math.abs(kgPerWeek), 1)} kg/week is ${dir === 'losing' ? 'aggressive — monitor energy and muscle retention' : 'fast — some may be fat, not muscle'}.`,
-        color: healthy ? colors.green : colors.honey,
+        body: weightGoal === 'maintain'
+          ? (healthy
+            ? `Trending ${dir === 'losing' ? 'down' : 'up'} — adjust intake slightly to stay at maintenance.`
+            : `${fmt(Math.abs(kgPerWeek), 1)} kg/week is too fast a ${dir === 'losing' ? 'drop' : 'gain'} — recalibrate your calorie intake.`)
+          : (healthy
+            ? `${dir === 'losing' ? 'Healthy loss rate' : 'Solid lean-gain pace'} — keep your current intake and activity level.`
+            : `${fmt(Math.abs(kgPerWeek), 1)} kg/week is ${dir === 'losing' ? 'aggressive — monitor energy and muscle retention' : 'fast — some may be fat, not muscle'}.`),
+        color: weightGoal === 'maintain' ? colors.honey : (healthy ? colors.green : colors.honey),
       });
     }
   }
