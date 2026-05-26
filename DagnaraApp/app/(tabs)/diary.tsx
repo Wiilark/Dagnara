@@ -1830,7 +1830,7 @@ export default function DiaryScreen() {
             </View>
             <View style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-                <Text style={st.xpName}>{stepCount.toLocaleString()}</Text>
+                <Text style={st.xpName}>{fmt(stepCount)}</Text>
                 <Text style={st.xpPts}>/ {STEP_GOAL.toLocaleString()}</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}>
@@ -1844,7 +1844,7 @@ export default function DiaryScreen() {
             <View style={st.xpBadge}><Text style={st.xpBadgeTxt}>{xpInfo.level}</Text></View>
             <View style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-                <Text style={st.xpName}>{xp.toLocaleString()}</Text>
+                <Text style={st.xpName}>{fmt(xp)}</Text>
                 <Text style={st.xpPts}>/ {xpInfo.nextMin.toLocaleString()} XP</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
@@ -1870,7 +1870,7 @@ export default function DiaryScreen() {
             }]}>
               <Animated.Text style={[st.ringNum, {
                 color: celebrateAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.ink, colors.green] }),
-              }]}>{remaining}</Animated.Text>
+              }]}>{fmt(remaining)}</Animated.Text>
               <Text style={st.ringLbl}>kcal left</Text>
             </Animated.View>
           </View>
