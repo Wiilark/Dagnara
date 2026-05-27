@@ -204,6 +204,10 @@ function MoodLogger({ visible, onClose }: { visible: boolean; onClose: () => voi
   const { addXp } = useAppStore();
   const { logMood } = useDiaryStore();
 
+  useEffect(() => {
+    if (!visible) { setNotes(''); setSelected(2); }
+  }, [visible]);
+
   async function handleLog() {
     await logMood(TODAY(), selected);
     addXp(10);
@@ -257,6 +261,10 @@ function SleepLogger({ visible, onClose }: { visible: boolean; onClose: () => vo
   const [quality, setQuality] = useState(2);
   const [notes, setNotes] = useState('');
   const QUALITIES = ['😫', '😕', '😐', '😊', '🌟'];
+
+  useEffect(() => {
+    if (!visible) { setBedtime('22:30'); setWaketime('06:00'); setQuality(2); setNotes(''); }
+  }, [visible]);
 
   function getDuration() {
     const [bh, bm] = bedtime.split(':').map(Number);
@@ -355,6 +363,10 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
   const [duration, setDuration] = useState('30');
   const [manualKcal, setManualKcal] = useState('');
   const [selected, setSelected] = useState<typeof EXERCISE_CATS[0] | null>(null);
+
+  useEffect(() => {
+    if (!visible) { setSearch(''); setExTab('list'); setDuration('30'); setManualKcal(''); setSelected(null); }
+  }, [visible]);
 
   const filtered = search.length > 0
     ? EXERCISE_CATS.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))
@@ -463,6 +475,10 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
   const { logSteps } = useDiaryStore();
   const [steps, setSteps] = useState(0);
   const STEP_GOAL = 8000;
+
+  useEffect(() => {
+    if (!visible) setSteps(0);
+  }, [visible]);
 
   function addSteps(n: number) { setSteps(s => Math.min(s + n, 30000)); }
 

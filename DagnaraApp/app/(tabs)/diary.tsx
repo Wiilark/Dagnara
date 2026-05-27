@@ -346,6 +346,14 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
     }
   }, [unitSystem, strengthExercises.length]);
 
+  useEffect(() => {
+    if (!visible) {
+      setTab('list'); setManualKcal(''); setManualTitle(''); setSearch('');
+      setSelectedExercise(null); setDuration('30');
+      setStrengthMode(false); setStrengthExercises([]); setStrengthSearch('');
+    }
+  }, [visible]);
+
   // Keyboard tracking — animate durPanel bottom to match keyboard height
   const kbBottom = useRef(new Animated.Value(0)).current;
   useEffect(() => {
