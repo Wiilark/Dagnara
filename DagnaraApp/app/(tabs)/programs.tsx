@@ -7463,7 +7463,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
   });
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { setEditSheet(false); setEditMed(null); return; }
     Promise.all([
       AsyncStorage.getItem(KEYS.PILLS),
       AsyncStorage.getItem(KEYS.PILL_LOG(today)),

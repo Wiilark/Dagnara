@@ -159,15 +159,6 @@ export default function ProfileScreen() {
     }
   }, [tdeeModal]);
 
-  // Populate display-unit weight/height inputs and name fields when Personal Details modal opens
-  useEffect(() => {
-    if (!editing) return;
-    setEditFirstName(profile.name?.split(' ')[0] ?? '');
-    setEditLastName(profile.name?.split(' ').slice(1).join(' ') ?? '');
-    setDraftWeightInput(draft.weight ? kgToInput(parseFloat(draft.weight), unitSystem) : '');
-    setDraftHeightInput(draft.height ? cmToInput(parseFloat(draft.height), unitSystem) : '');
-  }, [editing]);
-
   // Reset water goal input when dialog closes
   useEffect(() => {
     if (!waterGoalModal) setWaterGoalInput('');
