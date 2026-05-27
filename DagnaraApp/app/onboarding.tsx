@@ -562,7 +562,7 @@ export default function OnboardingScreen() {
                   <Text style={s.macroName}>Protein</Text>
                 </View>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.293 / 9)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.2 / 9)}g</Text>
                   <Text style={s.macroName}>Fat</Text>
                 </View>
               </View>
