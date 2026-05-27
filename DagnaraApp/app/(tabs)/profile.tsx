@@ -153,6 +153,7 @@ export default function ProfileScreen() {
   // Reset local TDEE state when modal opens
   useEffect(() => {
     if (tdeeModal) {
+      setSex((profile.sex as 'male' | 'female') ?? 'male');
       setLocalActivity(activityLevel);
       setLocalGoal(weightGoal);
     }
@@ -166,6 +167,24 @@ export default function ProfileScreen() {
     setDraftWeightInput(draft.weight ? kgToInput(parseFloat(draft.weight), unitSystem) : '');
     setDraftHeightInput(draft.height ? cmToInput(parseFloat(draft.height), unitSystem) : '');
   }, [editing]);
+
+  // Reset water goal input when dialog closes
+  useEffect(() => {
+    if (!waterGoalModal) setWaterGoalInput('');
+  }, [waterGoalModal]);
+
+  // Revert unsaved dietary preference changes when the sheet closes without saving
+  useEffect(() => {
+    if (dietaryModal) return;
+    AsyncStorage.multiGet([`${p}_diet_plan`, `${p}_food_pref`, `${p}_allergies`]).then(pairs => {
+      const m = Object.fromEntries(pairs);
+      if (m[`${p}_diet_plan`]) setSelectedDiet(m[`${p}_diet_plan`]!);
+      if (m[`${p}_food_pref`]) setSelectedFoodPref(m[`${p}_food_pref`]!);
+      if (m[`${p}_allergies`]) {
+        try { setSelectedAllergies(JSON.parse(m[`${p}_allergies`]!)); } catch { /* ignore */ }
+      }
+    });
+  }, [dietaryModal]);
 
   // Populate display-unit inputs when measurements modal opens
   useEffect(() => {
@@ -575,7 +594,7 @@ export default function ProfileScreen() {
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setDietModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>Diet Plan</Text>
-            <TouchableOpacity onPress={() => setDietModal(false)}><Text style={styles.saveText}>Done</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); }}><Text style={styles.saveText}>Done</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
             {DIET_PLANS.map((plan) => (
