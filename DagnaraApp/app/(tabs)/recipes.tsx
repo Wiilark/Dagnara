@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   Modal, StyleSheet, Alert, Image, Dimensions, type ImageSourcePropType,
+  Animated, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -336,6 +338,7 @@ export default function RecipesScreen() {
   }, [selected]);
   const [foodFilter, setFoodFilter] = useState('All');
   const [selectedFood, setSelectedFood] = useState<LocalFood | null>(null);
+  const [foodMeal, setFoodMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('snack');
 
   // Multi-recipe Plan-Shopping mode: tap recipe cards to toggle selection,
   // then "Create Grocery List" merges all picked recipes' ingredients into
@@ -410,9 +413,19 @@ export default function RecipesScreen() {
     return getFoodCategory(f) === foodFilter;
   });
 
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
+  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
+  const scrollPaddingTop = spacing.xl + spacing.lg + spacing.sm + insets.top;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-        {/* Header */}
+    <View style={styles.safe}>
+      <View style={[styles.fixedHeader, { paddingTop: insets.top, height: headerH }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
+          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+        </Animated.View>
         <View style={styles.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn}>
             <View style={styles.avatarThumb}>
@@ -422,7 +435,6 @@ export default function RecipesScreen() {
           </TouchableOpacity>
           <Text style={styles.heading}>Recipes</Text>
           <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-            {/* Plan Shopping toggle — only visible in Recipes view */}
             {viewMode === 'recipes' && (
               <TouchableOpacity
                 style={[styles.iconBtn, planMode && styles.iconBtnActive]}
@@ -442,7 +454,12 @@ export default function RecipesScreen() {
             )}
           </View>
         </View>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      </View>
+      <Animated.ScrollView
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
+        contentContainerStyle={[styles.scroll, { paddingTop: scrollPaddingTop }]}
+        showsVerticalScrollIndicator={false}>
 
         {/* Plan Shopping banner */}
         {planMode && (
@@ -609,14 +626,14 @@ export default function RecipesScreen() {
             </View>
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Food detail modal */}
-      <Modal visible={!!selectedFood} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedFood(null)}>
+      <Modal visible={!!selectedFood} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setSelectedFood(null); setFoodMeal('snack'); }}>
         {selectedFood && (
           <SafeAreaView style={styles.modal}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setSelectedFood(null)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={() => { setSelectedFood(null); setFoodMeal('snack'); }} style={styles.closeBtn}>
                 <Ionicons name="close" size={fontSize.base} color={colors.ink2} />
               </TouchableOpacity>
               <Text style={styles.modalMeal}>{getFoodCategory(selectedFood)}</Text>
@@ -625,13 +642,13 @@ export default function RecipesScreen() {
                   id: `${Date.now()}`, icon: selectedFood.icon, name: selectedFood.name,
                   kcal: selectedFood.kcal, carbs: selectedFood.carbs,
                   protein: selectedFood.protein, fat: selectedFood.fat,
-                  unit: '100g', meal: 'snack',
+                  unit: '100g', meal: foodMeal,
                   fiber: selectedFood.fiber, sugar: selectedFood.sugar, sodium: selectedFood.sodium,
                 });
                 await checkAndUpdateStreak(today);
                 await addXp(10);
                 Alert.alert('Added to diary ✓', `${selectedFood.name} logged (100g). +10 XP`);
-                setSelectedFood(null);
+                setSelectedFood(null); setFoodMeal('snack');
               }} activeOpacity={0.85} style={styles.addBtn}>
                 <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addBtnGrad}>
                   <Text style={styles.addBtnTxt}>+ Add</Text>
@@ -671,18 +688,26 @@ export default function RecipesScreen() {
                 ))}
               </View>
 
+              <View style={styles.mealPickerRow}>
+                {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(m => (
+                  <TouchableOpacity key={m} style={[styles.mealChip, foodMeal === m && styles.mealChipSel]} onPress={() => setFoodMeal(m)}>
+                    <Text style={[styles.mealChipTxt, foodMeal === m && styles.mealChipTxtSel]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <TouchableOpacity style={styles.logBtn} activeOpacity={0.85} onPress={async () => {
                 await addFood(today, {
                   id: `${Date.now()}`, icon: selectedFood.icon, name: selectedFood.name,
                   kcal: selectedFood.kcal, carbs: selectedFood.carbs,
                   protein: selectedFood.protein, fat: selectedFood.fat,
-                  unit: '100g', meal: 'snack',
+                  unit: '100g', meal: foodMeal,
                   fiber: selectedFood.fiber, sugar: selectedFood.sugar, sodium: selectedFood.sodium,
                 });
                 await checkAndUpdateStreak(today);
                 await addXp(10);
                 Alert.alert('Food logged ✓', `${selectedFood.name} added to your diary. +10 XP`);
-                setSelectedFood(null);
+                setSelectedFood(null); setFoodMeal('snack');
               }}>
                 <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logBtnGrad}>
                   <Text style={styles.logBtnTxt}>Log 100g to diary</Text>
@@ -926,21 +951,22 @@ export default function RecipesScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
 
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
-  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
+  avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
-  avatarBtn: { width: 36, height: 36, zIndex: 1 },
-  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
+  avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
 
   // Budget banner
@@ -1176,6 +1202,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 3,
   },
+  mealPickerRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md, flexWrap: 'wrap' },
+  mealChip: { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.line, borderWidth: 1, borderColor: colors.line2 },
+  mealChipSel: { backgroundColor: colors.purpleTint, borderColor: colors.line3 },
+  mealChipTxt: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink3 },
+  mealChipTxtSel: { color: colors.lavender },
   logBtn: { borderRadius: radius.md, marginTop: spacing.md, overflow: 'hidden' },
   logBtnGrad: { padding: spacing.md, alignItems: 'center' },
   logBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
@@ -1373,7 +1404,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    height: 36,
+    height: spacing.xl + spacing.sm,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: radius.pill,
     backgroundColor: colors.purpleTint,

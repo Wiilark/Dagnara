@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, TextInput, Modal, Switch, Image, Platform, KeyboardAvoidingView, Keyboard,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { useAppStore, getXpLevel, calcTDEE } from '../../src/store/appStore';
+import { useAppStore, calcTDEE } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, requestNotificationPermission } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
+import { BlurView } from 'expo-blur';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
 import { COUNTRIES, getCountry } from '../../src/lib/currency';
@@ -27,13 +29,11 @@ const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { xp, streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, macroPcts, setMacroPcts, country, setCountry, setMessagesOpen, hasUnread } = useAppStore();
-  const xpInfo = getXpLevel(xp);
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, hasUnread } = useAppStore();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
   const [dietModal, setDietModal] = useState(false);
-  const [macrosModal, setMacrosModal] = useState(false);
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
   const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health' | 'privacy'>('');
@@ -77,11 +77,6 @@ export default function ProfileScreen() {
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([]);
 
 
-  // Custom macro goals
-  const [localCarbs,   setLocalCarbs]   = useState(String(macroPcts.carbs));
-  const [localProtein, setLocalProtein] = useState(String(macroPcts.protein));
-  const [localFat,     setLocalFat]     = useState(String(macroPcts.fat));
-
   // Notification preferences
   const [notifCheckIn, setNotifCheckIn] = useState(false);
   const [notifMeals,   setNotifMeals]   = useState(false);
@@ -118,6 +113,7 @@ export default function ProfileScreen() {
       `${p}_body_measurements`,
       `${p}_notif_checkin`, `${p}_notif_meals`, `${p}_notif_streak`,
       `${p}_language`, `${p}_unit_system`, `${p}_water_goal`, `${p}_plan`,
+      `${p}_diet_plan`, `${p}_food_pref`, `${p}_allergies`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
       if (m[`${p}_body_measurements`]) {
@@ -130,6 +126,11 @@ export default function ProfileScreen() {
       if (m[`${p}_language`])      setLanguage(m[`${p}_language`]!);
       if (m[`${p}_plan`])          setSelectedPlan(m[`${p}_plan`] as 'free' | 'premium');
       if (m[`${p}_water_goal`])    setWaterGoal(m[`${p}_water_goal`]!);
+      if (m[`${p}_diet_plan`])     setSelectedDiet(m[`${p}_diet_plan`]!);
+      if (m[`${p}_food_pref`])     setSelectedFoodPref(m[`${p}_food_pref`]!);
+      if (m[`${p}_allergies`]) {
+        try { setSelectedAllergies(JSON.parse(m[`${p}_allergies`]!)); } catch { /* ignore */ }
+      }
       // Migrate old unit_system key to store (one-time, fire-and-forget)
       if (m[`${p}_unit_system`])   void setUnitSystem(m[`${p}_unit_system`] as UnitSystem);
     });
@@ -156,15 +157,6 @@ export default function ProfileScreen() {
       setLocalGoal(weightGoal);
     }
   }, [tdeeModal]);
-
-  // Sync macro inputs when modal opens
-  useEffect(() => {
-    if (macrosModal) {
-      setLocalCarbs(String(macroPcts.carbs));
-      setLocalProtein(String(macroPcts.protein));
-      setLocalFat(String(macroPcts.fat));
-    }
-  }, [macrosModal]);
 
   // Populate display-unit weight/height inputs and name fields when Personal Details modal opens
   useEffect(() => {
@@ -346,39 +338,96 @@ export default function ProfileScreen() {
     setSettingsPage('');
   }
 
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Super-smoothed interpolation for high-end Revolut feel
+  const headerNameOpacity = scrollY.interpolate({
+    inputRange: [100, 170],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const headerNameTranslateY = scrollY.interpolate({
+    inputRange: [100, 170],
+    outputRange: [15, 0],
+    extrapolate: 'clamp',
+  });
+
+  const headerBlurOpacity = scrollY.interpolate({
+    inputRange: [20, 120],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <View style={styles.safe}>
+      {/* ── Floating Header — blur + soft bottom fade, no hard edge ── */}
+      <View style={[styles.fixedHeader, { paddingTop: insets.top, height: 60 + insets.top + 24 }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
+          <BlurView
+            tint="dark"
+            intensity={Platform.OS === 'ios' ? 80 : 100}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Fade blur into bg at the bottom so there's no hard clip line */}
+          <LinearGradient
+            colors={['transparent', colors.bg]}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            pointerEvents="none"
+          />
+        </Animated.View>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.ink} />
+          </TouchableOpacity>
 
-        {/* ── Top bar + Hero (grouped so no large gap between them) ── */}
-        <View style={{ gap: spacing.xs }}>
-          <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-              <Ionicons name="close" size={18} color={colors.ink} />
-            </TouchableOpacity>
-            <View style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
-              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-                <Ionicons name="diamond" size={14} color={colors.white} />
-                <Text style={styles.upgradeTxt}>Upgrade</Text>
-              </LinearGradient>
+          <Animated.View style={{
+            opacity: headerNameOpacity,
+            flex: 1,
+            alignItems: 'center',
+            paddingHorizontal: 8,
+            transform: [{ translateY: headerNameTranslateY }]
+          }}>
+            <Text style={styles.headerNameText} numberOfLines={1}>{profile.name ?? 'Your Name'}</Text>
+          </Animated.View>
+
+          <TouchableOpacity style={{ borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
+            <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
+              <Ionicons name="diamond" size={16} color={colors.white} />
+              <Text style={styles.upgradeTxt}>Upgrade</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Animated.ScrollView
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+        contentContainerStyle={[styles.scroll, { paddingTop: 70 + insets.top }]}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
+          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
+            {profile.photoUri
+              ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
+              : <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+            }
+            <View style={styles.avatarAdd}>
+              <Ionicons name="camera" size={14} color={colors.white} />
             </View>
-          </View>
-
-          <View style={styles.hero}>
-            <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto}>
-              {profile.photoUri
-                ? <Image source={{ uri: profile.photoUri }} style={styles.avatarImg} />
-                : <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initials}</Text>
-                  </View>
-              }
-              <View style={styles.avatarAdd}>
-                <Ionicons name="camera" size={14} color={colors.white} />
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
-            <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
-          </View>
+          </TouchableOpacity>
+          <Text style={styles.heroName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile.name ?? 'Your Name'}</Text>
+          <Text style={styles.heroEmail} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
         </View>
 
         {/* ── Quick cards ── */}
@@ -406,71 +455,44 @@ export default function ProfileScreen() {
         {/* ── Customization ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'nutrition-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
+            { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
             { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
-            { icon: 'bar-chart-outline', label: 'Adjust Macronutrients', color: colors.sky, value: '', onPress: () => setMacrosModal(true) },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
-            { icon: 'leaf-outline', label: 'Dietary Needs & Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
+            { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
             { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
-              <View style={[styles.menuIcon, { backgroundColor: color + '22' }]}>
-                <Ionicons name={icon as any} size={16} color={color} />
-              </View>
+              <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.menuLabel}>{label}</Text>
-              {value ? <Text style={styles.menuValue}>{value}</Text> : null}
               <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Achievements ── */}
-        <View style={styles.xpRow}>
-          <View style={styles.xpBadge}><Text style={styles.xpBadgeTxt}>{xpInfo.level}</Text></View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.xpMeta}>
-              <Text style={styles.xpName}>{xpInfo.name}</Text>
-              <Text style={styles.xpPts}>{fmt(xp)} XP</Text>
-            </View>
-            <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
-          </View>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.sm, gap: spacing.sm }}>
-          {([
-            { id: 'streak3',   icon: '🔥', label: '3-day\nstreak',   unlocked: streak >= 3 },
-            { id: 'streak7',   icon: '🔥', label: '7-day\nstreak',   unlocked: streak >= 7 },
-            { id: 'streak30',  icon: '🏅', label: '30-day\nstreak',  unlocked: streak >= 30 },
-            { id: 'streak100', icon: '👑', label: '100-day\nstreak', unlocked: streak >= 100 },
-            { id: 'level5',  icon: '⭐', label: 'Level 5\nachiever', unlocked: xpInfo.level >= 5 },
-            { id: 'level10', icon: '🎯', label: 'Level 10\nfocused',  unlocked: xpInfo.level >= 10 },
-            { id: 'level15', icon: '🌟', label: 'Level 15\nall-star', unlocked: xpInfo.level >= 15 },
-            { id: 'level20', icon: '🏆', label: 'Level 20\nchampion', unlocked: xpInfo.level >= 20 },
-            { id: 'xp100',  icon: '💎', label: '100 XP\nearned',   unlocked: xp >= 100 },
-            { id: 'xp500',  icon: '🚀', label: '500 XP\nearned',   unlocked: xp >= 500 },
-            { id: 'xp2000', icon: '🌌', label: '2k XP\nearned',    unlocked: xp >= 2000 },
-          ] as { id: string; icon: string; label: string; unlocked: boolean }[]).map(a => (
-            <View key={a.id} style={[styles.achieveBadge, !a.unlocked && { opacity: 0.3 }]}>
-              <Text style={{ fontSize: fontSize.xl }}>{a.icon}</Text>
-              <Text style={styles.achieveLbl}>{a.label}</Text>
-              {a.unlocked && <View style={styles.achieveDot} />}
-            </View>
+        {/* ── Settings ── */}
+        <View style={styles.menuCard}>
+          {[
+            { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setAcFirstName(profile.name?.split(' ')[0] ?? ''); setAcLastName(profile.name?.split(' ').slice(1).join(' ') ?? ''); setAcEmail(email ?? ''); setAcPassword(''); setSettingsPage('account'); setSettingsModal(true); } },
+            { icon: 'scale-outline', label: 'Unit System', color: colors.sky, value: unitSystem, onPress: () => { setSettingsPage('unitSystem'); setSettingsModal(true); } },
+            { icon: 'globe-outline', label: 'Country', color: colors.honey, value: `${getCountry(country).flag}  ${getCountry(country).name}`, onPress: () => { setSettingsPage('country'); setSettingsModal(true); } },
+            { icon: 'language-outline', label: 'Language', color: colors.green, value: language, onPress: () => { setSettingsPage('language'); setSettingsModal(true); } },
+            { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
+            { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
+            { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
+          ].map(({ icon, label, color, value, onPress }) => (
+            <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
+              <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
+              <Text style={styles.menuLabel}>{label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+            </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* ── Account ── */}
         <View style={styles.menuCard}>
-          <TouchableOpacity style={styles.menuRow} onPress={() => setSettingsModal(true)}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.ink3 + '22' }]}>
-              <Ionicons name="settings-outline" size={16} color={colors.ink2} />
-            </View>
-            <Text style={styles.menuLabel}>Account Settings</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.rose + '22' }]}>
-              <Ionicons name="log-out-outline" size={16} color={colors.rose} />
-            </View>
+            <Ionicons name="log-out-outline" size={26} color={colors.rose} style={{ width: 36, textAlign: 'center' }} />
             <Text style={[styles.menuLabel, { color: colors.rose }]}>Log out</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
           </TouchableOpacity>
@@ -479,7 +501,7 @@ export default function ProfileScreen() {
         <Text style={styles.footer}>Version 1.0.0 · Dagnara</Text>
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── Measurements Modal ── */}
       <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMeasureModal(false)}>
@@ -566,74 +588,6 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ── Macros Modal ── */}
-      <Modal visible={macrosModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMacrosModal(false)}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setMacrosModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-            <Text style={styles.modalTitle}>Macro Goals</Text>
-            <TouchableOpacity onPress={() => {
-              const c = parseInt(localCarbs, 10) || 0;
-              const p = parseInt(localProtein, 10) || 0;
-              const f = parseInt(localFat, 10) || 0;
-              if (c + p + f !== 100) { Alert.alert('Invalid split', 'Carbs + Protein + Fat must equal 100%.'); return; }
-              void setMacroPcts({ carbs: c, protein: p, fat: f });
-              setMacrosModal(false);
-            }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-            <Text style={[styles.inputLabel, { marginBottom: spacing.md }]}>Enter the % of calories from each macro. Must total 100%.</Text>
-
-            {([
-              { key: 'carbs',   label: 'Carbohydrates', color: colors.sky,  val: localCarbs,   set: setLocalCarbs },
-              { key: 'protein', label: 'Protein',        color: colors.rose, val: localProtein, set: setLocalProtein },
-              { key: 'fat',     label: 'Fat',            color: colors.honey, val: localFat,    set: setLocalFat },
-            ] as const).map(({ key, label, color, val, set }) => {
-              const pct = parseInt(val, 10) || 0;
-              const grams = Math.round(calorieGoal * pct / 100 / (key === 'fat' ? 9 : 4));
-              return (
-                <View key={key} style={mst.macroRow}>
-                  <View style={[mst.macroDot, { backgroundColor: color }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={mst.macroLabel}>{label}</Text>
-                    <View style={mst.macroBar}><View style={[mst.macroFill, { width: `${Math.min(100, pct)}%` as any, backgroundColor: color + 'aa' }]} /></View>
-                  </View>
-                  <View style={mst.macroVals}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TextInput
-                        style={[mst.macroPct, { color, borderBottomWidth: 1, borderBottomColor: color + '55', minWidth: 32, textAlign: 'right' }]}
-                        value={val}
-                        onChangeText={set}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                      />
-                      <Text style={[mst.macroPct, { color }]}>%</Text>
-                    </View>
-                    <Text style={mst.macroG}>{fmt(grams)}g</Text>
-                  </View>
-                </View>
-              );
-            })}
-
-            {(() => {
-              const total = (parseInt(localCarbs, 10) || 0) + (parseInt(localProtein, 10) || 0) + (parseInt(localFat, 10) || 0);
-              const ok = total === 100;
-              return (
-                <View style={[mst.calCard, { borderColor: ok ? colors.line2 : colors.rose + '55' }]}>
-                  <Text style={mst.calLbl}>Total</Text>
-                  <Text style={[mst.calVal, { color: ok ? colors.green : colors.rose }]}>{fmt(total)}%</Text>
-                </View>
-              );
-            })()}
-
-            <View style={mst.calCard}>
-              <Text style={mst.calLbl}>Daily Calorie Goal</Text>
-              <Text style={mst.calVal}>{fmt(calorieGoal)} kcal</Text>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
       {/* ── Settings Modal ── */}
       <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')} onRequestClose={() => { setSettingsPage(''); setSettingsModal(false); }}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -657,32 +611,24 @@ export default function ProfileScreen() {
             <Text style={sst.sectionLbl}>PERSONAL</Text>
             <View style={sst.card}>
               <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <View style={[sst.icon, { backgroundColor: colors.purple2 + '22' }]}>
-                  <Ionicons name="mail-outline" size={16} color={colors.purple2} />
-                </View>
+                <Ionicons name="mail-outline" size={20} color={colors.purple2} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={act.fieldLbl}>Email</Text>
                 <Text style={[act.fieldInput, { color: colors.ink3 }]} numberOfLines={1} ellipsizeMode="middle">{acEmail}</Text>
               </View>
               <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
-                  <Ionicons name="person-outline" size={16} color={colors.lavender} />
-                </View>
+                <Ionicons name="person-outline" size={20} color={colors.lavender} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={act.fieldLbl}>First Name</Text>
                 <TextInput style={act.fieldInput} value={acFirstName} onChangeText={setAcFirstName}
                   placeholderTextColor={colors.ink3} placeholder="First name" />
               </View>
               <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <View style={[sst.icon, { backgroundColor: colors.lavender + '22' }]}>
-                  <Ionicons name="person-outline" size={16} color={colors.lavender} />
-                </View>
+                <Ionicons name="person-outline" size={20} color={colors.lavender} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={act.fieldLbl}>Last Name</Text>
                 <TextInput style={act.fieldInput} value={acLastName} onChangeText={setAcLastName}
                   placeholderTextColor={colors.ink3} placeholder="Last name" />
               </View>
               <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                <View style={[sst.icon, { backgroundColor: colors.ink3 + '22' }]}>
-                  <Ionicons name="lock-closed-outline" size={16} color={colors.ink3} />
-                </View>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.ink3} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={act.fieldLbl}>Password</Text>
                 <TextInput style={act.fieldInput} value={acPassword} onChangeText={setAcPassword}
                   secureTextEntry placeholder="New password" placeholderTextColor={colors.ink3} />
@@ -697,9 +643,7 @@ export default function ProfileScreen() {
               ].map(({ icon, label, value, color, onPress }, i, arr) => (
                 <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
                   onPress={onPress}>
-                  <View style={[sst.icon, { backgroundColor: color + '22' }]}>
-                    <Ionicons name={icon as any} size={16} color={color} />
-                  </View>
+                  <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
                   <Text style={sst.label}>{label}</Text>
                   <Text style={sst.val}>{value}</Text>
                   <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
@@ -709,25 +653,19 @@ export default function ProfileScreen() {
             <Text style={sst.sectionLbl}>PRIVACY</Text>
             <View style={sst.card}>
               <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Data Consents', 'Coming soon.')}>
-                <View style={[sst.icon, { backgroundColor: colors.teal + '22' }]}>
-                  <Ionicons name="shield-checkmark-outline" size={16} color={colors.teal} />
-                </View>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.teal} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={sst.label}>Data Consents</Text>
                 <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
               </TouchableOpacity>
             </View>
             <View style={[sst.card, { marginTop: spacing.lg }]}>
               <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Unsubscribe', 'You will no longer receive marketing emails.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Unsubscribe', style: 'destructive', onPress: () => {} }])}>
-                <View style={[sst.icon, { backgroundColor: colors.rose + '11' }]}>
-                  <Ionicons name="mail-unread-outline" size={16} color={colors.rose} />
-                </View>
+                <Ionicons name="mail-unread-outline" size={20} color={colors.rose} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={[sst.label, { color: colors.rose }]}>Unsubscribe from marketing</Text>
                 <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
               </TouchableOpacity>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: logout }])}>
-                <View style={[sst.icon, { backgroundColor: colors.rose + '11' }]}>
-                  <Ionicons name="trash-outline" size={16} color={colors.rose} />
-                </View>
+              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: handleDeleteAccount }])}>
+                <Ionicons name="trash-outline" size={20} color={colors.rose} style={{ width: 28, textAlign: 'center' }} />
                 <Text style={[sst.label, { color: colors.rose }]}>Delete Account</Text>
                 <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
               </TouchableOpacity>
@@ -872,7 +810,7 @@ export default function ProfileScreen() {
                     onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
                 ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
                   <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                    <View style={[sst.icon, { backgroundColor: bg }]}><Text>{icon}</Text></View>
+                    <Text style={{ width: 28, textAlign: 'center', fontSize: 20 }}>{icon}</Text>
                     <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
                     <Switch value={value} onValueChange={onToggle}
                       trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
@@ -892,9 +830,7 @@ export default function ProfileScreen() {
                 <Text style={sst.sectionLbl}>CONNECTION</Text>
                 <View style={sst.card}>
                   <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                    <View style={[sst.icon, { backgroundColor: Platform.OS === 'ios' ? colors.rose + '22' : colors.green + '22' }]}>
-                      <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={16} color={Platform.OS === 'ios' ? colors.rose : colors.green} />
-                    </View>
+                    <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={20} color={Platform.OS === 'ios' ? colors.rose : colors.green} style={{ width: 28, textAlign: 'center' }} />
                     <Text style={[sst.label, { flex: 1 }]}>{healthPlatformName()}</Text>
                     {healthConnected
                       ? <Text style={{ fontSize: fontSize.xs, color: colors.green, fontWeight: '700' }}>Connected</Text>
@@ -1002,9 +938,7 @@ export default function ProfileScreen() {
             <Text style={sst.sectionLbl}>IMPORT HEALTH DATA</Text>
             <View style={sst.card}>
               <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('health')}>
-                <View style={[sst.icon, { backgroundColor: Platform.OS === 'ios' ? colors.rose + '22' : colors.green + '22' }]}>
-                  <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={16} color={Platform.OS === 'ios' ? colors.rose : colors.green} />
-                </View>
+                <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={20} color={Platform.OS === 'ios' ? colors.rose : colors.green} style={{ width: 28, textAlign: 'center' }} />
                 <View style={{ flex: 1 }}>
                   <Text style={sst.label}>{healthPlatformName()}</Text>
                   {healthConnected && <Text style={{ fontSize: fontSize.xs, color: colors.green }}>Connected{healthLastSync ? ` · ${healthLastSync}` : ''}</Text>}
@@ -1024,9 +958,7 @@ export default function ProfileScreen() {
               ].map(({ icon, label, color, bg }, i, arr) => (
                 <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
                   onPress={() => Alert.alert(label, 'Coming soon.')}>
-                  <View style={[sst.icon, { backgroundColor: bg }]}>
-                    <Ionicons name={icon as any} size={16} color={color} />
-                  </View>
+                  <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
                   <Text style={sst.label}>{label}</Text>
                   <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
                 </TouchableOpacity>
@@ -1113,7 +1045,14 @@ export default function ProfileScreen() {
           </ScrollView>
           {/* Save footer */}
           <View style={dp.footer}>
-            <TouchableOpacity style={dp.saveBtn} onPress={() => setDietaryModal(false)}>
+            <TouchableOpacity style={dp.saveBtn} onPress={() => {
+              AsyncStorage.multiSet([
+                [`${p}_diet_plan`, selectedDiet],
+                [`${p}_food_pref`, selectedFoodPref],
+                [`${p}_allergies`, JSON.stringify(selectedAllergies)],
+              ]);
+              setDietaryModal(false);
+            }}>
               <Text style={dp.saveBtnTxt}>SAVE SETTINGS</Text>
             </TouchableOpacity>
           </View>
@@ -1337,58 +1276,87 @@ export default function ProfileScreen() {
         </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.md, gap: spacing.lg, paddingBottom: spacing.lg },
+  scroll: { padding: 16, gap: 24, paddingBottom: 40 },
 
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  closeBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
-  bellDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
-  upgradeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  upgradeTxt: { color: colors.white, fontSize: fontSize.base, fontWeight: '700' },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.lg,
+    flex: 1,
+  },
+  headerNameText: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    width: spacing.xl + spacing.sm,
+    height: spacing.xl + spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.layer2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.line2,
+    shadowColor: colors.purpleGlow,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 15,
+  },
+  bellDot: { position: 'absolute', top: 12, right: 12, width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 2.5, borderColor: colors.bg },
+  upgradeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    height: spacing.xl + spacing.sm,
+    justifyContent: 'center',
+  },
+  upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 0.4 },
 
-  hero: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
+  hero: { alignItems: 'center', gap: 14, paddingBottom: 8 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.white, fontSize: fontSize['2xl'], fontWeight: '800' },
-  avatarImg: { width: 96, height: 96, borderRadius: radius.pill },
-  avatarAdd: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
-  heroName: { color: colors.ink, fontSize: fontSize.xl, fontWeight: '800', marginTop: 2, textAlign: 'center' },
-  heroEmail: { color: colors.ink3, fontSize: fontSize.sm, maxWidth: 220, textAlign: 'center' },
+  avatar: { width: 110, height: 110, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.white, fontSize: 40, fontWeight: '800' },
+  avatarImg: { width: 110, height: 110, borderRadius: radius.pill },
+  avatarAdd: { position: 'absolute', bottom: 2, right: 2, width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 3.5, borderColor: colors.bg },
+  heroName: { color: colors.ink, fontSize: 32, fontWeight: '800', textAlign: 'center' },
+  heroEmail: { color: colors.ink3, fontSize: 16, maxWidth: 280, textAlign: 'center', marginTop: 6, opacity: 0.7 },
 
-  xpRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, width: '100%', marginTop: 4 },
-  xpBadge: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  xpBadgeTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
-  xpMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  xpName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink },
-  xpPts: { fontSize: fontSize.xs, color: colors.ink3 },
-  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden' },
-  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
+  quickRow: { flexDirection: 'row', gap: 12 },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: 20, padding: 16, minHeight: 110, justifyContent: 'center', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  quickIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
+  quickTexts: { gap: 2, marginTop: 12 },
+  quickVal: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  quickLbl: { fontSize: 12, color: colors.ink3, fontWeight: '600', opacity: 0.7 },
 
-  quickRow: { flexDirection: 'row', gap: spacing.sm },
-  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, minHeight: 128, justifyContent: 'space-between', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  quickIconWrap: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
-  quickTexts: { gap: 2 },
-  quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
-  quickLbl: { fontSize: fontSize.xs, color: colors.ink3 },
+  sectionHdr: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: 4, marginBottom: -16, opacity: 0.5 },
 
-  sectionHdr: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: spacing.xs },
+  menuCard: { backgroundColor: colors.layer1, borderRadius: 20, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
+  menuLabel: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '600' },
+  menuValue: { fontSize: 13, color: colors.ink3, maxWidth: 120, fontWeight: '500' },
 
-  achieveBadge: { alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  achieveLbl: { fontSize: fontSize.xs, color: colors.ink2, textAlign: 'center' },
-  achieveDot: { width: spacing.xs, height: spacing.xs, borderRadius: spacing.xs, backgroundColor: colors.green },
-
-  menuCard: { backgroundColor: colors.layer1, borderRadius: radius.xl, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
-  menuIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base },
-  menuValue: { fontSize: fontSize.xs, color: colors.ink3, maxWidth: 100 },
-
-  footer: { textAlign: 'center', color: colors.ink3, fontSize: fontSize.xs, marginTop: spacing.xs },
+  footer: { textAlign: 'center', color: colors.ink3, fontSize: 12, marginTop: 4, opacity: 0.4 },
 
   dietOption: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
@@ -1417,27 +1385,11 @@ const styles = StyleSheet.create({
   settingsBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
 });
 
-// ── Macros modal styles ──────────────────────────────────────────────────────
-const mst = StyleSheet.create({
-  macroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md - 2, padding: spacing.sm + 4, marginBottom: spacing.xs + 2 },
-  macroDot: { width: 12, height: 12, borderRadius: radius.pill, flexShrink: 0 },
-  macroLabel: { fontSize: fontSize.sm + 1, fontWeight: '600', color: colors.ink, marginBottom: spacing.xs },
-  macroBar: { height: 6, backgroundColor: colors.layer3, borderRadius: spacing.xs / 2, overflow: 'hidden' },
-  macroFill: { height: '100%', borderRadius: spacing.xs / 2 },
-  macroVals: { alignItems: 'flex-end', gap: 2 },
-  macroPct: { fontSize: fontSize.base, fontWeight: '800' },
-  macroG: { fontSize: fontSize.xs, color: colors.ink3 },
-  calCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md - 2, padding: spacing.md, alignItems: 'center', gap: 4, marginTop: 4 },
-  calLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
-  calVal: { fontSize: fontSize.xl, fontWeight: '800', color: colors.honey },
-});
-
 // ── Settings modal styles ─────────────────────────────────────────────────────
 const sst = StyleSheet.create({
   sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: 2, paddingTop: spacing.md, paddingBottom: spacing.xs + 2 },
   card: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 4, padding: spacing.md - 1, borderBottomWidth: 1, borderBottomColor: colors.line },
-  icon: { width: 32, height: 32, borderRadius: spacing.xs + 2, alignItems: 'center', justifyContent: 'center' },
   label: { flex: 1, fontSize: fontSize.sm + 1, fontWeight: '500', color: colors.ink },
   val: { fontSize: fontSize.xs, color: colors.ink3, fontWeight: '500', marginRight: 4 },
 });

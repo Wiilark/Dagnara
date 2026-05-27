@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Dimensions } from 'react-native';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Dimensions, Animated, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Circle, Defs, LinearGradient, Stop, G, Text as SvgText, Path, Line } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, G, Text as SvgText, Path, Line } from 'react-native-svg';
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
@@ -174,14 +176,14 @@ function WeightChart({
       <View style={{ width: CHART_W, height: CHART_H }}>
         <Svg width={CHART_W} height={CHART_H}>
           <Defs>
-            <LinearGradient id="wFill" x1="0" y1="0" x2="0" y2="1">
+            <SvgLinearGradient id="wFill" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0%" stopColor={colors.sky} stopOpacity="0.2" />
               <Stop offset="100%" stopColor={colors.sky} stopOpacity="0" />
-            </LinearGradient>
-            <LinearGradient id="wLine" x1="0" y1="0" x2="1" y2="0">
+            </SvgLinearGradient>
+            <SvgLinearGradient id="wLine" x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0%" stopColor={colors.sky} stopOpacity="0.6" />
               <Stop offset="100%" stopColor={colors.lavender} stopOpacity="1" />
-            </LinearGradient>
+            </SvgLinearGradient>
           </Defs>
           {/* Grid lines */}
           {([0.25, 0.5, 0.75] as const).map(f => (
@@ -898,9 +900,19 @@ export default function ProgressScreen() {
     [entries, calorieGoal, weightGoal, weightHistory, macroPcts.protein]
   );
 
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
+  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
+  const scrollPaddingTop = spacing.xl + spacing.lg + spacing.sm + insets.top;
+
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
-        {/* Header */}
+    <View style={st.safe}>
+      <View style={[st.fixedHeader, { paddingTop: insets.top, height: headerH }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
+          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+        </Animated.View>
         <View style={st.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
             <View style={st.avatarThumb}>
@@ -915,8 +927,13 @@ export default function ProgressScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </View>
 
-      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
+        contentContainerStyle={[st.scroll, { paddingTop: scrollPaddingTop }]}
+        showsVerticalScrollIndicator={false}>
         {/* Streaks card */}
         <View style={st.card}>
           <Text style={st.cardLabel}>STREAKS</Text>
@@ -1033,8 +1050,8 @@ export default function ProgressScreen() {
         <View style={st.card}>
           <Text style={st.cardLabel}>CALORIES — LAST 7 DAYS</Text>
           <View style={st.chart}>
-            {days.map(({ label, kcal }) => (
-              <View key={label} style={st.barCol}>
+            {days.map(({ label, kcal }, i) => (
+              <View key={`${label}_${i}`} style={st.barCol}>
                 {kcal > 0 && <Text style={st.barVal}>{kcal}</Text>}
                 <View style={st.barTrack}>
                   <View style={[st.bar, { height: `${(kcal / maxKcal) * 100}%` as any }]} />
@@ -1201,7 +1218,7 @@ export default function ProgressScreen() {
         <LoggingCalendar entries={entries} />
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       <StatisticsModal visible={statsVisible} onClose={() => setStatsVisible(false)} entries={entries} />
       <DailyProgressModal visible={dailyProgressVisible} onClose={() => setDailyProgressVisible(false)} entries={entries} />
@@ -1281,20 +1298,21 @@ export default function ProgressScreen() {
           )}
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
-  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
+  avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
   heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
-  avatarBtn: { width: 36, height: 36, zIndex: 1 },
-  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
+  avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   card: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: spacing.md },
   cardLabel: { color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing.sm },

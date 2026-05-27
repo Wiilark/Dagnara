@@ -5,6 +5,7 @@ import {
   Alert, ActivityIndicator, TextInput, Modal, FlatList,
   Animated, Share, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Pedometer } from 'expo-sensors';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +40,7 @@ const MEAL_SUGGESTED: Record<string, string> = { breakfast: '~550 kcal suggested
 const WATER_GOAL = 8;
 const VEG_GOAL = 3; const FRUIT_GOAL = 3;
 
-const RING_R = 76; const RING_SW = 12; const RING_CIRC = 2 * Math.PI * RING_R;
+const RING_SW = 12;
 
 function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 function addDays(date: string, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return dateStr(d); }
@@ -209,6 +210,10 @@ function SleepModal({ visible, onClose, onSave }: {
   const [waketime, setWaketime] = useState('06:00');
   const [quality, setQuality]   = useState(2);
   const [clockTarget, setClockTarget] = useState<'bed' | 'wake' | null>(null);
+
+  useEffect(() => {
+    if (!visible) { setBedtime('22:30'); setWaketime('06:00'); setQuality(2); setClockTarget(null); }
+  }, [visible]);
 
   function calcDuration(): string {
     const [bh, bm] = bedtime.split(':').map(Number);
@@ -488,13 +493,13 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
             </View>
           </View>
         )}
-        <View style={ex.doneWrap}>
-          {tab === 'list' && !selectedExercise && (
+        {tab === 'list' && !selectedExercise && (
+          <View style={ex.doneWrap}>
             <TouchableOpacity style={ex.doneBtn} onPress={onClose}>
               <Text style={ex.doneTxt}>DONE</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
         {/* Duration picker — slides up when an exercise row is tapped */}
         {selectedExercise && tab === 'list' && (() => {
           const mins = parseInt(duration, 10) || 30;
@@ -734,6 +739,10 @@ function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; 
   const [stressLevel, setStressLevel]       = useState<number | null>(null);
   const [activeExercise, setActiveExercise] = useState<BreathExercise | null>(null);
 
+  useEffect(() => {
+    if (!visible) { setStressLevel(null); setActiveExercise(null); }
+  }, [visible]);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       {activeExercise && <BreathingGuideModal exercise={activeExercise} onClose={() => setActiveExercise(null)} />}
@@ -798,6 +807,10 @@ const sbst = StyleSheet.create({
 function MoodModal({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (mood: number, notes: string) => void }) {
   const [mood, setMood]   = useState<number | null>(null);
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (!visible) { setMood(null); setNotes(''); }
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -1148,7 +1161,6 @@ export default function DiaryScreen() {
   const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const scanLockRef = useRef(false);
-  const scrollViewRef = useRef<ScrollView>(null);
   const mealYPositions = useRef<Record<string, number>>({});
 
   // Serving size modal
@@ -1192,7 +1204,6 @@ export default function DiaryScreen() {
   const PROTEIN_GOAL = Math.round(KCAL_GOAL * (macroPcts.protein / 100) / 4);
   const FAT_GOAL     = Math.round(KCAL_GOAL * (macroPcts.fat     / 100) / 9);
   const remaining = Math.max(0, KCAL_GOAL - netKcal);
-  const ringDash = clamp(netKcal / KCAL_GOAL, 0, 1) * RING_CIRC;
   const isToday = selectedDate === dateStr(new Date());
   const waterGoalMet = water >= WATER_GOAL;
 
@@ -1237,9 +1248,6 @@ export default function DiaryScreen() {
   const vegGoalMet = veggies >= VEG_GOAL;
   const fruitGoalMet = fruits >= FRUIT_GOAL;
 
-  // Streak risk: today, no food logged, hour >= 18
-  const hourNow = new Date().getHours();
-  const showStreakRisk = isToday && foods.length === 0 && streak > 0 && hourNow >= 18;
 
   useEffect(() => { loadEntry(selectedDate); }, [selectedDate]);
 
@@ -1791,54 +1799,52 @@ export default function DiaryScreen() {
     await checkAndUpdateStreak(selectedDate);
   }
 
-  return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
+  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
+  const dateBarH = spacing.xl + spacing.md;
+  const totalHeaderH = headerH + dateBarH;
 
-      {/* ── App Header ── */}
-      <View style={st.appHeader}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
-          <View style={st.avatarThumb}>
-            <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
+  return (
+    <View style={st.safe}>
+
+      {/* ── Floating Blur Header ── */}
+      <View style={[st.fixedHeader, { paddingTop: insets.top, height: totalHeaderH }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
+          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+          <ExpoLinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+        </Animated.View>
+        <View style={st.appHeader}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
+            <View style={st.avatarThumb}>
+              <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
+            </View>
+            {hasUnread && <View style={st.avatarDot} />}
+          </TouchableOpacity>
+          <Text style={st.appTitle}>Diary</Text>
+          <View style={st.headerRight}>
+            <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
+              <Ionicons name="share-outline" size={22} color={colors.ink2} />
+            </TouchableOpacity>
           </View>
-          {hasUnread && <View style={st.avatarDot} />}
-        </TouchableOpacity>
-        <Text style={st.appTitle}>Diary</Text>
-        <View style={st.headerRight}>
-          <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
-            <Ionicons name="share-outline" size={22} color={colors.ink2} />
+        </View>
+        {/* ── Date Nav ── */}
+        <View style={st.dateBar}>
+          <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, -1))} style={st.navBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.ink2} />
+          </TouchableOpacity>
+          <Text style={st.dateText}>
+            {isToday
+              ? `Today · ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          </Text>
+          <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, 1))} style={st.navBtn} disabled={isToday}>
+            <Ionicons name="chevron-forward" size={20} color={isToday ? colors.ink3 : colors.ink2} />
           </TouchableOpacity>
         </View>
       </View>
 
-
-      {/* ── Streak Risk Banner ── */}
-      {showStreakRisk && (
-        <View style={st.streakRisk}>
-          <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={st.srbTitle}>Your streak is at risk!</Text>
-            <Text style={st.srbSub}>Log before midnight to keep it alive.</Text>
-          </View>
-          <Text style={st.srbCta}>LOG NOW</Text>
-        </View>
-      )}
-
-      {/* ── Date Nav ── */}
-      <View style={st.dateBar}>
-        <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, -1))} style={st.navBtn}>
-          <Ionicons name="chevron-back" size={20} color={colors.ink2} />
-        </TouchableOpacity>
-        <Text style={st.dateText}>
-          {isToday
-            ? `Today · ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-            : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-        </Text>
-        <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, 1))} style={st.navBtn} disabled={isToday}>
-          <Ionicons name="chevron-forward" size={20} color={isToday ? colors.ink3 : colors.ink2} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView ref={scrollViewRef} contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView contentContainerStyle={[st.scroll, { paddingTop: totalHeaderH }]} showsVerticalScrollIndicator={false} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
 
         {/* ── Calorie Ring ── */}
         <ExpoLinearGradient
@@ -1909,7 +1915,7 @@ export default function DiaryScreen() {
           </View>
           {projText && (
             <View style={st.projRow}>
-              <Ionicons name="trending-down" size={fontSize.xs} color={colors.teal} />
+              <Ionicons name={projText.startsWith('+') ? 'trending-up' : 'trending-down'} size={fontSize.xs} color={colors.teal} />
               <Text style={st.projTxt}>{projText}</Text>
             </View>
           )}
@@ -2273,7 +2279,7 @@ export default function DiaryScreen() {
         )}
 
         <View style={{ height: spacing.xl }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── Modals ── */}
       <AiConfirmModal visible={aiConfirmVisible} items={pendingAiItems} meal={aiConfirmMeal} onConfirm={handleConfirmAiItems} onClose={() => setAiConfirmVisible(false)} />
@@ -2885,20 +2891,21 @@ export default function DiaryScreen() {
           })()}
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
 
   // Header
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
-  avatarBtn: { width: 36, height: 36, zIndex: 1 },
-  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
+  avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   upgradeBadge: { backgroundColor: colors.purple + '2e', borderWidth: 1, borderColor: colors.purple + '66', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
   upgradeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
@@ -2937,9 +2944,9 @@ const st = StyleSheet.create({
   browseItemMeta: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
   browseItemKcal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
   browseItemKcalLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: spacing.xs / 2, backgroundColor: colors.rose },
-  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
+  avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
 
   // XP / Achievement
   achieveBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer2, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6, borderWidth: 1, borderColor: colors.line2 },
