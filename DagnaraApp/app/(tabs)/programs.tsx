@@ -2439,7 +2439,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   // Reset detail-view state any time the modal closes so the next open lands on main
   useEffect(() => {
-    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); }
+    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); setCravingFormOpen(false); setNrtFormOpen(false); }
   }, [visible]);
 
   // Scroll to top whenever the inner view changes so first item is always visible
@@ -5347,7 +5347,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   // Reset detail-view state any time the modal closes so the next open lands on
   // the main view — mirrors QS, prevents resuming half-finished reasons-editor.
   useEffect(() => {
-    if (!visible) { setQdView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); }
+    if (!visible) { setQdView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); setCravingFormOpen(false); }
   }, [visible]);
 
   useEffect(() => {

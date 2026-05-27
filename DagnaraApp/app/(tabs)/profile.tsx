@@ -199,6 +199,15 @@ export default function ProfileScreen() {
     });
   }, [measureModal]);
 
+  useEffect(() => {
+    if (!editing) return;
+    const parts = (profile.name ?? '').trim().split(' ');
+    setEditFirstName(parts[0] ?? '');
+    setEditLastName(parts.slice(1).join(' '));
+    setDraftWeightInput(profile.weight ? kgToInput(parseFloat(profile.weight), unitSystem) : '');
+    setDraftHeightInput(profile.height ? cmToInput(parseFloat(profile.height), unitSystem) : '');
+  }, [editing]);
+
   async function handleHealthConnect() {
     const granted = await requestHealthPermissions();
     if (!granted) {
