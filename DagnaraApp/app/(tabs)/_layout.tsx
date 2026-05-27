@@ -544,7 +544,14 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
 // ── Weight Logger ─────────────────────────────────────────────────────────────
 function WeightLogger({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [valueKg, setValueKg] = useState(70.0);
-  const { addWeightEntry, addXp, unitSystem } = useAppStore();
+  const { addWeightEntry, addXp, unitSystem, weightHistory } = useAppStore();
+
+  useEffect(() => {
+    if (visible) {
+      const last = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].kg : 70.0;
+      setValueKg(last);
+    }
+  }, [visible]);
 
   function inc() { setValueKg(v => Math.round((v + 0.1) * 10) / 10); }
   function dec() { setValueKg(v => Math.max(20, Math.round((v - 0.1) * 10) / 10)); }
