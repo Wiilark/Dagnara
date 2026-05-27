@@ -5,7 +5,8 @@ import {
   Modal, Alert, TextInput, Platform, Keyboard, Share,
   Animated, Linking, Easing,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -8163,7 +8164,7 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
   const qtyInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { setNewName(''); setNewQty(''); return; }
     AsyncStorage.getItem(GROCERY_KEY).then(raw => {
       if (!raw) return;
       try { setItems(JSON.parse(raw)); }
@@ -8408,21 +8409,36 @@ export default function ProgramsScreen() {
   const [fastingVisible, setFastingVisible] = useState(false);
   const [groceryVisible, setGroceryVisible] = useState(false);
 
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
+  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
+  const scrollPaddingTop = spacing.xl + spacing.lg + spacing.sm + insets.top;
+
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
-      {/* App header — matches Diary / Recipes / Progress pattern */}
-      <View style={st.appHeader}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
-          <View style={st.avatarThumb}>
-            <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? authEmail?.[0] ?? '?').toUpperCase(); })()}</Text>
-          </View>
-          {hasUnread && <View style={st.avatarDot} />}
-        </TouchableOpacity>
-        <Text style={st.appTitle}>Programs</Text>
-        <View style={st.headerRight} />
+    <View style={st.safe}>
+      <View style={[st.fixedHeader, { paddingTop: insets.top, height: headerH }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
+          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+        </Animated.View>
+        <View style={st.appHeader}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
+            <View style={st.avatarThumb}>
+              <Text style={st.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? authEmail?.[0] ?? '?').toUpperCase(); })()}</Text>
+            </View>
+            {hasUnread && <View style={st.avatarDot} />}
+          </TouchableOpacity>
+          <Text style={st.appTitle}>Programs</Text>
+          <View style={st.headerRight} />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
+        contentContainerStyle={[st.scroll, { paddingTop: scrollPaddingTop }]}
+        showsVerticalScrollIndicator={false}>
         {/* HABITS TO BREAK */}
         <Text style={st.sectionLabel}>Habits to break</Text>
         <View style={st.group}>
@@ -8472,29 +8488,30 @@ export default function ProgramsScreen() {
         </View>
 
         <View style={{ height: spacing.xl }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       <QuitSmokingModal  visible={qsVisible}      onClose={() => setQsVisible(false)} />
       <QuitDrinkingModal visible={qdVisible}      onClose={() => setQdVisible(false)} />
       <PillReminderModal visible={pillVisible}    onClose={() => setPillVisible(false)} />
       <FastingModal      visible={fastingVisible} onClose={() => setFastingVisible(false)} />
       <GroceryModal      visible={groceryVisible} onClose={() => setGroceryVisible(false)} />
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.bg },
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   appTitle:  { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
-  avatarBtn: { width: 36, height: 36, zIndex: 1 },
-  avatarThumb: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
+  avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
+  avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  iconBtn:   { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn:   { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot:  { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
-  avatarDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
+  avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
 
   scroll:    { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, paddingTop: spacing.sm },
 
