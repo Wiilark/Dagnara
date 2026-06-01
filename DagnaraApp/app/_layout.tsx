@@ -63,11 +63,13 @@ function RootLayout() {
   // Re-check onboarding flag whenever email or segments change (covers finishing onboarding)
   useEffect(() => {
     if (email) {
-      AsyncStorage.getItem(`dagnara_onboarded_${email}`).then(v => setOnboarded(v === 'true'));
-    } else {
+      AsyncStorage.getItem(`dagnara_onboarded_${email}`).then(v => {
+        setOnboarded(v === 'true');
+      });
+    } else if (!isLoading) {
       setOnboarded(false);
     }
-  }, [email, segments]);
+  }, [email, isLoading, segments]);
 
   // Whenever email becomes available (login or session restore), sync cloud data
   useEffect(() => {

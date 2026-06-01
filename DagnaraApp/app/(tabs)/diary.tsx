@@ -409,7 +409,6 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
       loggedAt: new Date().toISOString(),
     };
     onAddStrengthSession(session);
-    onAddCalories(totalKcal, 'Weight Training');
     setStrengthMode(false);
     setStrengthExercises([]);
     onClose();
@@ -1797,10 +1796,13 @@ export default function DiaryScreen() {
 
   async function handleAddStrengthSession(session: StrengthSession) {
     await addStrengthSession(selectedDate, session);
+    await addXp(20);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(`Weight Training: ${session.totalKcal} kcal burned ✓`, 'Workout logged! +20 XP');
   }
 
   async function quickLog(item: { icon: string; name: string; kcal: number; carbs: number; protein: number; fat: number }) {
-    const food: FoodItem = { id: `${Date.now()}`, icon: item.icon, name: item.name, kcal: item.kcal, carbs: item.carbs, protein: item.protein, fat: item.fat, unit: 'serving', meal: searchMeal };
+    const food: FoodItem = { id: `${Date.now()}_${Math.random().toString(36).slice(2)}`, icon: item.icon, name: item.name, kcal: item.kcal, carbs: item.carbs, protein: item.protein, fat: item.fat, unit: 'serving', meal: searchMeal };
     await addFood(selectedDate, food);
     await addXp(10);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1809,9 +1811,9 @@ export default function DiaryScreen() {
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
-  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
+  const headerH = 50 + insets.top + 16;
   const dateBarH = spacing.xl + spacing.md;
-  const totalHeaderH = headerH + dateBarH;
+  const totalHeaderH = headerH; // Now only the top bar is fixed
 
   return (
     <View style={st.safe}>
@@ -1820,7 +1822,7 @@ export default function DiaryScreen() {
       <View style={[st.fixedHeader, { paddingTop: insets.top, height: totalHeaderH }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
           <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-          <ExpoLinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+          <ExpoLinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
         </Animated.View>
         <View style={st.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
@@ -1836,8 +1838,12 @@ export default function DiaryScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        {/* ── Date Nav ── */}
-        <View style={st.dateBar}>
+      </View>
+
+      <Animated.ScrollView contentContainerStyle={[st.scroll, { paddingTop: totalHeaderH + 10, paddingBottom: 100 }]} showsVerticalScrollIndicator={false} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
+
+        {/* ── Date Nav (Detached) ── */}
+        <View style={[st.dateBar, { borderBottomWidth: 0, marginBottom: spacing.xs }]}>
           <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, -1))} style={st.navBtn}>
             <Ionicons name="chevron-back" size={20} color={colors.ink2} />
           </TouchableOpacity>
@@ -1850,9 +1856,6 @@ export default function DiaryScreen() {
             <Ionicons name="chevron-forward" size={20} color={isToday ? colors.ink3 : colors.ink2} />
           </TouchableOpacity>
         </View>
-      </View>
-
-      <Animated.ScrollView contentContainerStyle={[st.scroll, { paddingTop: totalHeaderH }]} showsVerticalScrollIndicator={false} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
 
         {/* ── Calorie Ring ── */}
         <ExpoLinearGradient

@@ -37,9 +37,13 @@ def main():
     if not file_path or should_skip(file_path):
         sys.exit(0)
 
+    # --incremental + a dedicated buildinfo cache lets tsc skip unchanged files,
+    # turning a 20-45s cold typecheck into a ~1-3s warm one after the first run.
+    buildinfo = PROJECT_DIR / ".tsbuildinfo.hook"
     try:
         result = subprocess.run(
-            ["npx", "tsc", "--noEmit", "--pretty", "false"],
+            ["npx", "tsc", "--noEmit", "--pretty", "false",
+             "--incremental", "--tsBuildInfoFile", str(buildinfo)],
             cwd=str(PROJECT_DIR),
             capture_output=True,
             text=True,

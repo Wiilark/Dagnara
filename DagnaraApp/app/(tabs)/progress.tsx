@@ -79,50 +79,163 @@ function getNextMilestone(streak: number) {
   return STREAK_MILESTONES.find(m => m.days > streak) ?? STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
 }
 
-// ── 30-Day Logging Calendar ───────────────────────────────────────────────────
+// ── Logging Calendar (Interactive Activity Hub) ──────────────────────────────
 function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
+  const { unitSystem, weightHistory } = useAppStore();
   const [gridWidth, setGridWidth] = useState(0);
-  const today = new Date();
-  const days: { date: string; status: 'logged' | 'partial' | 'none' }[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toLocaleDateString('en-CA');
-    const entry = entries[key];
-    const kcal = (entry?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
-    days.push({ date: key, status: kcal >= 1200 ? 'logged' : kcal > 0 ? 'partial' : 'none' });
-  }
-  const firstDate = new Date(days[0].date);
-  const pad = (firstDate.getDay() + 6) % 7;
-  const cells: (typeof days[0] | null)[] = [...Array(pad).fill(null), ...days];
-  const loggedCount = days.filter(d => d.status !== 'none').length;
+  const [viewDate, setViewDate] = useState(new Date());
+  const [selectedDayKey, setSelectedDayKey] = useState(new Date().toLocaleDateString('en-CA'));
 
-  const CAL_GAP = 3;
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthName = viewDate.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
+  const now = new Date();
+  const todayKey = now.toLocaleDateString('en-CA');
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startPadding = (firstDayOfMonth.getDay() + 6) % 7;
+
+  const days: any[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const key = date.toLocaleDateString('en-CA');
+    const entry = entries[key];
+    const weightEntry = weightHistory.find(w => w.date === key);
+    const kcal = (entry?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
+
+    days.push({
+      day: d,
+      date: key,
+      kcal,
+      weight: weightEntry?.kg,
+      status: key > todayKey ? 'future' : (kcal >= 1200 ? 'logged' : kcal > 0 ? 'partial' : 'none')
+    });
+  }
+
+  const cells = [...Array(startPadding).fill(null), ...days];
+  const loggedInMonth = days.filter(d => d.status === 'logged' || d.status === 'partial').length;
+  const frequency = Math.round((loggedInMonth / daysInMonth) * 100);
+
+  const selectedData = days.find(d => d.date === selectedDayKey);
+  const CAL_GAP = 5;
   const cellSize = gridWidth > 0 ? Math.floor((gridWidth - CAL_GAP * 6) / 7) : 0;
+
+  const changeMonth = (offset: number) => {
+    const next = new Date(year, month + offset, 1);
+    if (next.getFullYear() !== now.getFullYear()) return; // Lock to current year
+    setViewDate(next);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const isFirstMonth = month === 0;
+  const isLastMonth = month === 11;
 
   return (
     <View style={st.card}>
       <View style={st.calHead}>
-        <Text style={st.cardLabel}>30-DAY LOGGING STREAK</Text>
-        <Text style={st.calCount}>{loggedCount}/30</Text>
+        <View>
+          <Text style={st.cardLabel}>ACTIVITY HUB</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text style={st.calMonthTitle}>{monthName} {year}</Text>
+            <View style={st.calFreqBadge}>
+              <Text style={st.calFreqTxt}>{frequency}% CONSISTENCY</Text>
+            </View>
+          </View>
+        </View>
+        <View style={st.calNav}>
+          <TouchableOpacity 
+            onPress={() => changeMonth(-1)} 
+            style={[st.calNavBtn, isFirstMonth && { opacity: 0.3 }]}
+            disabled={isFirstMonth}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => changeMonth(1)} 
+            style={[st.calNavBtn, isLastMonth && { opacity: 0.3 }]}
+            disabled={isLastMonth}
+          >
+            <Ionicons name="chevron-forward" size={18} color={colors.ink2} />
+          </TouchableOpacity>
+        </View>
       </View>
+
       <View style={st.calWeekRow}>
         {['M','T','W','T','F','S','S'].map((d, i) => (
           <Text key={i} style={st.calWeekDay}>{d}</Text>
         ))}
       </View>
+
       <View style={[st.calGrid, { gap: CAL_GAP }]}
         onLayout={e => setGridWidth(e.nativeEvent.layout.width)}>
         {cellSize > 0 && cells.map((cell, i) => {
-          if (!cell) return <View key={`p${i}`} style={[st.calCell, { width: cellSize, height: cellSize }]} />;
+          if (!cell) return <View key={`p${i}`} style={{ width: cellSize, height: cellSize }} />;
+
+          const isToday = cell.date === todayKey;
+          const isSelected = cell.date === selectedDayKey;
           const bg = cell.status === 'logged' ? colors.green
             : cell.status === 'partial' ? colors.honey
-            : colors.layer2;
-          return <View key={cell.date} style={[st.calCell, { width: cellSize, height: cellSize, backgroundColor: bg }]} />;
+            : cell.status === 'future' ? colors.layer3 + '33'
+            : colors.rose + '26';
+
+          return (
+            <TouchableOpacity
+              key={cell.date}
+              activeOpacity={0.7}
+              onPress={() => { setSelectedDayKey(cell.date); Haptics.selectionAsync(); }}
+              style={[
+                st.calCell,
+                { width: cellSize, height: cellSize, backgroundColor: bg },
+                isToday && { borderWidth: 1.5, borderColor: colors.lavender },
+                isSelected && !isToday && { borderWidth: 1.5, borderColor: colors.ink3 },
+                cell.status === 'none' && { borderWidth: 1, borderColor: colors.rose + '30' }
+              ]}
+            >
+              <Text style={[
+                st.calDayNum,
+                { fontSize: cellSize > 35 ? 10 : 9 },
+                (cell.status === 'logged' || cell.status === 'partial') ? { color: colors.white } :
+                cell.status === 'none' ? { color: colors.rose } : { color: colors.ink3 }
+              ]}>{cell.day}</Text>
+              {cell.weight && <View style={st.calWeightDot} />}
+            </TouchableOpacity>
+          );
         })}
       </View>
+
+      {/* Day Details Area */}
+      {selectedData && (
+        <View style={st.calDetail}>
+          <View style={st.calDetailHead}>
+            <Text style={st.calDetailDate}>
+              {new Date(selectedData.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </Text>
+            {selectedData.date === todayKey && <Text style={st.calTodayBadge}>TODAY</Text>}
+          </View>
+          <View style={st.calDetailGrid}>
+            <View style={st.calDetailItem}>
+              <Text style={st.calDetailVal}>{selectedData.kcal || '0'}</Text>
+              <Text style={st.calDetailLbl}>kcal</Text>
+            </View>
+            <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
+              <Text style={st.calDetailVal}>{selectedData.weight ? formatWeight(selectedData.weight, unitSystem) : '—'}</Text>
+              <Text style={st.calDetailLbl}>weight</Text>
+            </View>
+            <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
+              <Ionicons
+                name={selectedData.status === 'logged' ? 'checkmark-circle' : selectedData.status === 'partial' ? 'remove-circle' : 'close-circle'}
+                size={18}
+                color={selectedData.status === 'logged' ? colors.green : selectedData.status === 'partial' ? colors.honey : colors.rose}
+              />
+              <Text style={st.calDetailLbl}>{selectedData.status === 'logged' ? 'Complete' : selectedData.status === 'partial' ? 'Partial' : 'No Log'}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={st.calLegend}>
-        {[[colors.green,'Goal met'],[colors.honey,'Partial'],[colors.layer2,'No log']].map(([c,l]) => (
+        {[[colors.green,'Goal met'],[colors.honey,'Partial'],[colors.rose + '66','Missed']].map(([c,l]) => (
           <View key={l} style={st.calLegendItem}>
             <View style={[st.calLegendDot, { backgroundColor: c }]} />
             <Text style={st.calLegendTxt}>{l}</Text>
@@ -903,15 +1016,15 @@ export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
-  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
-  const scrollPaddingTop = spacing.xl + spacing.lg + spacing.sm + insets.top;
+  const headerH = 50 + insets.top + 16;
+  const scrollPaddingTop = 60 + insets.top;
 
   return (
     <View style={st.safe}>
       <View style={[st.fixedHeader, { paddingTop: insets.top, height: headerH }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
           <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
         </Animated.View>
         <View style={st.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
@@ -1427,6 +1540,22 @@ const st = StyleSheet.create({
   calLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs / 2 },
   calLegendDot: { width: spacing.xs + 2, height: spacing.xs + 2, borderRadius: 2 },
   calLegendTxt: { fontSize: fontSize.xs, color: colors.ink3 },
+  calMonthTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, marginTop: -2 },
+  calSubLabel: { fontSize: 10, fontWeight: '600', color: colors.ink3, textTransform: 'uppercase', letterSpacing: 0.5 },
+  calDayNum: { fontWeight: '700', position: 'absolute', top: 2, left: 3 },
+  calNav: { flexDirection: 'row', gap: spacing.xs },
+  calNavBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  calFreqBadge: { backgroundColor: colors.purple + '1a', paddingHorizontal: spacing.xs + 2, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.purple + '33' },
+  calFreqTxt: { fontSize: 9, fontWeight: '800', color: colors.lavender, letterSpacing: 0.5 },
+  calWeightDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.sky, position: 'absolute', bottom: 3, right: 3 },
+  calDetail: { marginTop: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.line2 },
+  calDetailHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm, paddingHorizontal: 4 },
+  calDetailDate: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink2, textTransform: 'uppercase' },
+  calTodayBadge: { fontSize: 9, fontWeight: '800', color: colors.white, backgroundColor: colors.lavender, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+  calDetailGrid: { flexDirection: 'row', alignItems: 'center' },
+  calDetailItem: { flex: 1, alignItems: 'center', gap: 2 },
+  calDetailVal: { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink },
+  calDetailLbl: { fontSize: 9, fontWeight: '600', color: colors.ink3, textTransform: 'uppercase' },
   // Weight chart
   weightChartWrap: { gap: spacing.sm },
   weightChartLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

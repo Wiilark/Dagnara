@@ -13,6 +13,7 @@ import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
+import { MESSAGES, MSG_COLORS } from '../../src/lib/messages';
 
 const TODAY = () => new Date().toLocaleDateString('en-CA');
 
@@ -31,24 +32,13 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 
 
 // ── Messages Modal ────────────────────────────────────────────────────────────
-const MESSAGES = [
-  { id: 1, icon: '✦', type: 'insight', title: 'Sleep × activity insight', time: 'Today', body: 'On the 3 nights you slept 8+ hours this week, your step count was 34% higher. Your sleep is your biggest lever right now.' },
-  { id: 2, icon: '🍎', type: 'nutrition', title: 'Why protein timing matters', time: 'Yesterday', body: 'Eating 30g+ of protein within 2 hours of waking improves satiety and reduces afternoon cravings by up to 25%.' },
-  { id: 3, icon: '🚭', type: 'quit', title: '18 days smoke-free 🎉', time: '2 days ago', body: 'Your lung cilia are now fully active again. Breathing will feel noticeably easier over the next week.' },
-  { id: 4, icon: '😴', type: 'sleep', title: 'The science of deep sleep', time: '3 days ago', body: 'Deep sleep (NREM stage 3) is when your body repairs muscle tissue and consolidates memory. A consistent bedtime is the #1 predictor.' },
-  { id: 5, icon: '🏃', type: 'activity', title: '14-day step streak', time: '4 days ago', body: "You've hit your step goal every day for two weeks. 14 days is the threshold where a behaviour becomes automatic. You've built a habit." },
-  { id: 6, icon: '💡', type: 'insight', title: 'Hydration & cognitive performance', time: '1 week ago', body: 'Even mild dehydration (1–2% body weight) reduces focus, working memory, and reaction time. Your daily water goal is set for peak performance.', group: 'Last month' },
-];
-
-const MSG_COLORS: Record<string, string> = {
-  insight: colors.violet, nutrition: colors.green, quit: colors.rose, sleep: colors.sky, activity: colors.honey,
-};
-
 function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const [dismissed, setDismissed] = useState<number[]>([]);
-  const visible_msgs = MESSAGES.filter(m => !dismissed.includes(m.id));
-  const thisWeek = visible_msgs.filter(m => !m.group);
-  const lastMonth = visible_msgs.filter(m => m.group === 'Last month');
+  const readMessageIds = useAppStore((s) => s.readMessageIds);
+  const markMessageRead = useAppStore((s) => s.markMessageRead);
+  const isUnread = (m: typeof MESSAGES[number]) => !!m.unread && !readMessageIds.includes(m.id);
+  const thisWeek = MESSAGES.filter(m => !m.group);
+  const lastMonth = MESSAGES.filter(m => m.group === 'Last month');
+  const visible_msgs = MESSAGES;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -74,7 +64,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                   <Text style={msg.groupLbl}>This week</Text>
                   {thisWeek.map(m => (
                     <TouchableOpacity key={m.id} style={msg.card}
-                      onPress={() => setDismissed(d => [...d, m.id])} activeOpacity={0.75}>
+                      onPress={() => markMessageRead(m.id)} activeOpacity={0.75}>
                       <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
                         <Text style={msg.iconTxt}>{m.icon}</Text>
                       </View>
@@ -85,7 +75,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                         </View>
                         <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
                       </View>
-                      <View style={[msg.unreadDot, { backgroundColor: MSG_COLORS[m.type] ?? colors.lavender }]} />
+                      {isUnread(m) && <View style={[msg.unreadDot, { backgroundColor: MSG_COLORS[m.type] ?? colors.lavender }]} />}
                     </TouchableOpacity>
                   ))}
                 </>
@@ -95,7 +85,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                   <Text style={[msg.groupLbl, { marginTop: 20 }]}>Last month</Text>
                   {lastMonth.map(m => (
                     <TouchableOpacity key={m.id} style={msg.card}
-                      onPress={() => setDismissed(d => [...d, m.id])} activeOpacity={0.75}>
+                      onPress={() => markMessageRead(m.id)} activeOpacity={0.75}>
                       <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
                         <Text style={msg.iconTxt}>{m.icon}</Text>
                       </View>
@@ -106,6 +96,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                         </View>
                         <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
                       </View>
+                      {isUnread(m) && <View style={[msg.unreadDot, { backgroundColor: MSG_COLORS[m.type] ?? colors.lavender }]} />}
                     </TouchableOpacity>
                   ))}
                 </>

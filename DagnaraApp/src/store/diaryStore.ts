@@ -227,7 +227,6 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
         // Network error — local data already shown
       }
     }
-    set((s) => ({ entries: pruneEntries({ ...s.entries, [date]: local }) }));
   },
 
   addFood: async (date, item) => {
@@ -330,7 +329,11 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
   addStrengthSession: async (date, session) => {
     const entries = get().entries;
     const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, strengthSessions: [...(entry.strengthSessions ?? []), session] };
+    const updated = {
+      ...entry,
+      strengthSessions: [...(entry.strengthSessions ?? []), session],
+      calories_burned: entry.calories_burned + session.totalKcal,
+    };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
     await saveEntry(date, updated, getEmail(), get);
   },
@@ -338,7 +341,12 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
   removeStrengthSession: async (date, id) => {
     const entries = get().entries;
     const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, strengthSessions: (entry.strengthSessions ?? []).filter(s => s.id !== id) };
+    const removed = (entry.strengthSessions ?? []).find(s => s.id === id);
+    const updated = {
+      ...entry,
+      strengthSessions: (entry.strengthSessions ?? []).filter(s => s.id !== id),
+      calories_burned: Math.max(0, entry.calories_burned - (removed?.totalKcal ?? 0)),
+    };
     set((s) => ({ entries: { ...s.entries, [date]: updated } }));
     await saveEntry(date, updated, getEmail(), get);
   },

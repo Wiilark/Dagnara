@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type { LocalFood } from '../lib/foodDatabase';
+import { countUnread } from '../lib/messages';
 
 export const XP_LEVELS = [
   { level: 1,  name: '🌱 Seed',            min: 0      },
@@ -64,15 +65,18 @@ interface PersistedData {
   fastingWindow: string | null;       // e.g. '16:8', '18:6', '14:10' — null = not set
   dietaryPreferences: string | null;  // maps to a DIET_FILTERS value: 'High Protein', 'Vegan', etc.
   pillDefaultTime: string | null;     // 'HH:MM' 24h, e.g. '07:30'
+  readMessageIds: number[];           // ids of inbox messages the user has read
 }
 
 interface AppState extends PersistedData {
   userEmail: string | null;
   messagesOpen: boolean;
   hasUnread: boolean;
+  unreadCount: number;
   setUserEmail: (email: string | null) => void;
   setMessagesOpen: (v: boolean) => void;
   setHasUnread: (v: boolean) => void;
+  markMessageRead: (id: number) => Promise<void>;
   setLifeScore: (score: number) => Promise<void>;
   checkAndUpdateStreak: (date: string) => Promise<void>;
   setProgram: (id: string, enabled: boolean) => Promise<void>;
@@ -116,6 +120,7 @@ function pick(s: AppState): PersistedData {
     fastingWindow: s.fastingWindow,
     dietaryPreferences: s.dietaryPreferences,
     pillDefaultTime: s.pillDefaultTime,
+    readMessageIds: s.readMessageIds,
   };
 }
 
@@ -165,16 +170,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   fastingWindow: null,
   dietaryPreferences: null,
   pillDefaultTime: null,
+  readMessageIds: [],
   userEmail: null,
   messagesOpen: false,
-  hasUnread: false,
+  hasUnread: countUnread([]) > 0,
+  unreadCount: countUnread([]),
 
   pendingAddMeal: null,
   setPendingAddMeal: (meal) => set({ pendingAddMeal: meal }),
 
   setUserEmail: (email) => set({ userEmail: email }),
-  setMessagesOpen: (v) => set({ messagesOpen: v, ...(v ? { hasUnread: false } : {}) }),
+  setMessagesOpen: (v) => set({ messagesOpen: v }),
   setHasUnread: (v) => set({ hasUnread: v }),
+
+  markMessageRead: async (id) => {
+    const { readMessageIds } = get();
+    if (readMessageIds.includes(id)) return;
+    const next = [...readMessageIds, id];
+    const count = countUnread(next);
+    set({ readMessageIds: next, unreadCount: count, hasUnread: count > 0 });
+    await persist(pick(get()), get().userEmail);
+  },
 
   // Load local first, then overlay with cloud data if email provided
   loadApp: async (email?: string) => {
@@ -219,8 +235,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             fastingWindow: cloud.fastingWindow ?? local.fastingWindow ?? null,
             dietaryPreferences: cloud.dietaryPreferences ?? local.dietaryPreferences ?? null,
             pillDefaultTime: cloud.pillDefaultTime ?? local.pillDefaultTime ?? null,
+            readMessageIds: cloud.readMessageIds ?? local.readMessageIds ?? [],
           };
-          set(merged);
+          const mergedCount = countUnread(merged.readMessageIds);
+          set({ ...merged, unreadCount: mergedCount, hasUnread: mergedCount > 0 });
           await AsyncStorage.setItem(localKey, JSON.stringify(merged));
           return;
         }
@@ -229,7 +247,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    if (Object.keys(local).length > 0) set(local);
+    if (Object.keys(local).length > 0) {
+      const localCount = countUnread(local.readMessageIds ?? []);
+      set({ ...local, unreadCount: localCount, hasUnread: localCount > 0 });
+    }
   },
 
   setLifeScore: async (score) => {
@@ -265,6 +286,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       .slice(-365);
     set({ weightHistory });
     await persist(pick({ ...get(), weightHistory }), get().userEmail);
+
+    // Sync weight to authStore profile for global consistency
+    const { useAuthStore } = require('./authStore');
+    const authStore = useAuthStore.getState();
+    if (authStore.email) {
+      await authStore.setProfile({
+        ...authStore.profile,
+        weight: String(Math.round(kg * 10) / 10)
+      });
+    }
   },
 
   addXp: async (amount) => {
@@ -323,7 +354,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () => set({
     lifeScore: null, lifeScoreDate: null, streak: 0, lastLoggedDate: null,
     programs: { nutrition: true, hydration: true, movement: false, sleep: false, stress: false, quit_smoking: false, quit_drinking: false, pill_reminder: false },
-    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, userEmail: null, messagesOpen: false,
+    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, readMessageIds: [], unreadCount: countUnread([]), hasUnread: countUnread([]) > 0, userEmail: null, messagesOpen: false,
   }),
 }));
 

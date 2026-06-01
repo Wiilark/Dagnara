@@ -8412,15 +8412,15 @@ export default function ProgramsScreen() {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
-  const headerH = spacing.xl + spacing.lg + spacing.lg + insets.top;
-  const scrollPaddingTop = spacing.xl + spacing.lg + spacing.sm + insets.top;
+  const headerH = 50 + insets.top + 16;
+  const scrollPaddingTop = 60 + insets.top;
 
   return (
     <View style={st.safe}>
       <View style={[st.fixedHeader, { paddingTop: insets.top, height: headerH }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
           <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
+          <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
         </Animated.View>
         <View style={st.appHeader}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={st.avatarBtn}>
