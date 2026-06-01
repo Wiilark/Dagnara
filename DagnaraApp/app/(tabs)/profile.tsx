@@ -16,6 +16,7 @@ import { supabase } from '../../src/lib/supabase';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, requestNotificationPermission } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
 import { COUNTRIES, getCountry } from '../../src/lib/currency';
@@ -24,19 +25,18 @@ import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthA
 import { useDiaryStore } from '../../src/store/diaryStore';
 
 const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Mediterranean'];
-const ALLERGIES = ['Gluten', 'Dairy', 'Nuts', 'Eggs', 'Soy', 'Shellfish'];
 
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, hasUnread } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount } = useAppStore();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
   const [dietModal, setDietModal] = useState(false);
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
-  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health' | 'privacy'>('');
+  const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health' | 'about'>('');
 
   async function handleDeleteAccount() {
     Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [
@@ -47,21 +47,13 @@ export default function ProfileScreen() {
           if (error) throw error;
           await logout();
           router.replace('/(auth)/login');
-        } catch (err: any) {
+        } catch {
           Alert.alert('Error', 'Could not delete account automatically. Please contact support.');
         }
       }}
     ]);
   }
 
-  async function handleUnsubscribe() {
-    try {
-      await setProfile({ ...profile, marketing_opt_in: 'false' });
-      Alert.alert('Unsubscribed', 'You will no longer receive marketing emails.');
-    } catch {
-      Alert.alert('Error', 'Update failed. Try again.');
-    }
-  }
   const [language, setLanguage] = useState('English');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
   const [acFirstName, setAcFirstName] = useState('');
@@ -102,7 +94,6 @@ export default function ProfileScreen() {
   const [healthSyncSteps, setHealthSyncSteps] = useState(false);
   const [healthSyncCalories, setHealthSyncCalories] = useState(false);
   const [healthSyncSleep, setHealthSyncSleep] = useState(false);
-  const [healthWriteBack, setHealthWriteBack] = useState(false);
   const [healthLastSync, setHealthLastSync] = useState<string | null>(null);
   const [healthSyncing, setHealthSyncing] = useState(false);
 
@@ -137,14 +128,13 @@ export default function ProfileScreen() {
     // Load health sync prefs
     AsyncStorage.multiGet([
       `${p}_health_connected`, `${p}_health_steps`, `${p}_health_calories`,
-      `${p}_health_sleep`, `${p}_health_writeback`, `${p}_health_last_sync`,
+      `${p}_health_sleep`, `${p}_health_last_sync`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
       if (m[`${p}_health_connected`]) setHealthConnected(m[`${p}_health_connected`] === 'true');
       if (m[`${p}_health_steps`])     setHealthSyncSteps(m[`${p}_health_steps`] === 'true');
       if (m[`${p}_health_calories`])  setHealthSyncCalories(m[`${p}_health_calories`] === 'true');
       if (m[`${p}_health_sleep`])     setHealthSyncSleep(m[`${p}_health_sleep`] === 'true');
-      if (m[`${p}_health_writeback`]) setHealthWriteBack(m[`${p}_health_writeback`] === 'true');
       if (m[`${p}_health_last_sync`]) setHealthLastSync(m[`${p}_health_last_sync`]);
     });
     // `setUnitSystem` is a stable Zustand action — safe to omit. `p` already covers email changes.
@@ -216,7 +206,10 @@ export default function ProfileScreen() {
       const today = new Date().toLocaleDateString('en-CA');
       const data = await readHealthData(today);
       if (healthSyncCalories && data.activeCalories > 0) {
-        await updateCaloriesBurned(today, data.activeCalories);
+        // Don't clobber manually logged workouts: keep whichever is higher.
+        // This also makes re-syncing idempotent (max stays stable).
+        const current = useDiaryStore.getState().entries[today]?.calories_burned ?? 0;
+        await updateCaloriesBurned(today, Math.max(current, data.activeCalories));
       }
       if (healthSyncSleep && data.sleepMinutes > 0) {
         const hrs = Math.floor(data.sleepMinutes / 60);
@@ -379,10 +372,17 @@ export default function ProfileScreen() {
     extrapolate: 'clamp',
   });
 
+  // Reusable Back Button component for modals
+  const ModalBackBtn = ({ onPress }: { onPress: () => void }) => (
+    <TouchableOpacity onPress={onPress} style={styles.closeBtn}>
+      <Ionicons name="chevron-back" size={22} color={colors.ink} />
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.safe}>
       {/* ── Floating Header — blur + soft bottom fade, no hard edge ── */}
-      <View style={[styles.fixedHeader, { paddingTop: insets.top, height: 60 + insets.top + 24 }]}>
+      <View style={[styles.fixedHeader, { paddingTop: insets.top, height: 50 + insets.top + 16 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: headerBlurOpacity }]}>
           <BlurView
             tint="dark"
@@ -392,7 +392,7 @@ export default function ProfileScreen() {
           {/* Fade blur into bg at the bottom so there's no hard clip line */}
           <LinearGradient
             colors={['transparent', colors.bg]}
-            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             pointerEvents="none"
@@ -413,10 +413,12 @@ export default function ProfileScreen() {
             <Text style={styles.headerNameText} numberOfLines={1}>{profile.name ?? 'Your Name'}</Text>
           </Animated.View>
 
-          <TouchableOpacity style={{ borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
+          <TouchableOpacity
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSettingsPage('subscription'); setSettingsModal(true); }}
+            style={{ borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
             <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
               <Ionicons name="diamond" size={16} color={colors.white} />
-              <Text style={styles.upgradeTxt}>Upgrade</Text>
+              <Text style={styles.upgradeTxt}>{selectedPlan === 'premium' ? 'Premium' : 'Upgrade'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -428,7 +430,7 @@ export default function ProfileScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
-        contentContainerStyle={[styles.scroll, { paddingTop: 70 + insets.top }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: 60 + insets.top }]}
         showsVerticalScrollIndicator={false}
       >
 
@@ -456,7 +458,7 @@ export default function ProfileScreen() {
               <Ionicons name="diamond-outline" size={20} color={colors.purple} />
             </View>
             <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>Free</Text>
+              <Text style={styles.quickVal}>{selectedPlan === 'premium' ? 'Premium' : 'Free'}</Text>
               <Text style={styles.quickLbl}>Your plan</Text>
             </View>
           </View>
@@ -477,13 +479,19 @@ export default function ProfileScreen() {
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
             { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
+            { icon: 'water-outline', label: 'Water Goal', color: colors.sky, value: `${waterGoal} glasses`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
+            { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
             { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
-          ].map(({ icon, label, color, value, onPress }) => (
+          ].map(({ icon, label, color, value, badge, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
               <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.menuLabel}>{label}</Text>
+              {!!badge && badge > 0 && (
+                <View style={styles.inboxBadge}>
+                  <Text style={styles.inboxBadgeText}>{badge}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
             </TouchableOpacity>
           ))}
@@ -493,9 +501,8 @@ export default function ProfileScreen() {
         <View style={styles.menuCard}>
           {[
             { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setAcFirstName(profile.name?.split(' ')[0] ?? ''); setAcLastName(profile.name?.split(' ').slice(1).join(' ') ?? ''); setAcEmail(email ?? ''); setAcPassword(''); setSettingsPage('account'); setSettingsModal(true); } },
-            { icon: 'scale-outline', label: 'Unit System', color: colors.sky, value: unitSystem, onPress: () => { setSettingsPage('unitSystem'); setSettingsModal(true); } },
-            { icon: 'globe-outline', label: 'Country', color: colors.honey, value: `${getCountry(country).flag}  ${getCountry(country).name}`, onPress: () => { setSettingsPage('country'); setSettingsModal(true); } },
-            { icon: 'language-outline', label: 'Language', color: colors.green, value: language, onPress: () => { setSettingsPage('language'); setSettingsModal(true); } },
+            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
+            { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
             { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
             { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
             { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
@@ -508,11 +515,21 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* ── Account ── */}
+        {/* ── About & Account ── */}
         <View style={styles.menuCard}>
+          <TouchableOpacity style={styles.menuRow} onPress={() => { setSettingsPage('about'); setSettingsModal(true); }}>
+            <Ionicons name="information-circle-outline" size={24} color={colors.ink2} style={{ width: 32, textAlign: 'center' }} />
+            <Text style={styles.menuLabel}>About Us</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={26} color={colors.rose} style={{ width: 36, textAlign: 'center' }} />
+            <Ionicons name="log-out-outline" size={24} color={colors.rose} style={{ width: 32, textAlign: 'center' }} />
             <Text style={[styles.menuLabel, { color: colors.rose }]}>Log out</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuRow} onPress={handleDeleteAccount}>
+            <Ionicons name="trash-outline" size={24} color={colors.rose} style={{ width: 32, textAlign: 'center' }} />
+            <Text style={[styles.menuLabel, { color: colors.rose }]}>Delete Account</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
           </TouchableOpacity>
         </View>
@@ -526,7 +543,7 @@ export default function ProfileScreen() {
       <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMeasureModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setMeasureModal(false)}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
+            <ModalBackBtn onPress={() => setMeasureModal(false)} />
             <Text style={styles.modalTitle}>Body Measurements</Text>
             <TouchableOpacity onPress={handleSaveMeasurements}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
@@ -592,7 +609,7 @@ export default function ProfileScreen() {
       <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setDietModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <ModalBackBtn onPress={() => setDietModal(false)} />
             <Text style={styles.modalTitle}>Diet Plan</Text>
             <TouchableOpacity onPress={() => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); }}><Text style={styles.saveText}>Done</Text></TouchableOpacity>
           </View>
@@ -611,269 +628,117 @@ export default function ProfileScreen() {
       <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')} onRequestClose={() => { setSettingsPage(''); setSettingsModal(false); }}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            {settingsPage !== ''
-              ? <TouchableOpacity onPress={() => setSettingsPage('')}><Text style={styles.cancelText}>← Back</Text></TouchableOpacity>
-              : <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}><Text style={styles.cancelText}>Close</Text></TouchableOpacity>
-            }
+            <ModalBackBtn onPress={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }} />
             <Text style={styles.modalTitle}>
-              {settingsPage === 'account' ? 'Account Settings' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Manage Subscriptions' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+              {settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notifications' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             </Text>
             {settingsPage === 'account'
-              ? <TouchableOpacity onPress={handleSaveAccount}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+              ? <TouchableOpacity onPress={async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
               : <View style={{ width: 40 }} />
             }
           </View>
-          <ScrollView contentContainerStyle={[styles.modalScroll, { gap: 0 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-            {settingsPage === 'account' ? (
-              /* ── Account Settings page ── */
-              <>
-            <Text style={sst.sectionLbl}>PERSONAL</Text>
-            <View style={sst.card}>
-              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <Ionicons name="mail-outline" size={20} color={colors.purple2} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={act.fieldLbl}>Email</Text>
-                <Text style={[act.fieldInput, { color: colors.ink3 }]} numberOfLines={1} ellipsizeMode="middle">{acEmail}</Text>
-              </View>
-              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <Ionicons name="person-outline" size={20} color={colors.lavender} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={act.fieldLbl}>First Name</Text>
-                <TextInput style={act.fieldInput} value={acFirstName} onChangeText={setAcFirstName}
-                  placeholderTextColor={colors.ink3} placeholder="First name" />
-              </View>
-              <View style={[sst.row, { borderBottomWidth: 1, borderBottomColor: colors.line }]}>
-                <Ionicons name="person-outline" size={20} color={colors.lavender} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={act.fieldLbl}>Last Name</Text>
-                <TextInput style={act.fieldInput} value={acLastName} onChangeText={setAcLastName}
-                  placeholderTextColor={colors.ink3} placeholder="Last name" />
-              </View>
-              <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                <Ionicons name="lock-closed-outline" size={20} color={colors.ink3} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={act.fieldLbl}>Password</Text>
-                <TextInput style={act.fieldInput} value={acPassword} onChangeText={setAcPassword}
-                  secureTextEntry placeholder="New password" placeholderTextColor={colors.ink3} />
-              </View>
-            </View>
-            <Text style={sst.sectionLbl}>PREFERENCES</Text>
-            <View style={sst.card}>
-              {[
-                { icon: 'scale-outline', label: 'Unit System', value: unitSystem, color: colors.sky, onPress: () => setSettingsPage('unitSystem') },
-                { icon: 'globe-outline', label: 'Country', value: `${getCountry(country).flag}  ${getCountry(country).name}`, color: colors.honey, onPress: () => setSettingsPage('country') },
-                { icon: 'language-outline', label: 'Language', value: language, color: colors.green, onPress: () => setSettingsPage('language') },
-              ].map(({ icon, label, value, color, onPress }, i, arr) => (
-                <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                  onPress={onPress}>
-                  <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
-                  <Text style={sst.label}>{label}</Text>
-                  <Text style={sst.val}>{value}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={sst.sectionLbl}>PRIVACY</Text>
-            <View style={sst.card}>
-              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Data Consents', 'Coming soon.')}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={colors.teal} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={sst.label}>Data Consents</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-            </View>
-            <View style={[sst.card, { marginTop: spacing.lg }]}>
-              <TouchableOpacity style={sst.row} onPress={() => Alert.alert('Unsubscribe', 'You will no longer receive marketing emails.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Unsubscribe', style: 'destructive', onPress: () => {} }])}>
-                <Ionicons name="mail-unread-outline" size={20} color={colors.rose} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={[sst.label, { color: colors.rose }]}>Unsubscribe from marketing</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: handleDeleteAccount }])}>
-                <Ionicons name="trash-outline" size={20} color={colors.rose} style={{ width: 28, textAlign: 'center' }} />
-                <Text style={[sst.label, { color: colors.rose }]}>Delete Account</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.rose + '88'} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ height: spacing.xl }} />
-              </>
-            ) : settingsPage === 'unitSystem' ? (
-              /* ── Unit System page ── */
-              <View style={sst.card}>
-                {[
-                  { name: 'Metric',        subtitle: 'kg · cm · ml · °C  —  used by most of the world' },
-                  { name: 'Imperial (US)', subtitle: 'lb · ft/in · fl oz · °F  —  used in the United States' },
-                  { name: 'UK',            subtitle: 'st/lb · ft/in · ml · °C  —  used in the United Kingdom' },
-                  { name: 'US Customary',  subtitle: 'lb · in · cup · °F  —  US cooking & informal measures' },
-                ].map(({ name, subtitle }, i, arr) => (
-                  <TouchableOpacity key={name} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                    onPress={() => { void setUnitSystem(name as UnitSystem); setSettingsPage('account'); }}>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={sst.label}>{name}</Text>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>{subtitle}</Text>
-                    </View>
-                    {unitSystem === name && <Ionicons name="checkmark" size={18} color={colors.purple} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : settingsPage === 'language' ? (
-              /* ── Language page ── */
-              <View style={sst.card}>
-                {['English'].map((lang, i, arr) => (
-                  <TouchableOpacity key={lang} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                    onPress={() => { setLanguage(lang); AsyncStorage.setItem(`${p}_language`, lang); setSettingsPage('account'); }}>
-                    <Text style={[sst.label, { flex: 1 }]}>{lang}</Text>
-                    {language === lang && <Ionicons name="checkmark" size={18} color={colors.purple} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : settingsPage === 'country' ? (
-              /* ── Country page — drives money formatting (Programs / Quit Smoking / Quit Drinking) ── */
-              <View style={sst.card}>
-                {COUNTRIES.map((c, i, arr) => (
-                  <TouchableOpacity
-                    key={c.code}
-                    style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                    onPress={() => { void setCountry(c.code); setSettingsPage('account'); }}
-                  >
-                    <Text style={{ fontSize: fontSize.lg, marginRight: spacing.sm }}>{c.flag}</Text>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={sst.label}>{c.name}</Text>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>{c.currency} · {c.symbol}</Text>
-                    </View>
-                    {country === c.code && <Ionicons name="checkmark" size={18} color={colors.purple} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : settingsPage === 'subscription' ? (
-              /* ── Subscription page ── */
-              <View style={{ gap: spacing.md, paddingVertical: spacing.xs }}>
-                {/* Free plan */}
-                <TouchableOpacity
-                  onPress={() => { setSelectedPlan('free'); void AsyncStorage.setItem(`${p}_plan`, 'free'); }}
-                  style={[subst.planCard, selectedPlan === 'free' && subst.planCardSel]}>
-                  <View style={subst.planHeader}>
-                    <View style={[subst.planBadge, { backgroundColor: colors.ink3 + '22' }]}>
-                      <Ionicons name="person-outline" size={18} color={colors.ink2} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={subst.planName}>Free</Text>
-                      <Text style={subst.planPrice}>$0 / month</Text>
-                    </View>
-                    <View style={[subst.planRadio, selectedPlan === 'free' && subst.planRadioSel]}>
-                      {selectedPlan === 'free' && <View style={subst.planRadioDot} />}
-                    </View>
-                  </View>
-                  <View style={subst.divider} />
-                  {[
-                    'Log meals manually (unlimited)',
-                    'Calories, protein, carbs & fat tracking',
-                    'Daily diary & streak tracking',
-                    'Body measurements & BMI',
-                    '10 built-in recipes',
-                  ].map(f => (
-                    <View key={f} style={subst.featureRow}>
-                      <Ionicons name="checkmark-circle-outline" size={16} color={colors.ink3} />
-                      <Text style={subst.featureTxt}>{f}</Text>
-                    </View>
-                  ))}
-                </TouchableOpacity>
 
-                {/* Premium plan */}
-                <TouchableOpacity
-                  onPress={() => { setSelectedPlan('premium'); void AsyncStorage.setItem(`${p}_plan`, 'premium'); }}
-                  style={[subst.planCard, subst.planCardPremium, selectedPlan === 'premium' && subst.planCardSel]}>
-                  <LinearGradient colors={[colors.purple + '2e', 'transparent']}
-                    style={{ ...StyleSheet.absoluteFillObject as any, borderRadius: radius.lg }}
-                    start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.5 }}
-                    pointerEvents="none" />
-                  <View style={subst.planHeader}>
-                    <LinearGradient colors={[colors.purple, colors.purpleGlow]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={[subst.planBadge, { borderRadius: radius.sm }]}>
-                      <Ionicons name="star" size={16} color={colors.white} />
-                    </LinearGradient>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[subst.planName, { color: colors.lavender }]}>Premium</Text>
-                      <Text style={[subst.planPrice, { color: colors.purple2 }]}>$4.99 / month</Text>
-                    </View>
-                    <View style={[subst.planRadio, subst.planRadioPremium, selectedPlan === 'premium' && subst.planRadioSel]}>
-                      {selectedPlan === 'premium' && <View style={[subst.planRadioDot, { backgroundColor: colors.purple }]} />}
-                    </View>
-                  </View>
-                  <View style={[subst.divider, { borderColor: colors.line2 }]} />
-                  {[
-                    'Everything in Free',
-                    'AI food scan — log by photo',
-                    'AI recipe import from any URL',
-                    '50+ full recipe library',
-                    'Advanced micros: fiber, sugar, sodium, vitamins',
-                    'Workout & nutrition programs',
-                    'Full body progress analytics',
-                    'Priority support',
-                  ].map((f, i) => (
-                    <View key={f} style={subst.featureRow}>
-                      <Ionicons
-                        name={i === 0 ? 'copy-outline' : 'checkmark-circle'}
-                        size={16}
-                        color={i === 0 ? colors.ink3 : colors.purple2}
-                      />
-                      <Text style={[subst.featureTxt, i !== 0 && { color: colors.ink }]}>{f}</Text>
-                    </View>
-                  ))}
-                </TouchableOpacity>
-              </View>
-            ) : settingsPage === 'notifications' ? (
-              /* ── Notification Settings page ── */
-              <View style={sst.card}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+            {settingsPage === 'account' && (
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                <View>
+                  <Text style={styles.inputLabel}>First Name</Text>
+                  <TextInput style={styles.input} value={acFirstName} onChangeText={setAcFirstName} placeholder="Enter first name" placeholderTextColor={colors.ink3} />
+                </View>
+                <View>
+                  <Text style={styles.inputLabel}>Last Name</Text>
+                  <TextInput style={styles.input} value={acLastName} onChangeText={setAcLastName} placeholder="Enter last name" placeholderTextColor={colors.ink3} />
+                </View>
+                <View style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
+                  <Text style={{ color: colors.ink2, fontSize: fontSize.xs, fontWeight: '700', marginBottom: 4 }}>EMAIL</Text>
+                  <Text style={{ color: colors.ink3, fontSize: fontSize.sm }}>{acEmail}</Text>
+                </View>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginTop: spacing.sm }}>PREFERENCES</Text>
                 {[
-                  { icon: '🔔', label: 'Daily check-in reminder', bg: colors.purple + '1a', value: notifCheckIn,
-                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
-                  { icon: '🥗', label: 'Meal reminders', bg: colors.green + '1a', value: notifMeals,
-                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
-                  { icon: '🔥', label: 'Streak protection', bg: colors.honey + '1a', value: notifStreak,
-                    onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in your device settings to use reminders.'); return; } } setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
-                ].map(({ icon, label, bg, value, onToggle }, i, arr) => (
-                  <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                    <Text style={{ width: 28, textAlign: 'center', fontSize: 20 }}>{icon}</Text>
-                    <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
-                    <Switch value={value} onValueChange={onToggle}
-                      trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
-                      thumbColor={value ? colors.purple : colors.ink3}
-                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
-                  </View>
+                  { label: 'Unit System', value: unitSystem, icon: 'scale-outline', color: colors.sky, page: 'unitSystem' as const },
+                  { label: 'Country', value: `${getCountry(country).flag}  ${getCountry(country).name}`, icon: 'globe-outline', color: colors.honey, page: 'country' as const },
+                  { label: 'Language', value: language, icon: 'language-outline', color: colors.green, page: 'language' as const },
+                ].map(({ label, value, icon, color, page }) => (
+                  <TouchableOpacity key={label} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSettingsPage(page); }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
+                    <Ionicons name={icon as any} size={22} color={color} style={{ width: 28, textAlign: 'center' }} />
+                    <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '600', flex: 1 }}>{label}</Text>
+                    <Text style={{ color: colors.ink3, fontSize: fontSize.sm }} numberOfLines={1}>{value}</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+                  </TouchableOpacity>
                 ))}
               </View>
-            ) : settingsPage === 'health' ? (
-              /* ── Health Connect settings ── */
-              <ScrollView contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.xl }}>
-                {!isHealthAvailable() && (
-                  <Text style={[sst.sectionLbl, { color: colors.rose, paddingHorizontal: spacing.md }]}>
-                    Health sync is not available on this platform.
-                  </Text>
-                )}
-                <Text style={sst.sectionLbl}>CONNECTION</Text>
-                <View style={sst.card}>
-                  <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                    <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={20} color={Platform.OS === 'ios' ? colors.rose : colors.green} style={{ width: 28, textAlign: 'center' }} />
-                    <Text style={[sst.label, { flex: 1 }]}>{healthPlatformName()}</Text>
-                    {healthConnected
-                      ? <Text style={{ fontSize: fontSize.xs, color: colors.green, fontWeight: '700' }}>Connected</Text>
-                      : <TouchableOpacity onPress={handleHealthConnect} activeOpacity={0.85} style={{ borderRadius: radius.pill, overflow: 'hidden' }}>
-                          <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
-                            <Text style={{ fontSize: fontSize.xs, color: colors.white, fontWeight: '700' }}>Connect</Text>
-                          </LinearGradient>
-                        </TouchableOpacity>
-                    }
+            )}
+
+            {settingsPage === 'unitSystem' && (
+              <View style={{ padding: spacing.md }}>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginBottom: spacing.md }}>SELECT UNIT SYSTEM</Text>
+                {[
+                  { name: 'Metric',        subtitle: 'kg · cm · ml · °C' },
+                  { name: 'Imperial (US)', subtitle: 'lb · ft/in · fl oz · °F' },
+                  { name: 'UK',            subtitle: 'st/lb · ft/in · ml · °C' },
+                  { name: 'US Customary',  subtitle: 'lb · in · cup · °F' },
+                ].map(({ name, subtitle }) => (
+                  <TouchableOpacity key={name} onPress={async () => {
+                    setUnitSystem(name as UnitSystem);
+                    setSettingsPage(''); setSettingsModal(false);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: unitSystem === name ? colors.lavender : colors.line2 }}>
+                    <View>
+                      <Text style={{ color: unitSystem === name ? colors.lavender : colors.ink, fontWeight: '600', fontSize: fontSize.base }}>{name}</Text>
+                      <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginTop: 2 }}>{subtitle}</Text>
+                    </View>
+                    {unitSystem === name && <Ionicons name="checkmark-circle" size={22} color={colors.lavender} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {settingsPage === 'country' && (
+              <View style={{ padding: spacing.md }}>
+                 <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginBottom: spacing.md }}>SELECT COUNTRY</Text>
+                 {COUNTRIES.map(c => (
+                   <TouchableOpacity key={c.code} onPress={() => { setCountry(c.code); setSettingsPage(''); setSettingsModal(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                     style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: country === c.code ? colors.lavender : colors.line2 }}>
+                     <Text style={{ fontSize: fontSize.lg, marginRight: spacing.sm }}>{c.flag}</Text>
+                     <Text style={{ color: country === c.code ? colors.lavender : colors.ink, fontSize: fontSize.base, fontWeight: '600' }}>{c.name}</Text>
+                   </TouchableOpacity>
+                 ))}
+              </View>
+            )}
+
+            {settingsPage === 'health' && (
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.ink, fontWeight: '700', marginBottom: 2 }}>{healthPlatformName()}</Text>
+                    <Text style={{ color: healthConnected ? colors.green : colors.ink3, fontSize: fontSize.sm }}>{healthConnected ? 'Connected' : 'Not connected'}</Text>
+                    {healthLastSync ? <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginTop: 2 }}>Last sync {healthLastSync}</Text> : null}
                   </View>
+                  {!healthConnected && (
+                    <TouchableOpacity onPress={handleHealthConnect} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+                      <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+                        <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm }}>Connect</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                <Text style={sst.sectionLbl}>SYNC DATA</Text>
+                {!isHealthAvailable() && (
+                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{healthPlatformName()} is not available on this device.</Text>
+                )}
+
                 <View style={sst.card}>
-                  {[
-                    { key: 'steps',    icon: '👟', label: 'Steps',           value: healthSyncSteps,    onToggle: (v: boolean) => { setHealthSyncSteps(v);    AsyncStorage.setItem(`${p}_health_steps`, String(v)); } },
-                    { key: 'calories', icon: '🔥', label: 'Active Calories', value: healthSyncCalories, onToggle: (v: boolean) => { setHealthSyncCalories(v); AsyncStorage.setItem(`${p}_health_calories`, String(v)); } },
-                    { key: 'sleep',    icon: '🌙', label: 'Sleep',           value: healthSyncSleep,    onToggle: (v: boolean) => { setHealthSyncSleep(v);    AsyncStorage.setItem(`${p}_health_sleep`, String(v)); } },
-                  ].map(({ key, icon, label, value, onToggle }, i, arr) => (
+                  {([
+                    { key: 'steps',     icon: '👟', label: 'Sync steps',          value: healthSyncSteps,    set: setHealthSyncSteps,    storeKey: `${p}_health_steps` },
+                    { key: 'calories',  icon: '🔥', label: 'Sync calories burned', value: healthSyncCalories, set: setHealthSyncCalories, storeKey: `${p}_health_calories` },
+                    { key: 'sleep',     icon: '😴', label: 'Sync sleep',          value: healthSyncSleep,    set: setHealthSyncSleep,    storeKey: `${p}_health_sleep` },
+                  ] as const).map(({ key, icon, label, value, set, storeKey }, i, arr) => (
                     <View key={key} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                      <View style={[sst.icon, { backgroundColor: colors.layer3 }]}><Text>{icon}</Text></View>
+                      <Text style={{ width: 28, textAlign: 'center', fontSize: fontSize.lg }}>{icon}</Text>
                       <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
-                      <Switch value={value} onValueChange={onToggle}
-                        disabled={!healthConnected}
+                      <Switch value={value} onValueChange={(v) => { set(v); void AsyncStorage.setItem(storeKey, String(v)); }}
                         trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
                         thumbColor={value ? colors.purple : colors.ink3}
                         style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
@@ -881,117 +746,106 @@ export default function ProfileScreen() {
                   ))}
                 </View>
 
-                <Text style={sst.sectionLbl}>WRITE BACK</Text>
-                <View style={sst.card}>
-                  <View style={[sst.row, { borderBottomWidth: 0 }]}>
-                    <View style={[sst.icon, { backgroundColor: colors.honey + '1a' }]}><Text>💪</Text></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={sst.label}>Write Workouts</Text>
-                      <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Log exercises back to {healthPlatformName()}</Text>
-                    </View>
-                    <Switch value={healthWriteBack} onValueChange={(v) => { setHealthWriteBack(v); AsyncStorage.setItem(`${p}_health_writeback`, String(v)); }}
-                      disabled={!healthConnected}
-                      trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
-                      thumbColor={healthWriteBack ? colors.purple : colors.ink3}
-                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
-                  </View>
-                </View>
+                <TouchableOpacity onPress={handleHealthSync} disabled={healthSyncing}
+                  style={{ borderRadius: radius.md, overflow: 'hidden', opacity: healthSyncing ? 0.6 : 1 }}>
+                  <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ padding: spacing.md, alignItems: 'center' }}>
+                    <Text style={{ color: colors.white, fontWeight: '700' }}>{healthSyncing ? 'Syncing…' : healthConnected ? 'Sync now' : 'Connect & sync'}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
 
-                <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
-                  {healthLastSync && (
-                    <Text style={{ fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center' }}>Last synced: {healthLastSync}</Text>
-                  )}
-                  <TouchableOpacity onPress={handleHealthSync} disabled={healthSyncing} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-                    <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={{ paddingVertical: spacing.sm + 2, alignItems: 'center' }}>
-                      <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm, letterSpacing: 0.5 }}>
-                        {healthSyncing ? 'Syncing…' : 'Sync Now'}
-                      </Text>
-                    </LinearGradient>
+            {settingsPage === 'notifications' && (
+              <View style={{ padding: spacing.md }}>
+                <View style={sst.card}>
+                  {[
+                    { icon: '🔔', label: 'Daily check-in reminder', value: notifCheckIn,
+                      onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in settings.'); return; } } setNotifCheckIn(v); AsyncStorage.setItem(`${p}_notif_checkin`, String(v)); scheduleWaterReminder(v); } },
+                    { icon: '🥗', label: 'Meal reminders', value: notifMeals,
+                      onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in settings.'); return; } } setNotifMeals(v); AsyncStorage.setItem(`${p}_notif_meals`, String(v)); scheduleMealReminders(v); } },
+                    { icon: '🔥', label: 'Streak protection', value: notifStreak,
+                      onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in settings.'); return; } } setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
+                  ].map(({ icon, label, value, onToggle }, i, arr) => (
+                    <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                      <Text style={{ width: 28, textAlign: 'center', fontSize: 20 }}>{icon}</Text>
+                      <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
+                      <Switch value={value} onValueChange={onToggle}
+                        trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
+                        thumbColor={value ? colors.purple : colors.ink3}
+                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}
+                  style={{ backgroundColor: colors.purple, padding: spacing.md, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.md }}>
+                  <Text style={{ color: colors.white, fontWeight: '700' }}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {settingsPage === 'language' && (
+              <View style={{ padding: spacing.md }}>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginBottom: spacing.md }}>SELECT LANGUAGE</Text>
+                {['English'].map((lang) => (
+                  <TouchableOpacity key={lang} onPress={() => { setLanguage(lang); AsyncStorage.setItem(`${p}_language`, lang); setSettingsPage(''); setSettingsModal(false); }}
+                    style={{ padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1.5, borderColor: language === lang ? colors.lavender : colors.line2, marginBottom: spacing.sm }}>
+                    <Text style={{ color: language === lang ? colors.lavender : colors.ink, fontWeight: '600' }}>{lang}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {settingsPage === 'subscription' && (
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                {[
+                  { key: 'free', name: 'Free', price: '$0 / mo', icon: 'person-outline', color: colors.ink2 },
+                  { key: 'premium', name: 'Premium', price: '$4.99 / mo', icon: 'star', color: colors.lavender },
+                ].map((plan) => (
+                  <TouchableOpacity key={plan.key} onPress={() => { setSelectedPlan(plan.key as 'free' | 'premium'); AsyncStorage.setItem(`${p}_plan`, plan.key); setSettingsPage(''); setSettingsModal(false); }}
+                    style={[subst.planCard, selectedPlan === plan.key && { borderColor: colors.purple, borderWidth: 2 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <Ionicons name={plan.icon as any} size={24} color={plan.color} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.ink, fontWeight: '700' }}>{plan.name}</Text>
+                        <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{plan.price}</Text>
+                      </View>
+                      {selectedPlan === plan.key && <Ionicons name="checkmark-circle" size={24} color={colors.purple} />}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {settingsPage === 'about' && (
+              <View style={{ padding: spacing.md }}>
+                {/* Rate Us - Separate Card */}
+                <View style={[sst.card, { marginBottom: spacing.md }]}>
+                  <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Rate Us', 'Opening App Store...')}>
+                    <Ionicons name="star" size={20} color={colors.honey} style={{ width: 28, textAlign: 'center' }} />
+                    <Text style={sst.label}>Rate us on the App Store</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            ) : (
-              /* ── Settings list page ── */
-              <>
-            {/* Account */}
-            <Text style={sst.sectionLbl}>ACCOUNT</Text>
-            <View style={sst.card}>
-              <TouchableOpacity style={sst.row} onPress={() => {
-                setAcFirstName(profile.name?.split(' ')[0] ?? '');
-                setAcLastName(profile.name?.split(' ').slice(1).join(' ') ?? '');
-                setAcEmail(email ?? '');
-                setAcPassword('');
-                setSettingsPage('account');
-              }}>
-                <View style={[sst.icon, { backgroundColor: colors.purple + '1a' }]}>
-                  <Ionicons name="person-circle-outline" size={16} color={colors.purple2} />
-                </View>
-                <Text style={sst.label}>Account Settings</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('subscription')}>
-                <View style={[sst.icon, { backgroundColor: colors.honey + '1a' }]}>
-                  <Ionicons name="card-outline" size={16} color={colors.honey} />
-                </View>
-                <Text style={sst.label}>Manage Subscriptions</Text>
-                <Text style={[sst.val, { color: selectedPlan === 'premium' ? colors.honey : colors.ink3, textTransform: 'capitalize' }]}>{selectedPlan}</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-            </View>
 
-
-            {/* Notifications */}
-            <Text style={sst.sectionLbl}>NOTIFICATIONS</Text>
-            <View style={sst.card}>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('notifications')}>
-                <View style={[sst.icon, { backgroundColor: colors.purple + '1a' }]}>
-                  <Ionicons name="notifications-outline" size={16} color={colors.purple2} />
+                {/* Social Links - Grouped Card */}
+                <View style={sst.card}>
+                  {[
+                    { icon: 'logo-x', label: 'Follow us on X', color: colors.ink, onPress: () => Alert.alert('Follow Us', 'Opening X...') },
+                    { icon: 'logo-facebook', label: 'Like us on Facebook', color: '#1877F2', onPress: () => Alert.alert('Facebook', 'Opening Facebook...') },
+                    { icon: 'logo-instagram', label: 'Watch our stories on Instagram', color: colors.rose, onPress: () => Alert.alert('Instagram', 'Opening Instagram...') },
+                  ].map(({ icon, label, color, onPress }, i, arr) => (
+                    <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]} onPress={onPress}>
+                      <Ionicons name={icon as any} size={20} color={color} style={{ width: 28, textAlign: 'center' }} />
+                      <Text style={sst.label}>{label}</Text>
+                      <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <Text style={sst.label}>Notification Settings</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Import Health Data */}
-            <Text style={sst.sectionLbl}>IMPORT HEALTH DATA</Text>
-            <View style={sst.card}>
-              <TouchableOpacity style={[sst.row, { borderBottomWidth: 0 }]} onPress={() => setSettingsPage('health')}>
-                <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'fitness-outline'} size={20} color={Platform.OS === 'ios' ? colors.rose : colors.green} style={{ width: 28, textAlign: 'center' }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={sst.label}>{healthPlatformName()}</Text>
-                  {healthConnected && <Text style={{ fontSize: fontSize.xs, color: colors.green }}>Connected{healthLastSync ? ` · ${healthLastSync}` : ''}</Text>}
-                </View>
-                <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Help */}
-            <Text style={sst.sectionLbl}>HELP</Text>
-            <View style={sst.card}>
-              {[
-                { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, bg: colors.sky + '1a' },
-                { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, bg: colors.layer3 },
-                { icon: 'code-slash-outline', label: 'Open-source Licenses', color: colors.purple2, bg: colors.purple + '1a' },
-                { icon: 'library-outline', label: 'Sources of recommendations', color: colors.green, bg: colors.green + '1a' },
-              ].map(({ icon, label, color, bg }, i, arr) => (
-                <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                  onPress={() => Alert.alert(label, 'Coming soon.')}>
-                  <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
-                  <Text style={sst.label}>{label}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={{ alignSelf: 'center', marginTop: spacing.xl, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm + 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.rose + '55', backgroundColor: colors.rose + '11' }}
-              onPress={() => { setSettingsModal(false); handleLogout(); }}>
-              <Text style={{ color: colors.rose, fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 1.1 }}>LOG OUT</Text>
-            </TouchableOpacity>
-            <Text style={{ textAlign: 'center', color: colors.ink3, fontSize: fontSize.xs, marginTop: spacing.sm }}>1.0.0</Text>
-            <View style={{ height: spacing.xl }} />
-              </>
+              </View>
             )}
+
+            {/* If we end up with an empty page somehow, show nothing or return */}
+            {settingsPage === '' && <View style={{ padding: spacing.xl, alignItems: 'center' }}><Text style={{ color: colors.ink3 }}>Select a setting to edit.</Text></View>}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -1000,9 +854,7 @@ export default function ProfileScreen() {
       <Modal visible={dietaryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietaryModal(false)}>
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
           <View style={dp.header}>
-            <TouchableOpacity onPress={() => setDietaryModal(false)} style={dp.backBtn}>
-              <BackChevron size={20} />
-            </TouchableOpacity>
+            <ModalBackBtn onPress={() => setDietaryModal(false)} />
             <Text style={dp.title}>Food Preferences</Text>
             <View style={{ width: 36 }} />
           </View>
@@ -1082,7 +934,7 @@ export default function ProfileScreen() {
       <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTdeeModal(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setTdeeModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <ModalBackBtn onPress={() => setTdeeModal(false)} />
             <Text style={styles.modalTitle}>Calorie & Goals</Text>
             <TouchableOpacity onPress={() => {
               const age = parseInt(profile.age ?? '25', 10) || 25;
@@ -1096,11 +948,11 @@ export default function ProfileScreen() {
           </View>
           <ScrollView contentContainerStyle={styles.modalScroll}>
             {/* Sex selector */}
-            <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Biological Sex</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Biological Sex</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
               {(['male', 'female'] as const).map(s => (
                 <TouchableOpacity key={s} onPress={() => setSex(s)}
-                  style={{ flex: 1, padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
+                  style={{ flex: 1, padding: spacing.sm, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
                     borderColor: sex === s ? colors.lavender : colors.line2,
                     backgroundColor: sex === s ? colors.purple + '22' : colors.layer2 }}>
                   <Ionicons name={s === 'male' ? 'male' : 'female'} size={24} color={s === 'male' ? colors.sky : colors.rose} />
@@ -1110,8 +962,8 @@ export default function ProfileScreen() {
             </View>
 
             {/* Activity Level */}
-            <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Activity Level</Text>
-            <View style={{ gap: spacing.xs + 2, marginBottom: spacing.md }}>
+            <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Activity Level</Text>
+            <View style={{ gap: spacing.xs, marginBottom: spacing.xs }}>
               {([
                 { key: 'sedentary', label: 'Sedentary', desc: 'Little or no exercise' },
                 { key: 'light', label: 'Lightly Active', desc: '1–3 days/week' },
@@ -1120,7 +972,7 @@ export default function ProfileScreen() {
                 { key: 'very_active', label: 'Extra Active', desc: 'Physical job or 2x/day' },
               ] as const).map(({ key, label, desc }) => (
                 <TouchableOpacity key={key} onPress={() => setLocalActivity(key)}
-                  style={{ padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+                  style={{ padding: spacing.sm, borderRadius: radius.sm + 2, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
                     borderColor: localActivity === key ? colors.lavender : colors.line2,
                     backgroundColor: localActivity === key ? colors.purple + '22' : colors.layer2 }}>
                   <View style={{ flex: 1 }}>
@@ -1133,15 +985,15 @@ export default function ProfileScreen() {
             </View>
 
             {/* Weight Goal */}
-            <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Weight Goal</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Weight Goal</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
               {([
                 { key: 'lose', label: 'Lose', emoji: '📉' },
                 { key: 'maintain', label: 'Maintain', emoji: '⚖️' },
                 { key: 'gain', label: 'Gain', emoji: '📈' },
               ] as const).map(({ key, label, emoji }) => (
                 <TouchableOpacity key={key} onPress={() => setLocalGoal(key)}
-                  style={{ flex: 1, padding: spacing.sm + 2, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
+                  style={{ flex: 1, padding: spacing.sm, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
                     borderColor: localGoal === key ? colors.lavender : colors.line2,
                     backgroundColor: localGoal === key ? colors.purple + '22' : colors.layer2 }}>
                   <Text style={{ fontSize: fontSize.lg }}>{emoji}</Text>
@@ -1172,7 +1024,7 @@ export default function ProfileScreen() {
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
         <SafeAreaView style={styles.safe} edges={['bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <ModalBackBtn onPress={() => setEditing(false)} />
             <Text style={styles.modalTitle}>Personal Details</Text>
             <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
@@ -1303,7 +1155,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 16, gap: 24, paddingBottom: 40 },
 
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   fixedHeader: {
     position: 'absolute',
     top: 0,
@@ -1341,7 +1192,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 15,
   },
-  bellDot: { position: 'absolute', top: 12, right: 12, width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 2.5, borderColor: colors.bg },
   upgradeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1368,21 +1218,20 @@ const styles = StyleSheet.create({
   quickVal: { fontSize: 17, fontWeight: '800', color: colors.ink },
   quickLbl: { fontSize: 12, color: colors.ink3, fontWeight: '600', opacity: 0.7 },
 
-  sectionHdr: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3, paddingHorizontal: 4, marginBottom: -16, opacity: 0.5 },
 
   menuCard: { backgroundColor: colors.layer1, borderRadius: 20, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
   menuLabel: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '600' },
-  menuValue: { fontSize: 13, color: colors.ink3, maxWidth: 120, fontWeight: '500' },
 
   footer: { textAlign: 'center', color: colors.ink3, fontSize: 12, marginTop: 4, opacity: 0.4 },
 
+  inboxBadge: { backgroundColor: colors.rose, borderRadius: radius.pill, minWidth: 20, height: 20, paddingHorizontal: spacing.xs, alignItems: 'center', justifyContent: 'center' },
+  inboxBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '800' },
   dietOption: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
   dietOptionTxt: { color: colors.ink, fontSize: fontSize.base, fontWeight: '500' },
 
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  cancelText: { color: colors.ink2, fontSize: fontSize.base },
   modalTitle: { color: colors.ink, fontSize: fontSize.base, fontWeight: '700' },
   saveText: { color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' },
   modalScroll: { padding: spacing.md, gap: spacing.sm },
