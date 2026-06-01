@@ -56,14 +56,6 @@ export default function ProfileScreen() {
 
   const [language, setLanguage] = useState('English');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
-  const [acFirstName, setAcFirstName] = useState('');
-  const [acLastName,  setAcLastName]  = useState('');
-  const [acEmail,     setAcEmail]     = useState('');
-  const [acPassword,  setAcPassword]  = useState('');
-  const [nameModal,      setNameModal]      = useState(false);
-  const [nameDraftFirst, setNameDraftFirst] = useState('');
-  const [nameDraftLast,  setNameDraftLast]  = useState('');
-  const [nameError,      setNameError]      = useState('');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName,  setEditLastName]  = useState('');
   const [dietaryModal, setDietaryModal] = useState(false);
@@ -344,38 +336,8 @@ export default function ProfileScreen() {
     : (nameParts[0]?.[0] ?? email?.[0] ?? '?').toUpperCase();
 
   async function handleSaveAccount() {
-    const newName = [acFirstName.trim(), acLastName.trim()].filter(Boolean).join(' ');
-    await setProfile({ ...profile, name: newName || profile.name });
     await AsyncStorage.setItem(`${p}_language`, language);
-    if (acPassword.trim().length >= 6) {
-      const { error } = await supabase.auth.updateUser({ password: acPassword.trim() });
-      if (error) { Alert.alert('Password Error', error.message); return; }
-    }
     setSettingsPage('');
-  }
-
-  function validateNamePart(label: string, raw: string): string | null {
-    const t = raw.trim();
-    if (t.length < 2) return `${label} must be at least 2 letters.`;
-    if (t.length > 30) return `${label} is too long (max 30 characters).`;
-    if (!/^[\p{L}][\p{L} '’-]*$/u.test(t)) return `${label} can only contain letters.`;
-    return null;
-  }
-
-  function handleSaveName() {
-    const f = nameDraftFirst.trim();
-    const l = nameDraftLast.trim();
-    const err = validateNamePart('First name', f) ?? (l ? validateNamePart('Last name', l) : null);
-    if (err) {
-      setNameError(err);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
-    }
-    setAcFirstName(f);
-    setAcLastName(l);
-    setNameError('');
-    setNameModal(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   const insets = useSafeAreaInsets();
@@ -529,7 +491,7 @@ export default function ProfileScreen() {
         {/* ── Settings ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setAcFirstName(profile.name?.split(' ')[0] ?? ''); setAcLastName(profile.name?.split(' ').slice(1).join(' ') ?? ''); setAcEmail(email ?? ''); setAcPassword(''); setSettingsPage('account'); setSettingsModal(true); } },
+            { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
             { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
@@ -665,26 +627,7 @@ export default function ProfileScreen() {
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
             {settingsPage === 'account' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
-                <TouchableOpacity onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setNameDraftFirst(acFirstName); setNameDraftLast(acLastName); setNameError('');
-                  setNameModal(true);
-                }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
-                  <Ionicons name="person-outline" size={22} color={colors.purple} style={{ width: 28, textAlign: 'center' }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.6 }}>NAME</Text>
-                    <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '600' }} numberOfLines={1}>
-                      {[acFirstName, acLastName].filter(Boolean).join(' ') || 'Add your name'}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
-                </TouchableOpacity>
-                <View style={{ padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
-                  <Text style={{ color: colors.ink2, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.6, marginBottom: 4 }}>EMAIL</Text>
-                  <Text style={{ color: colors.ink3, fontSize: fontSize.sm }}>{acEmail}</Text>
-                </View>
-                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginTop: spacing.sm }}>PREFERENCES</Text>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1 }}>PREFERENCES</Text>
                 {[
                   { label: 'Unit System', value: unitSystem, icon: 'scale-outline', color: colors.sky, page: 'unitSystem' as const },
                   { label: 'Country', value: `${getCountry(country).flag}  ${getCountry(country).name}`, icon: 'globe-outline', color: colors.honey, page: 'country' as const },
@@ -1090,6 +1033,12 @@ export default function ProfileScreen() {
                 returnKeyType="next"
               />
             </View>
+            <View>
+              <Text style={styles.inputLabel}>Email</Text>
+              <View style={[styles.input, { justifyContent: 'center', backgroundColor: colors.layer1 }]}>
+                <Text style={{ color: colors.ink3, fontSize: fontSize.base }} numberOfLines={1}>{email}</Text>
+              </View>
+            </View>
             {[
               { label: 'Age', key: 'age', keyboard: 'numeric' as const },
               { label: 'Goal', key: 'goal' },
@@ -1182,58 +1131,6 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Name edit modal — popup for first / last name with validation */}
-      <Modal visible={nameModal} transparent animationType="fade" onRequestClose={() => setNameModal(false)}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={{ flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
-            <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.lg, width: '100%', gap: spacing.md }}>
-              <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Edit Name</Text>
-              <View>
-                <Text style={styles.inputLabel}>First Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={nameDraftFirst}
-                  onChangeText={(v) => { setNameDraftFirst(v); if (nameError) setNameError(''); }}
-                  placeholder="First name"
-                  placeholderTextColor={colors.ink3}
-                  autoCapitalize="words"
-                  autoFocus
-                  maxLength={30}
-                  returnKeyType="next"
-                />
-              </View>
-              <View>
-                <Text style={styles.inputLabel}>Last Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={nameDraftLast}
-                  onChangeText={(v) => { setNameDraftLast(v); if (nameError) setNameError(''); }}
-                  placeholder="Last name"
-                  placeholderTextColor={colors.ink3}
-                  autoCapitalize="words"
-                  maxLength={30}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSaveName}
-                />
-              </View>
-              {nameError ? <Text style={{ color: colors.rose, fontSize: fontSize.sm }}>{nameError}</Text> : null}
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <TouchableOpacity onPress={() => { setNameError(''); setNameModal(false); }}
-                  style={{ flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md }}>
-                  <Text style={{ color: colors.ink2, fontWeight: '600', fontSize: fontSize.sm }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleSaveName} style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
-                  <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={{ paddingVertical: spacing.sm, alignItems: 'center' }}>
-                    <Text style={{ color: colors.ink, fontWeight: '700', fontSize: fontSize.sm }}>Save</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
