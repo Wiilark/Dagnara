@@ -342,6 +342,7 @@ export default function ProfileScreen() {
 
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const lastNameRef = useRef<TextInput>(null);
 
   // Super-smoothed interpolation for high-end Revolut feel
   const headerNameOpacity = scrollY.interpolate({
@@ -1009,79 +1010,107 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-            <View>
-              <Text style={styles.inputLabel}>First Name</Text>
-              <TextInput
-                style={styles.input}
-                value={editFirstName}
-                onChangeText={setEditFirstName}
-                placeholderTextColor={colors.ink3}
-                placeholder="First name"
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
+            <View style={styles.fieldRow}>
+              <Ionicons name="person-outline" size={20} color={colors.purple} style={styles.fieldIcon} />
+              <View style={styles.fieldBody}>
+                <Text style={styles.fieldLabel}>FIRST NAME</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editFirstName}
+                  onChangeText={setEditFirstName}
+                  placeholderTextColor={colors.ink3}
+                  placeholder="First name"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete="name-given"
+                  textContentType="givenName"
+                  maxLength={40}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
+                />
+              </View>
             </View>
-            <View>
-              <Text style={styles.inputLabel}>Last Name</Text>
-              <TextInput
-                style={styles.input}
-                value={editLastName}
-                onChangeText={setEditLastName}
-                placeholderTextColor={colors.ink3}
-                placeholder="Last name"
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
+            <View style={styles.fieldRow}>
+              <Ionicons name="people-outline" size={20} color={colors.purple} style={styles.fieldIcon} />
+              <View style={styles.fieldBody}>
+                <Text style={styles.fieldLabel}>LAST NAME</Text>
+                <TextInput
+                  ref={lastNameRef}
+                  style={styles.fieldInput}
+                  value={editLastName}
+                  onChangeText={setEditLastName}
+                  placeholderTextColor={colors.ink3}
+                  placeholder="Last name"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete="name-family"
+                  textContentType="familyName"
+                  maxLength={40}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
+              </View>
             </View>
-            <View>
-              <Text style={styles.inputLabel}>Email</Text>
-              <View style={[styles.input, { justifyContent: 'center', backgroundColor: colors.layer1 }]}>
-                <Text style={{ color: colors.ink3, fontSize: fontSize.base }} numberOfLines={1}>{email}</Text>
+            <View style={[styles.fieldRow, { backgroundColor: colors.layer1 }]}>
+              <Ionicons name="mail-outline" size={20} color={colors.sky} style={styles.fieldIcon} />
+              <View style={styles.fieldBody}>
+                <Text style={styles.fieldLabel}>EMAIL</Text>
+                <Text style={[styles.fieldInput, { color: colors.ink3 }]} numberOfLines={1}>{email}</Text>
               </View>
             </View>
             {[
-              { label: 'Age', key: 'age', keyboard: 'numeric' as const },
-              { label: 'Goal', key: 'goal' },
-            ].map(({ label, key, keyboard }) => (
-              <View key={key}>
-                <Text style={styles.inputLabel}>{label}</Text>
+              { label: 'AGE', key: 'age', keyboard: 'numeric' as const, icon: 'calendar-outline' as const, color: colors.honey },
+              { label: 'GOAL', key: 'goal', keyboard: undefined, icon: 'flag-outline' as const, color: colors.green },
+            ].map(({ label, key, keyboard, icon, color }) => (
+              <View key={key} style={styles.fieldRow}>
+                <Ionicons name={icon} size={20} color={color} style={styles.fieldIcon} />
+                <View style={styles.fieldBody}>
+                  <Text style={styles.fieldLabel}>{label}</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={draft[key] ?? ''}
+                    onChangeText={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                    placeholderTextColor={colors.ink3}
+                    keyboardType={keyboard ?? 'default'}
+                    autoCapitalize="none"
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                  />
+                </View>
+              </View>
+            ))}
+            <View style={styles.fieldRow}>
+              <Ionicons name="barbell-outline" size={20} color={colors.teal} style={styles.fieldIcon} />
+              <View style={styles.fieldBody}>
+                <Text style={styles.fieldLabel}>WEIGHT ({weightUnit(unitSystem)})</Text>
                 <TextInput
-                  style={styles.input}
-                  value={draft[key] ?? ''}
-                  onChangeText={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                  style={styles.fieldInput}
+                  value={draftWeightInput}
+                  onChangeText={setDraftWeightInput}
                   placeholderTextColor={colors.ink3}
-                  keyboardType={keyboard ?? 'default'}
+                  keyboardType="decimal-pad"
                   autoCapitalize="none"
                   returnKeyType="done"
                   onSubmitEditing={() => Keyboard.dismiss()}
                 />
               </View>
-            ))}
-            <View>
-              <Text style={styles.inputLabel}>Weight ({weightUnit(unitSystem)})</Text>
-              <TextInput
-                style={styles.input}
-                value={draftWeightInput}
-                onChangeText={setDraftWeightInput}
-                placeholderTextColor={colors.ink3}
-                keyboardType="decimal-pad"
-                autoCapitalize="none"
-                returnKeyType="done"
-                onSubmitEditing={() => Keyboard.dismiss()}
-              />
             </View>
-            <View>
-              <Text style={styles.inputLabel}>Height ({heightUnit(unitSystem)})</Text>
-              <TextInput
-                style={styles.input}
-                value={draftHeightInput}
-                onChangeText={setDraftHeightInput}
-                placeholderTextColor={colors.ink3}
-                keyboardType={unitSystem === 'Metric' ? 'decimal-pad' : 'default'}
-                autoCapitalize="none"
-                returnKeyType="done"
-                onSubmitEditing={() => Keyboard.dismiss()}
-              />
+            <View style={styles.fieldRow}>
+              <Ionicons name="resize-outline" size={20} color={colors.lavender} style={styles.fieldIcon} />
+              <View style={styles.fieldBody}>
+                <Text style={styles.fieldLabel}>HEIGHT ({heightUnit(unitSystem)})</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={draftHeightInput}
+                  onChangeText={setDraftHeightInput}
+                  placeholderTextColor={colors.ink3}
+                  keyboardType={unitSystem === 'Metric' ? 'decimal-pad' : 'default'}
+                  autoCapitalize="none"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
+              </View>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -1223,6 +1252,11 @@ const styles = StyleSheet.create({
   modalScroll: { padding: spacing.md, gap: spacing.sm },
   inputLabel: { color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.xs },
   input: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, color: colors.ink, fontSize: fontSize.base },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  fieldIcon: { width: 26, textAlign: 'center' },
+  fieldBody: { flex: 1, paddingVertical: spacing.xs },
+  fieldLabel: { color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.5 },
+  fieldInput: { color: colors.ink, fontSize: fontSize.base, paddingVertical: spacing.xs, paddingTop: 2 },
   bmiCard: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs + 2 },
   bmiSectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, color: colors.ink3, textTransform: 'uppercase' },
   bmiNum: { fontSize: fontSize['2xl'] + 10, fontWeight: '800', lineHeight: 52 },
