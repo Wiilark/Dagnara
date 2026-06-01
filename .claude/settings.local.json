@@ -1,4 +1,13 @@
 {
+  "model": "claude-opus-4-8",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "env": {
+    "ECC_DISABLED_HOOKS": "pre:bash:gateguard-fact-force",
+    "ECC_CONTEXT_MONITOR_COST_WARNINGS": "false"
+  },
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
@@ -86,6 +95,19 @@
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/typescript_check.py\"",
             "timeout": 50,
             "statusMessage": "Checking TypeScript..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/auto_compact.py\"",
+            "timeout": 60,
+            "async": true,
+            "statusMessage": "Saving session context..."
           }
         ]
       }
