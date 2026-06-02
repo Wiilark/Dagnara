@@ -133,36 +133,28 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
 
   return (
     <View style={st.card}>
-      <View style={st.calHead}>
-        <View>
-          <Text style={st.cardLabel}>ACTIVITY HUB</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text style={st.calMonthTitle}>{monthName} {year}</Text>
-            <View style={st.calFreqBadge}>
-              <Text style={st.calFreqTxt}>{frequency}% CONSISTENCY</Text>
-            </View>
-          </View>
-        </View>
-        <View style={st.calNav}>
+      <View style={st.calHeader}>
+        <Text style={st.calMonthTitle}>{monthName} {year}</Text>
+        <View style={st.calNavHorizontal}>
           <TouchableOpacity 
             onPress={() => changeMonth(-1)} 
             style={[st.calNavBtn, isFirstMonth && { opacity: 0.3 }]}
             disabled={isFirstMonth}
           >
-            <Ionicons name="chevron-back" size={18} color={colors.ink2} />
+            <Ionicons name="chevron-up" size={18} color={colors.ink2} />
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => changeMonth(1)} 
             style={[st.calNavBtn, isLastMonth && { opacity: 0.3 }]}
             disabled={isLastMonth}
           >
-            <Ionicons name="chevron-forward" size={18} color={colors.ink2} />
+            <Ionicons name="chevron-down" size={18} color={colors.ink2} />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={st.calWeekRow}>
-        {['M','T','W','T','F','S','S'].map((d, i) => (
+        {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d, i) => (
           <Text key={i} style={st.calWeekDay}>{d}</Text>
         ))}
       </View>
@@ -204,35 +196,43 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
         })}
       </View>
 
-      {/* Day Details Area */}
-      {selectedData && (
-        <View style={st.calDetail}>
-          <View style={st.calDetailHead}>
-            <Text style={st.calDetailDate}>
-              {new Date(selectedData.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </Text>
-            {selectedData.date === todayKey && <Text style={st.calTodayBadge}>TODAY</Text>}
-          </View>
-          <View style={st.calDetailGrid}>
-            <View style={st.calDetailItem}>
-              <Text style={st.calDetailVal}>{selectedData.kcal || '0'}</Text>
-              <Text style={st.calDetailLbl}>kcal</Text>
-            </View>
-            <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
-              <Text style={st.calDetailVal}>{selectedData.weight ? formatWeight(selectedData.weight, unitSystem) : '—'}</Text>
-              <Text style={st.calDetailLbl}>weight</Text>
-            </View>
-            <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
-              <Ionicons
-                name={selectedData.status === 'logged' ? 'checkmark-circle' : selectedData.status === 'partial' ? 'remove-circle' : 'close-circle'}
-                size={18}
-                color={selectedData.status === 'logged' ? colors.green : selectedData.status === 'partial' ? colors.honey : colors.rose}
-              />
-              <Text style={st.calDetailLbl}>{selectedData.status === 'logged' ? 'Complete' : selectedData.status === 'partial' ? 'Partial' : 'No Log'}</Text>
-            </View>
+      {/* Consistency + Details Area */}
+      <View style={st.calFooter}>
+        <View style={st.calFreqRow}>
+          <View style={st.calFreqBadge}>
+            <Text style={st.calFreqTxt}>{frequency}% CONSISTENCY</Text>
           </View>
         </View>
-      )}
+
+        {selectedData && (
+          <View style={st.calDetail}>
+            <View style={st.calDetailHead}>
+              <Text style={st.calDetailDate}>
+                {new Date(selectedData.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </Text>
+              {selectedData.date === todayKey && <Text style={st.calTodayBadge}>TODAY</Text>}
+            </View>
+            <View style={st.calDetailGrid}>
+              <View style={st.calDetailItem}>
+                <Text style={st.calDetailVal}>{selectedData.kcal || '0'}</Text>
+                <Text style={st.calDetailLbl}>kcal</Text>
+              </View>
+              <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
+                <Text style={st.calDetailVal}>{selectedData.weight ? formatWeight(selectedData.weight, unitSystem) : '—'}</Text>
+                <Text style={st.calDetailLbl}>weight</Text>
+              </View>
+              <View style={[st.calDetailItem, { borderLeftWidth: 1, borderLeftColor: colors.line }]}>
+                <Ionicons
+                  name={selectedData.status === 'logged' ? 'checkmark-circle' : selectedData.status === 'partial' ? 'remove-circle' : 'close-circle'}
+                  size={18}
+                  color={selectedData.status === 'logged' ? colors.green : selectedData.status === 'partial' ? colors.honey : colors.rose}
+                />
+                <Text style={st.calDetailLbl}>{selectedData.status === 'logged' ? 'Complete' : selectedData.status === 'partial' ? 'Partial' : 'No Log'}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
 
       <View style={st.calLegend}>
         {[[colors.green,'Goal met'],[colors.honey,'Partial'],[colors.rose + '66','Missed']].map(([c,l]) => (
@@ -1530,7 +1530,11 @@ const st = StyleSheet.create({
   // Statistics modal extra styles (stat.* used inline)
 
   // Calendar
-  calHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  calHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md, height: 32 },
+  calNavHorizontal: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  calNavBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
+  calFooter: { marginTop: spacing.md },
+  calFreqRow: { alignItems: 'center', marginBottom: spacing.sm },
   calCount: { fontSize: fontSize.xs, color: colors.ink3, fontFamily: 'monospace' },
   calWeekRow: { flexDirection: 'row', marginBottom: spacing.xs / 2 },
   calWeekDay: { flex: 1, textAlign: 'center', fontSize: fontSize.xs, color: colors.ink3, fontFamily: 'monospace' },
@@ -1543,12 +1547,10 @@ const st = StyleSheet.create({
   calMonthTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, marginTop: -2 },
   calSubLabel: { fontSize: 10, fontWeight: '600', color: colors.ink3, textTransform: 'uppercase', letterSpacing: 0.5 },
   calDayNum: { fontWeight: '700', position: 'absolute', top: 2, left: 3 },
-  calNav: { flexDirection: 'row', gap: spacing.xs },
-  calNavBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line2 },
   calFreqBadge: { backgroundColor: colors.purple + '1a', paddingHorizontal: spacing.xs + 2, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.purple + '33' },
   calFreqTxt: { fontSize: 9, fontWeight: '800', color: colors.lavender, letterSpacing: 0.5 },
   calWeightDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.sky, position: 'absolute', bottom: 3, right: 3 },
-  calDetail: { marginTop: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.line2 },
+  calDetail: { backgroundColor: colors.layer2, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.line2 },
   calDetailHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm, paddingHorizontal: 4 },
   calDetailDate: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink2, textTransform: 'uppercase' },
   calTodayBadge: { fontSize: 9, fontWeight: '800', color: colors.white, backgroundColor: colors.lavender, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },

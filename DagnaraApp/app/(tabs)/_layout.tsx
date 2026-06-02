@@ -3,8 +3,9 @@ import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   View, TouchableOpacity, StyleSheet, Text, Modal,
-  ScrollView, TextInput, Alert, Pressable,
+  ScrollView, TextInput, Alert, Pressable, Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
@@ -35,23 +36,43 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const readMessageIds = useAppStore((s) => s.readMessageIds);
   const markMessageRead = useAppStore((s) => s.markMessageRead);
+  const markAllRead = useAppStore((s) => s.markAllRead);
+  const hasUnread = useAppStore((s) => s.hasUnread);
   const isUnread = (m: typeof MESSAGES[number]) => !!m.unread && !readMessageIds.includes(m.id);
   const thisWeek = MESSAGES.filter(m => !m.group);
   const lastMonth = MESSAGES.filter(m => m.group === 'Last month');
-  const visible_msgs = MESSAGES;
+
+  const handleMarkAll = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    markAllRead();
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={msg.safe} edges={['top', 'bottom']}>
+        <LinearGradient
+          colors={['rgba(124,77,255,0.18)', 'transparent']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }}
+          pointerEvents="none"
+        />
         <View style={msg.header}>
-          <TouchableOpacity style={msg.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
+          <TouchableOpacity style={msg.backBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <BackChevron size={22} color={colors.ink} />
           </TouchableOpacity>
-          <Text style={msg.title}>Messages</Text>
-          <View style={{ width: 34 }} />
+          <View style={msg.titleContainer}>
+            <Text style={msg.title}>Inbox</Text>
+          </View>
+          {hasUnread ? (
+            <TouchableOpacity onPress={handleMarkAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={msg.markAllTxt}>Mark all</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
         </View>
         <ScrollView contentContainerStyle={msg.scroll} showsVerticalScrollIndicator={false}>
-          {visible_msgs.length === 0 ? (
+          {MESSAGES.length === 0 ? (
             <View style={msg.emptyWrap}>
               <Text style={msg.emptyIcon}>📬</Text>
               <Text style={msg.emptyTitle}>Your inbox</Text>
@@ -63,14 +84,17 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                 <>
                   <Text style={msg.groupLbl}>This week</Text>
                   {thisWeek.map(m => (
-                    <TouchableOpacity key={m.id} style={msg.card}
-                      onPress={() => markMessageRead(m.id)} activeOpacity={0.75}>
+                    <TouchableOpacity key={m.id} style={[msg.card, isUnread(m) && msg.cardUnread]}
+                      onPress={() => {
+                        if (isUnread(m)) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        markMessageRead(m.id);
+                      }} activeOpacity={0.75}>
                       <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
                         <Text style={msg.iconTxt}>{m.icon}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={msg.cardHead}>
-                          <Text style={msg.cardTitle}>{m.title}</Text>
+                          <Text style={[msg.cardTitle, isUnread(m) && msg.cardTitleUnread]}>{m.title}</Text>
                           <Text style={msg.cardTime}>{m.time}</Text>
                         </View>
                         <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
@@ -82,16 +106,19 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
               )}
               {lastMonth.length > 0 && (
                 <>
-                  <Text style={[msg.groupLbl, { marginTop: 20 }]}>Last month</Text>
+                  <Text style={[msg.groupLbl, { marginTop: 24 }]}>Last month</Text>
                   {lastMonth.map(m => (
-                    <TouchableOpacity key={m.id} style={msg.card}
-                      onPress={() => markMessageRead(m.id)} activeOpacity={0.75}>
+                    <TouchableOpacity key={m.id} style={[msg.card, isUnread(m) && msg.cardUnread]}
+                      onPress={() => {
+                        if (isUnread(m)) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        markMessageRead(m.id);
+                      }} activeOpacity={0.75}>
                       <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
                         <Text style={msg.iconTxt}>{m.icon}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={msg.cardHead}>
-                          <Text style={msg.cardTitle}>{m.title}</Text>
+                          <Text style={[msg.cardTitle, isUnread(m) && msg.cardTitleUnread]}>{m.title}</Text>
                           <Text style={msg.cardTime}>{m.time}</Text>
                         </View>
                         <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
@@ -932,7 +959,6 @@ const al = StyleSheet.create({
 });
 
 // Messages modal styles
-// Messages modal styles
 const msg = StyleSheet.create({
   safe: {
     flex: 1,
@@ -942,109 +968,126 @@ const msg = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md + 2,
-    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    height: 54,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line2,
+    borderBottomColor: colors.line,
   },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.md + 1,
-    backgroundColor: colors.layer2,
-    borderWidth: 1,
-    borderColor: colors.line2,
+  backBtn: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+  },
+  titleContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 0,
   },
   title: {
-    fontSize: fontSize.base + 1,
-    fontWeight: '600',
+    fontSize: fontSize.md,
+    fontWeight: '800',
     color: colors.ink,
-    letterSpacing: -0.01 * 16,
+    letterSpacing: -0.5,
+  },
+  markAllTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.lavender,
+    width: 60,
+    textAlign: 'right',
   },
   scroll: {
     padding: spacing.md,
-    paddingBottom: spacing.xl + spacing.md - 2,
-    gap: spacing.sm,
+    paddingBottom: spacing.xl,
   },
   emptyWrap: {
     alignItems: 'center',
-    paddingTop: spacing.xl + 4,
-    paddingHorizontal: spacing.xl - 4,
-    gap: spacing.sm + 4,
+    paddingTop: spacing.xl * 2,
+    paddingHorizontal: spacing.xl,
   },
-  emptyIcon: { fontSize: fontSize['2xl'] + 26 },
+  emptyIcon: { fontSize: 64, marginBottom: spacing.md },
   emptyTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '700',
+    fontSize: fontSize.lg,
+    fontWeight: '800',
     color: colors.ink,
-    letterSpacing: -0.025 * 28,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   emptySub: {
     fontSize: fontSize.base,
     color: colors.ink2,
-    lineHeight: 24,
+    lineHeight: 22,
     textAlign: 'center',
-    fontWeight: '300',
+    fontWeight: '400',
   },
   groupLbl: {
     fontSize: fontSize.xs - 1,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
     color: colors.ink3,
-    marginBottom: 4,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
   },
   card: {
     flexDirection: 'row',
-    gap: spacing.sm + 2,
-    backgroundColor: colors.layer2,
+    gap: spacing.md,
+    backgroundColor: colors.layer1,
     borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  cardUnread: {
+    backgroundColor: colors.purpleTint,
     borderColor: colors.line2,
-    borderRadius: radius.md,
-    padding: spacing.sm + 4,
-    alignItems: 'flex-start',
   },
   iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  iconTxt: { fontSize: fontSize.base + 1 },
+  iconTxt: { fontSize: 24 },
   cardHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'baseline',
     marginBottom: 4,
-    gap: 8,
   },
   cardTitle: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.base,
     fontWeight: '600',
-    color: colors.ink,
+    color: colors.ink2,
     flex: 1,
+    marginRight: 8,
+  },
+  cardTitleUnread: {
+    fontWeight: '800',
+    color: colors.ink,
   },
   cardTime: {
     fontSize: fontSize.xs,
     color: colors.ink3,
-    flexShrink: 0,
+    fontWeight: '500',
   },
   cardBody: {
     fontSize: fontSize.sm,
-    color: colors.ink2,
-    lineHeight: 19,
+    color: colors.ink3,
+    lineHeight: 18,
   },
   unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginTop: 4,
-    flexShrink: 0,
+    marginLeft: 4,
   },
 });
 

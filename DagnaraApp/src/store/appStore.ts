@@ -77,6 +77,7 @@ interface AppState extends PersistedData {
   setMessagesOpen: (v: boolean) => void;
   setHasUnread: (v: boolean) => void;
   markMessageRead: (id: number) => Promise<void>;
+  markAllRead: () => Promise<void>;
   setLifeScore: (score: number) => Promise<void>;
   checkAndUpdateStreak: (date: string) => Promise<void>;
   setProgram: (id: string, enabled: boolean) => Promise<void>;
@@ -189,6 +190,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = [...readMessageIds, id];
     const count = countUnread(next);
     set({ readMessageIds: next, unreadCount: count, hasUnread: count > 0 });
+    await persist(pick(get()), get().userEmail);
+  },
+
+  markAllRead: async () => {
+    const { MESSAGES } = require('../lib/messages');
+    const allIds = MESSAGES.map((m: any) => m.id);
+    set({ readMessageIds: allIds, unreadCount: 0, hasUnread: false });
     await persist(pick(get()), get().userEmail);
   },
 
