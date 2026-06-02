@@ -5,7 +5,7 @@
     "pr": ""
   },
   "env": {
-    "ECC_DISABLED_HOOKS": "pre:bash:gateguard-fact-force",
+    "ECC_DISABLED_HOOKS": "pre:bash:gateguard-fact-force,pre:edit-write:gateguard-fact-force",
     "ECC_CONTEXT_MONITOR_COST_WARNINGS": "false"
   },
   "permissions": {
