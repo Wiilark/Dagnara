@@ -174,7 +174,7 @@ Any code written by Gemini, Copilot, or another external AI **must be audited be
 | Test UI in a real browser | `playwright` MCP |
 | Query/inspect Supabase DB | `Supabase` MCP |
 | Create PRs, read CI | `github` MCP |
-| Research competitors / nutrition APIs | `/deep-research` with `exa` MCP |
+| Research competitors / nutrition APIs | `/dagnara-kit:search-first` (exa MCP disabled to save tokens) |
 | Session about to compact | `/dx:handoff` for richer recovery context |
 | Stale rules in CLAUDE.md | `/dx:review-claudemd` |
 
