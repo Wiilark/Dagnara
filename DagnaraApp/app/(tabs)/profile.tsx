@@ -58,6 +58,8 @@ export default function ProfileScreen() {
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName,  setEditLastName]  = useState('');
+  const [editDob, setEditDob] = useState('');          // ISO YYYY-MM-DD
+  const [dobPickerOpen, setDobPickerOpen] = useState(false);
   const [dietaryModal, setDietaryModal] = useState(false);
   const [tdeeModal, setTdeeModal] = useState(false);
   const [selectedFoodPref, setSelectedFoodPref] = useState('none');
@@ -82,8 +84,6 @@ export default function ProfileScreen() {
   const [measureInputs, setMeasureInputs] = useState<Record<string, string>>({
     weight: '', height: '', waist: '', chest: '', hips: '', arms: '',
   });
-  const [draftWeightInput, setDraftWeightInput] = useState('');
-  const [draftHeightInput, setDraftHeightInput] = useState('');
 
   // Health sync state
   const [healthConnected, setHealthConnected] = useState(false);
@@ -181,8 +181,7 @@ export default function ProfileScreen() {
     const parts = (profile.name ?? '').trim().split(' ');
     setEditFirstName(parts[0] ?? '');
     setEditLastName(parts.slice(1).join(' '));
-    setDraftWeightInput(profile.weight ? kgToInput(parseFloat(profile.weight), unitSystem) : '');
-    setDraftHeightInput(profile.height ? cmToInput(parseFloat(profile.height), unitSystem) : '');
+    setEditDob(profile.dob ?? '');
   }, [editing]);
 
   async function handleHealthConnect() {
@@ -229,29 +228,16 @@ export default function ProfileScreen() {
   }
 
   async function handleSave() {
-    const wKg = parseWeight(draftWeightInput, unitSystem);
-    const hCm = parseHeight(draftHeightInput, unitSystem);
-    const ageNum = parseInt(draft.age ?? '', 10);
-    if (draft.age && !isNaN(ageNum) && (ageNum < 16 || ageNum > 100)) {
-      Alert.alert('Invalid age', 'Age must be between 16 and 100 years.');
-      return;
-    }
-    if (wKg != null && (wKg < 30 || wKg > 300)) {
-      const bounds = unitSystem === 'Metric' ? '30–300 kg' : unitSystem === 'UK' ? '4 st 10 lb – 47 st 3 lb' : '66–661 lb';
-      Alert.alert('Invalid weight', `Weight must be between ${bounds}.`);
-      return;
-    }
-    if (hCm != null && (hCm < 100 || hCm > 250)) {
-      const bounds = unitSystem === 'Metric' ? '100–250 cm' : "3'4\"–8'2\"";
-      Alert.alert('Invalid height', `Height must be between ${bounds}.`);
+    const age = ageFromDob(editDob);
+    if (editDob && age != null && (age < 16 || age > 100)) {
+      Alert.alert('Invalid date of birth', 'Age must be between 16 and 100 years.');
       return;
     }
     const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
     await setProfile({
       ...draft,
       ...(newName ? { name: newName } : {}),
-      ...(wKg != null ? { weight: String(Math.round(wKg * 10) / 10) } : {}),
-      ...(hCm != null ? { height: String(Math.round(hCm)) } : {}),
+      ...(editDob ? { dob: editDob, age: age != null ? String(age) : draft.age } : {}),
     });
     setEditing(false);
   }
@@ -340,9 +326,31 @@ export default function ProfileScreen() {
     setSettingsPage('');
   }
 
+  // Format an ISO date (YYYY-MM-DD) like "26 October 1994". Empty → placeholder.
+  function formatDob(iso: string): string {
+    if (!iso) return 'Not set';
+    const d = new Date(`${iso}T00:00:00`);
+    if (isNaN(d.getTime())) return 'Not set';
+    return `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+  }
+
+  // Whole-year age from an ISO date of birth.
+  function ageFromDob(iso: string): number | null {
+    if (!iso) return null;
+    const d = new Date(`${iso}T00:00:00`);
+    if (isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age;
+  }
+
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const firstNameRef = useRef<TextInput>(null);
   const lastNameRef = useRef<TextInput>(null);
+  const purposeRef = useRef<TextInput>(null);
 
   // Super-smoothed interpolation for high-end Revolut feel
   const headerNameOpacity = scrollY.interpolate({
@@ -469,12 +477,12 @@ export default function ProfileScreen() {
         <View style={styles.menuCard}>
           {[
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
-            { icon: 'person-outline', label: 'Personal Details', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
+            { icon: 'person-outline', label: 'Personal Info', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
+            { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
-            { icon: 'water-outline', label: 'Water Goal', color: colors.sky, value: `${waterGoal} glasses`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
             { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
+            { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
           ].map(({ icon, label, color, value, badge, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
               <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
@@ -492,9 +500,9 @@ export default function ProfileScreen() {
         {/* ── Settings ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
-            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
+            { icon: 'water-outline', label: 'Water Goal', color: colors.sky, value: `${waterGoal} glasses`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
+            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
             { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
             { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
@@ -747,14 +755,14 @@ export default function ProfileScreen() {
                     { icon: '🔥', label: 'Streak protection', value: notifStreak,
                       onToggle: async (v: boolean) => { if (v) { const ok = await requestNotificationPermission(); if (!ok) { Alert.alert('Permission required', 'Enable notifications in settings.'); return; } } setNotifStreak(v); AsyncStorage.setItem(`${p}_notif_streak`, String(v)); scheduleStreakReminder(v); } },
                   ].map(({ icon, label, value, onToggle }, i, arr) => (
-                    <View key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                      <Text style={{ width: 28, textAlign: 'center', fontSize: 20 }}>{icon}</Text>
+                    <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                      activeOpacity={0.7} onPress={() => onToggle(!value)}>
+                      <Text style={{ width: 28, textAlign: 'center', fontSize: fontSize.lg }}>{icon}</Text>
                       <Text style={[sst.label, { flex: 1 }]}>{label}</Text>
-                      <Switch value={value} onValueChange={onToggle}
-                        trackColor={{ false: colors.layer3, true: colors.purple + '88' }}
-                        thumbColor={value ? colors.purple : colors.ink3}
-                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} />
-                    </View>
+                      <View style={[dp.toggle, value && dp.toggleOn]}>
+                        <View style={[dp.toggleThumb, value && { transform: [{ translateX: 22 }] }]} />
+                      </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
                 <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}
@@ -837,7 +845,14 @@ export default function ProfileScreen() {
           <View style={dp.header}>
             <ModalBackBtn onPress={() => setDietaryModal(false)} />
             <Text style={dp.title}>Food Preferences</Text>
-            <View style={{ width: 36 }} />
+            <TouchableOpacity onPress={() => {
+              AsyncStorage.multiSet([
+                [`${p}_diet_plan`, selectedDiet],
+                [`${p}_food_pref`, selectedFoodPref],
+                [`${p}_allergies`, JSON.stringify(selectedAllergies)],
+              ]);
+              setDietaryModal(false);
+            }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={dp.scroll} showsVerticalScrollIndicator={false}>
             {/* Food preferences — single select */}
@@ -895,19 +910,6 @@ export default function ProfileScreen() {
               })}
             </View>
           </ScrollView>
-          {/* Save footer */}
-          <View style={dp.footer}>
-            <TouchableOpacity style={dp.saveBtn} onPress={() => {
-              AsyncStorage.multiSet([
-                [`${p}_diet_plan`, selectedDiet],
-                [`${p}_food_pref`, selectedFoodPref],
-                [`${p}_allergies`, JSON.stringify(selectedAllergies)],
-              ]);
-              setDietaryModal(false);
-            }}>
-              <Text style={dp.saveBtnTxt}>SAVE SETTINGS</Text>
-            </TouchableOpacity>
-          </View>
         </SafeAreaView>
       </Modal>
 
@@ -1001,120 +1003,140 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ── Edit Profile Modal ── */}
+      {/* ── Edit Profile Modal (Revolut-style "Your profile") ── */}
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <ModalBackBtn onPress={() => setEditing(false)} />
-            <Text style={styles.modalTitle}>Personal Details</Text>
-            <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-            <View style={styles.fieldRow}>
-              <Ionicons name="person-outline" size={20} color={colors.purple} style={styles.fieldIcon} />
-              <View style={styles.fieldBody}>
-                <Text style={styles.fieldLabel}>FIRST NAME</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={editFirstName}
-                  onChangeText={setEditFirstName}
-                  placeholderTextColor={colors.ink3}
-                  placeholder="First name"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  autoComplete="name-given"
-                  textContentType="givenName"
-                  maxLength={40}
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  onSubmitEditing={() => lastNameRef.current?.focus()}
-                />
-              </View>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <ScrollView contentContainerStyle={pf.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+            {/* Top bar: back + Save */}
+            <View style={pf.topBar}>
+              <TouchableOpacity style={pf.backBtn} onPress={() => setEditing(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="chevron-back" size={22} color={colors.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSave} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.fieldRow}>
-              <Ionicons name="people-outline" size={20} color={colors.purple} style={styles.fieldIcon} />
-              <View style={styles.fieldBody}>
-                <Text style={styles.fieldLabel}>LAST NAME</Text>
-                <TextInput
-                  ref={lastNameRef}
-                  style={styles.fieldInput}
-                  value={editLastName}
-                  onChangeText={setEditLastName}
-                  placeholderTextColor={colors.ink3}
-                  placeholder="Last name"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  autoComplete="name-family"
-                  textContentType="familyName"
-                  maxLength={40}
-                  returnKeyType="done"
-                  onSubmitEditing={() => Keyboard.dismiss()}
-                />
-              </View>
+
+            {/* Title + avatar */}
+            <View style={pf.titleRow}>
+              <Text style={pf.bigTitle}>Your profile</Text>
+              <TouchableOpacity style={pf.avatarWrap} onPress={handlePickPhoto} activeOpacity={0.85}>
+                {profile.photoUri
+                  ? <Image source={{ uri: profile.photoUri }} style={pf.avatarImg} />
+                  : <View style={pf.avatar}><Text style={pf.avatarText}>{initials}</Text></View>}
+                <View style={pf.avatarCam}>
+                  <Ionicons name="camera" size={13} color={colors.white} />
+                </View>
+              </TouchableOpacity>
             </View>
-            <View style={[styles.fieldRow, { backgroundColor: colors.layer1 }]}>
-              <Ionicons name="mail-outline" size={20} color={colors.sky} style={styles.fieldIcon} />
-              <View style={styles.fieldBody}>
-                <Text style={styles.fieldLabel}>EMAIL</Text>
-                <Text style={[styles.fieldInput, { color: colors.ink3 }]} numberOfLines={1}>{email}</Text>
-              </View>
-            </View>
-            {[
-              { label: 'AGE', key: 'age', keyboard: 'numeric' as const, icon: 'calendar-outline' as const, color: colors.honey },
-              { label: 'GOAL', key: 'goal', keyboard: undefined, icon: 'flag-outline' as const, color: colors.green },
-            ].map(({ label, key, keyboard, icon, color }) => (
-              <View key={key} style={styles.fieldRow}>
-                <Ionicons name={icon} size={20} color={color} style={styles.fieldIcon} />
-                <View style={styles.fieldBody}>
-                  <Text style={styles.fieldLabel}>{label}</Text>
+
+            <Text style={pf.sectionLbl}>PERSONAL</Text>
+            <View style={pf.card}>
+              {/* Name */}
+              <View style={pf.field}>
+                <View style={pf.fieldBody}>
+                  <Text style={pf.label}>Name</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    value={draft[key] ?? ''}
-                    onChangeText={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                    ref={firstNameRef}
+                    style={pf.input}
+                    value={editFirstName}
+                    onChangeText={setEditFirstName}
+                    placeholder="First name"
                     placeholderTextColor={colors.ink3}
-                    keyboardType={keyboard ?? 'default'}
-                    autoCapitalize="none"
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    autoComplete="name-given"
+                    textContentType="givenName"
+                    maxLength={40}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => lastNameRef.current?.focus()}
+                  />
+                </View>
+                <TouchableOpacity style={pf.pencil} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); firstNameRef.current?.focus(); }}>
+                  <Ionicons name="pencil" size={16} color={colors.lavender} />
+                </TouchableOpacity>
+              </View>
+              {/* Surname */}
+              <View style={pf.field}>
+                <View style={pf.fieldBody}>
+                  <Text style={pf.label}>Surname</Text>
+                  <TextInput
+                    ref={lastNameRef}
+                    style={pf.input}
+                    value={editLastName}
+                    onChangeText={setEditLastName}
+                    placeholder="Last name"
+                    placeholderTextColor={colors.ink3}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    autoComplete="name-family"
+                    textContentType="familyName"
+                    maxLength={40}
                     returnKeyType="done"
                     onSubmitEditing={() => Keyboard.dismiss()}
                   />
                 </View>
+                <TouchableOpacity style={pf.pencil} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); lastNameRef.current?.focus(); }}>
+                  <Ionicons name="pencil" size={16} color={colors.lavender} />
+                </TouchableOpacity>
               </View>
-            ))}
-            <View style={styles.fieldRow}>
-              <Ionicons name="barbell-outline" size={20} color={colors.teal} style={styles.fieldIcon} />
-              <View style={styles.fieldBody}>
-                <Text style={styles.fieldLabel}>WEIGHT ({weightUnit(unitSystem)})</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={draftWeightInput}
-                  onChangeText={setDraftWeightInput}
-                  placeholderTextColor={colors.ink3}
-                  keyboardType="decimal-pad"
-                  autoCapitalize="none"
-                  returnKeyType="done"
-                  onSubmitEditing={() => Keyboard.dismiss()}
-                />
+              {/* Date of birth */}
+              <TouchableOpacity style={pf.field} activeOpacity={0.7}
+                onPress={() => { Keyboard.dismiss(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDobPickerOpen(true); }}>
+                <View style={pf.fieldBody}>
+                  <Text style={pf.label}>Date of birth</Text>
+                  <Text style={[pf.value, !editDob && { color: colors.ink3 }]}>{formatDob(editDob)}</Text>
+                </View>
+                <View style={pf.pencil}>
+                  <Ionicons name="pencil" size={16} color={colors.lavender} />
+                </View>
+              </TouchableOpacity>
+              {/* Email (read-only) */}
+              <View style={pf.field}>
+                <View style={pf.fieldBody}>
+                  <Text style={pf.label}>Email</Text>
+                  <Text style={[pf.value, { color: colors.ink2 }]} numberOfLines={1}>{email}</Text>
+                </View>
+                <View style={pf.lockWrap}>
+                  <Ionicons name="lock-closed" size={14} color={colors.ink3} />
+                </View>
               </View>
-            </View>
-            <View style={styles.fieldRow}>
-              <Ionicons name="resize-outline" size={20} color={colors.lavender} style={styles.fieldIcon} />
-              <View style={styles.fieldBody}>
-                <Text style={styles.fieldLabel}>HEIGHT ({heightUnit(unitSystem)})</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={draftHeightInput}
-                  onChangeText={setDraftHeightInput}
-                  placeholderTextColor={colors.ink3}
-                  keyboardType={unitSystem === 'Metric' ? 'decimal-pad' : 'default'}
-                  autoCapitalize="none"
-                  returnKeyType="done"
-                  onSubmitEditing={() => Keyboard.dismiss()}
-                />
+              {/* Purpose = fitness goal */}
+              <View style={[pf.field, pf.fieldLast]}>
+                <View style={pf.fieldBody}>
+                  <Text style={pf.label}>Purpose</Text>
+                  <TextInput
+                    ref={purposeRef}
+                    style={pf.input}
+                    value={draft.goal ?? ''}
+                    onChangeText={(v) => setDraft((d) => ({ ...d, goal: v }))}
+                    placeholder="e.g. Lose weight, build muscle"
+                    placeholderTextColor={colors.ink3}
+                    maxLength={80}
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                  />
+                </View>
+                <TouchableOpacity style={pf.pencil} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); purposeRef.current?.focus(); }}>
+                  <Ionicons name="pencil" size={16} color={colors.lavender} />
+                </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* ── Date of birth picker ── */}
+      <DobPicker
+        visible={dobPickerOpen}
+        value={editDob}
+        onClose={() => setDobPickerOpen(false)}
+        onSelect={(iso) => { setEditDob(iso); setDobPickerOpen(false); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+      />
 
       {/* Water Goal modal — cross-platform replacement for Alert.prompt */}
       <Modal visible={waterGoalModal} transparent animationType="fade" onRequestClose={() => setWaterGoalModal(false)}>
@@ -1317,12 +1339,116 @@ const dp = StyleSheet.create({
   listCard: { backgroundColor: colors.layer1, borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.lg },
   prefRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   prefLabel: { fontSize: fontSize.base, color: colors.ink },
-  radio: { width: 24, height: 24, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
-  radioSel: { backgroundColor: colors.green, borderColor: colors.green },
   toggle: { width: 50, height: 28, borderRadius: radius.pill, backgroundColor: colors.layer2, position: 'relative', overflow: 'hidden' },
-  toggleOn: { backgroundColor: colors.green },
+  toggleOn: { backgroundColor: colors.purple },
   toggleThumb: { position: 'absolute', top: 3, left: 3, width: 22, height: 22, borderRadius: radius.pill, backgroundColor: colors.white },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
-  saveBtn: { alignItems: 'center', paddingVertical: spacing.sm },
-  saveBtnTxt: { fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 1.4, color: colors.ink },
 });
+
+// Revolut-style "Your profile" edit screen
+const pf = StyleSheet.create({
+  scroll: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl * 3 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
+  backBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.lg },
+  bigTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, flex: 1 },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 72, height: 72, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
+  avatarImg: { width: 72, height: 72, borderRadius: radius.pill },
+  avatarCam: { position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.bg },
+  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm },
+  card: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, overflow: 'hidden' },
+  field: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
+  fieldLast: { borderBottomWidth: 0 },
+  fieldBody: { flex: 1 },
+  pencil: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  lockWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.6, color: colors.ink3, marginBottom: 2 },
+  input: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
+  value: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
+  // DOB picker
+  pickerBackdrop: { flex: 1, backgroundColor: colors.dim, justifyContent: 'flex-end' },
+  pickerSheet: { backgroundColor: colors.layer3, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: spacing.md, paddingBottom: spacing.xl },
+  pickerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  pickerTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
+  pickerDone: { fontSize: fontSize.base, fontWeight: '700', color: colors.lavender },
+  pickerCols: { flexDirection: 'row', height: 220 },
+  pickerCol: { flex: 1 },
+  pickerColInner: { paddingVertical: spacing.xl * 2.5 },
+  pickerItem: { height: 40, alignItems: 'center', justifyContent: 'center' },
+  pickerItemTxt: { fontSize: fontSize.base, color: colors.ink3 },
+  pickerItemActive: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink },
+});
+
+const PF_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function DobPicker({ visible, value, onClose, onSelect }: {
+  visible: boolean; value: string; onClose: () => void; onSelect: (iso: string) => void;
+}) {
+  const now = new Date();
+  const init = value ? new Date(`${value}T00:00:00`) : new Date(now.getFullYear() - 25, 0, 1);
+  const [day, setDay] = useState(init.getDate());
+  const [month, setMonth] = useState(init.getMonth());
+  const [year, setYear] = useState(init.getFullYear());
+
+  // Re-seed columns whenever the sheet opens with the current stored value
+  useEffect(() => {
+    if (!visible) return;
+    const d = value ? new Date(`${value}T00:00:00`) : new Date(now.getFullYear() - 25, 0, 1);
+    setDay(d.getDate());
+    setMonth(d.getMonth());
+    setYear(d.getFullYear());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const years: number[] = [];
+  for (let y = now.getFullYear() - 16; y >= now.getFullYear() - 100; y--) years.push(y);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: number[] = [];
+  for (let dd = 1; dd <= daysInMonth; dd++) days.push(dd);
+  const clampedDay = Math.min(day, daysInMonth);
+
+  const Col = ({ data, selected, render, onPick }: {
+    data: number[]; selected: number; render: (n: number) => string; onPick: (n: number) => void;
+  }) => (
+    <ScrollView style={pf.pickerCol} contentContainerStyle={pf.pickerColInner} showsVerticalScrollIndicator={false}>
+      {data.map((n) => {
+        const active = n === selected;
+        return (
+          <TouchableOpacity key={n} style={pf.pickerItem} activeOpacity={0.7}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPick(n); }}>
+            <Text style={active ? pf.pickerItemActive : pf.pickerItemTxt}>{render(n)}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+
+  function confirm() {
+    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+    onSelect(iso);
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={pf.pickerBackdrop} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={pf.pickerSheet} activeOpacity={1} onPress={() => {}}>
+          <View style={pf.pickerHead}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={[pf.pickerDone, { color: colors.ink3 }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={pf.pickerTitle}>Date of birth</Text>
+            <TouchableOpacity onPress={confirm} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={pf.pickerDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={pf.pickerCols}>
+            <Col data={days} selected={clampedDay} render={(n) => String(n)} onPick={setDay} />
+            <Col data={PF_MONTHS.map((_, i) => i)} selected={month} render={(n) => PF_MONTHS[n]} onPick={setMonth} />
+            <Col data={years} selected={year} render={(n) => String(n)} onPick={setYear} />
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}

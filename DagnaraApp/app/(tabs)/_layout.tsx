@@ -14,7 +14,7 @@ import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
-import { MESSAGES, MSG_COLORS } from '../../src/lib/messages';
+import { MESSAGES, MSG_COLORS, groupMessages } from '../../src/lib/messages';
 
 const TODAY = () => new Date().toLocaleDateString('en-CA');
 
@@ -36,16 +36,8 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const readMessageIds = useAppStore((s) => s.readMessageIds);
   const markMessageRead = useAppStore((s) => s.markMessageRead);
-  const markAllRead = useAppStore((s) => s.markAllRead);
-  const hasUnread = useAppStore((s) => s.hasUnread);
   const isUnread = (m: typeof MESSAGES[number]) => !!m.unread && !readMessageIds.includes(m.id);
-  const thisWeek = MESSAGES.filter(m => !m.group);
-  const lastMonth = MESSAGES.filter(m => m.group === 'Last month');
-
-  const handleMarkAll = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    markAllRead();
-  };
+  const groups = groupMessages();
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -53,25 +45,20 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
         <LinearGradient
           colors={['rgba(124,77,255,0.18)', 'transparent']}
           style={StyleSheet.absoluteFillObject}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.32 }}
           pointerEvents="none"
         />
-        <View style={msg.header}>
-          <TouchableOpacity style={msg.backBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <BackChevron size={22} color={colors.ink} />
-          </TouchableOpacity>
-          <View style={msg.titleContainer}>
-            <Text style={msg.title}>Inbox</Text>
-          </View>
-          {hasUnread ? (
-            <TouchableOpacity onPress={handleMarkAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={msg.markAllTxt}>Mark all</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 60 }} />
-          )}
-        </View>
         <ScrollView contentContainerStyle={msg.scroll} showsVerticalScrollIndicator={false}>
+          {/* Top bar: circular back button */}
+          <View style={msg.topBar}>
+            <TouchableOpacity style={msg.backBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <BackChevron size={22} color={colors.ink} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Big left-aligned title */}
+          <Text style={msg.bigTitle}>Inbox</Text>
+
           {MESSAGES.length === 0 ? (
             <View style={msg.emptyWrap}>
               <Text style={msg.emptyIcon}>📬</Text>
@@ -79,56 +66,39 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
               <Text style={msg.emptySub}>Get science-backed content on nutrition and behaviour created by experts, new app features, and more.</Text>
             </View>
           ) : (
-            <>
-              {thisWeek.length > 0 && (
-                <>
-                  <Text style={msg.groupLbl}>This week</Text>
-                  {thisWeek.map(m => (
-                    <TouchableOpacity key={m.id} style={[msg.card, isUnread(m) && msg.cardUnread]}
-                      onPress={() => {
-                        if (isUnread(m)) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        markMessageRead(m.id);
-                      }} activeOpacity={0.75}>
-                      <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
-                        <Text style={msg.iconTxt}>{m.icon}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={msg.cardHead}>
-                          <Text style={[msg.cardTitle, isUnread(m) && msg.cardTitleUnread]}>{m.title}</Text>
-                          <Text style={msg.cardTime}>{m.time}</Text>
+            groups.map((group, gi) => (
+              <View key={group.label} style={gi > 0 ? { marginTop: spacing.lg } : undefined}>
+                <Text style={msg.groupLbl}>{group.label}</Text>
+                {group.items.map((m) => {
+                  const accent = MSG_COLORS[m.type] ?? colors.lavender;
+                  const unread = isUnread(m);
+                  const onPress = () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    markMessageRead(m.id);
+                    if (m.route) { router.push(m.route as any); onClose(); }
+                  };
+                  return (
+                    <TouchableOpacity key={m.id} style={[msg.card, unread && msg.cardUnread]} onPress={onPress} activeOpacity={0.85}>
+                      <View style={msg.cardRow}>
+                        <View style={[msg.iconWrap, { backgroundColor: `${accent}22` }]}>
+                          <Text style={msg.iconTxt}>{m.icon}</Text>
+                          {unread && <View style={msg.unreadDot} />}
                         </View>
-                        <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
-                      </View>
-                      {isUnread(m) && <View style={[msg.unreadDot, { backgroundColor: MSG_COLORS[m.type] ?? colors.lavender }]} />}
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-              {lastMonth.length > 0 && (
-                <>
-                  <Text style={[msg.groupLbl, { marginTop: 24 }]}>Last month</Text>
-                  {lastMonth.map(m => (
-                    <TouchableOpacity key={m.id} style={[msg.card, isUnread(m) && msg.cardUnread]}
-                      onPress={() => {
-                        if (isUnread(m)) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        markMessageRead(m.id);
-                      }} activeOpacity={0.75}>
-                      <View style={[msg.iconWrap, { backgroundColor: `${MSG_COLORS[m.type] ?? colors.lavender}22` }]}>
-                        <Text style={msg.iconTxt}>{m.icon}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={msg.cardHead}>
-                          <Text style={[msg.cardTitle, isUnread(m) && msg.cardTitleUnread]}>{m.title}</Text>
-                          <Text style={msg.cardTime}>{m.time}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[msg.cardTitle, unread && msg.cardTitleUnread]}>{m.title}</Text>
+                          <Text style={msg.cardBody}>{m.body}</Text>
+                          {!!m.cta && (
+                            <TouchableOpacity style={msg.ctaPill} onPress={onPress} activeOpacity={0.8}>
+                              <Text style={msg.ctaTxt}>{m.cta}</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
-                        <Text style={msg.cardBody} numberOfLines={3}>{m.body}</Text>
                       </View>
-                      {isUnread(m) && <View style={[msg.unreadDot, { backgroundColor: MSG_COLORS[m.type] ?? colors.lavender }]} />}
                     </TouchableOpacity>
-                  ))}
-                </>
-              )}
-            </>
+                  );
+                })}
+              </View>
+            ))
           )}
         </ScrollView>
       </SafeAreaView>
@@ -964,51 +934,40 @@ const msg = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  header: {
+  scroll: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    height: 54,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
+    paddingTop: spacing.sm,
+    minHeight: 48,
   },
   backBtn: {
     width: 44,
     height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.layer2,
+    borderWidth: 1,
+    borderColor: colors.line2,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
   },
-  titleContainer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 0,
-  },
-  title: {
-    fontSize: fontSize.md,
+  bigTitle: {
+    fontSize: fontSize['2xl'],
     fontWeight: '800',
     color: colors.ink,
     letterSpacing: -0.5,
-  },
-  markAllTxt: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.lavender,
-    width: 60,
-    textAlign: 'right',
-  },
-  scroll: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   emptyWrap: {
     alignItems: 'center',
-    paddingTop: spacing.xl * 2,
-    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
-  emptyIcon: { fontSize: 64, marginBottom: spacing.md },
+  emptyIcon: { fontSize: fontSize['2xl'], marginBottom: spacing.md },
   emptyTitle: {
     fontSize: fontSize.lg,
     fontWeight: '800',
@@ -1024,17 +983,14 @@ const msg = StyleSheet.create({
     fontWeight: '400',
   },
   groupLbl: {
-    fontSize: fontSize.xs - 1,
+    fontSize: fontSize.xs,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
     color: colors.ink3,
     marginBottom: spacing.sm,
-    marginTop: spacing.sm,
   },
   card: {
-    flexDirection: 'row',
-    gap: spacing.md,
     backgroundColor: colors.layer1,
     borderWidth: 1,
     borderColor: colors.line,
@@ -1046,48 +1002,58 @@ const msg = StyleSheet.create({
     backgroundColor: colors.purpleTint,
     borderColor: colors.line2,
   },
+  cardRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'flex-start',
+  },
   iconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  iconTxt: { fontSize: 24 },
-  cardHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 4,
+  iconTxt: { fontSize: fontSize.lg },
+  unreadDot: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 14,
+    height: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.rose,
+    borderWidth: 2,
+    borderColor: colors.bg,
   },
   cardTitle: {
     fontSize: fontSize.base,
     fontWeight: '600',
     color: colors.ink2,
-    flex: 1,
-    marginRight: 8,
+    marginBottom: spacing.xs,
   },
   cardTitleUnread: {
     fontWeight: '800',
     color: colors.ink,
-  },
-  cardTime: {
-    fontSize: fontSize.xs,
-    color: colors.ink3,
-    fontWeight: '500',
   },
   cardBody: {
     fontSize: fontSize.sm,
     color: colors.ink3,
     lineHeight: 18,
   },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
-    marginLeft: 4,
+  ctaPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.purple,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+  },
+  ctaTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.white,
   },
 });
 

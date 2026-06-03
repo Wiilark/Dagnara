@@ -5,9 +5,11 @@ import { supabase } from '../lib/supabase';
 interface Profile {
   name?: string;
   age?: string;
+  dob?: string;        // ISO date string (YYYY-MM-DD)
   weight?: string;
   height?: string;
   goal?: string;
+  photoUri?: string;
   [key: string]: string | undefined;
 }
 
