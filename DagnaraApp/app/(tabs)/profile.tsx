@@ -703,12 +703,14 @@ export default function ProfileScreen() {
             scrollY={settingsScrollY}
             title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
-            staticTitle={settingsPage === 'notifications' || settingsPage === 'account'}
+            staticTitle={settingsPage === 'notifications' || settingsPage === 'account' || settingsPage === 'health'}
             action={
               settingsPage === 'account'
                 ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } }
                 : settingsPage === 'notifications'
                 ? { label: 'Save', onPress: () => { setSettingsPage(''); setSettingsModal(false); } }
+                : settingsPage === 'health'
+                ? { label: 'Save', onPress: async () => { if (healthConnected) await handleHealthSync(); setSettingsPage(''); setSettingsModal(false); } }
                 : undefined
             }
           />
@@ -822,13 +824,6 @@ export default function ProfileScreen() {
                     </View>
                   ))}
                 </View>
-
-                <TouchableOpacity onPress={handleHealthSync} disabled={healthSyncing}
-                  style={{ borderRadius: radius.md, overflow: 'hidden', opacity: healthSyncing ? 0.6 : 1 }}>
-                  <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ padding: spacing.md, alignItems: 'center' }}>
-                    <Text style={{ color: colors.white, fontWeight: '700' }}>{healthSyncing ? 'Syncing…' : healthConnected ? 'Sync now' : 'Connect & sync'}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
               </View>
             )}
 
