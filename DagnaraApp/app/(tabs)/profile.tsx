@@ -277,9 +277,15 @@ export default function ProfileScreen() {
       Alert.alert('Invalid date of birth', 'Age must be between 16 and 100 years.');
       return;
     }
+    // Validate names: letters/spaces/hyphens/apostrophes/periods only (covers
+    // "O'Brien", "Jean-Luc", "J.R."), 2–40 chars, no digits or symbols.
+    const first = editFirstName.trim();
+    const last  = editLastName.trim();
+    const nameErr = validateName(first, true) ?? validateName(last, false);
+    if (nameErr) { Alert.alert('Invalid name', nameErr); return; }
     const measurePatch = await saveMeasurementsCore();
     if (measurePatch === null) return; // validation failed — keep editor open
-    const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
+    const newName = [first, last].filter(Boolean).join(' ');
     // Persist in the background (setProfile updates state + local cache synchronously,
     // then upserts to Supabase). Don't block the close on the network round-trip.
     void setProfile({
@@ -358,6 +364,26 @@ export default function ProfileScreen() {
   }
 
   // Whole-year age from an ISO date of birth.
+  // Strip characters that aren't allowed in a name as the user types, so digits
+  // and symbols never make it into the field in the first place.
+  function sanitizeNameInput(value: string): string {
+    return value.replace(/[^\p{L} '.-]/gu, '');
+  }
+
+  // Returns an error string if the name is invalid, or null if it's fine.
+  // `required` first name must be present; surname may be empty but, if given,
+  // must still pass the same character/length rules.
+  function validateName(value: string, required: boolean): string | null {
+    if (!value) return required ? 'Please enter your first name.' : null;
+    if (value.length < 2) return 'Name must be at least 2 characters.';
+    if (value.length > 40) return 'Name must be 40 characters or fewer.';
+    // Letters (incl. accented), spaces, hyphens, apostrophes, periods.
+    if (!/^[\p{L}][\p{L} '.-]*$/u.test(value)) {
+      return 'Names can only contain letters, spaces, hyphens, and apostrophes.';
+    }
+    return null;
+  }
+
   function ageFromDob(iso: string): number | null {
     if (!iso) return null;
     const d = new Date(`${iso}T00:00:00`);
@@ -1141,7 +1167,7 @@ export default function ProfileScreen() {
                     ref={firstNameRef}
                     style={pf.input}
                     value={editFirstName}
-                    onChangeText={setEditFirstName}
+                    onChangeText={(t) => setEditFirstName(sanitizeNameInput(t))}
                     placeholder="First name"
                     placeholderTextColor={colors.ink3}
                     autoCapitalize="words"
@@ -1167,7 +1193,7 @@ export default function ProfileScreen() {
                     ref={lastNameRef}
                     style={pf.input}
                     value={editLastName}
-                    onChangeText={setEditLastName}
+                    onChangeText={(t) => setEditLastName(sanitizeNameInput(t))}
                     placeholder="Last name"
                     placeholderTextColor={colors.ink3}
                     autoCapitalize="words"
