@@ -1365,7 +1365,7 @@ const styles = StyleSheet.create({
   },
   upgradeTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '700', letterSpacing: 0.4 },
 
-  hero: { alignItems: 'center', gap: 14, paddingBottom: 8 },
+  hero: { alignItems: 'center', gap: spacing.md - 2, paddingBottom: 2 },
   avatarWrap: { position: 'relative' },
   avatar: { width: 82, height: 82, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
