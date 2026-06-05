@@ -1209,36 +1209,6 @@ export default function ProfileScreen() {
                   <Ionicons name="lock-closed" size={14} color={colors.ink3} />
                 </View>
               </View>
-              {/* Purpose of account = fitness goal, picked from 3 blocks */}
-              <View style={[pf.field, { flexDirection: 'column', alignItems: 'stretch' }]}>
-                <Text style={[pf.label, { marginBottom: spacing.sm }]}>Purpose of account</Text>
-                <View style={pf.goalRow}>
-                  {PURPOSE_GOALS.map((g) => {
-                    const active = localGoal === g.key;
-                    return (
-                      <TouchableOpacity
-                        key={g.key}
-                        activeOpacity={0.85}
-                        style={[pf.goalBlock, active && pf.goalBlockActive]}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setLocalGoal(g.key);
-                          setDraft((d) => ({ ...d, goal: g.label }));
-                          const age = parseInt(profile.age ?? '25', 10) || 25;
-                          const weight = parseFloat(profile.weight ?? '70') || 70;
-                          const height = parseFloat(profile.height ?? '170') || 170;
-                          setGoals(localActivity, g.key, calcTDEE(age, weight, height, sex, localActivity, g.key));
-                        }}>
-                        {active && <View style={pf.goalCheck}><Ionicons name="checkmark" size={12} color={colors.bg} /></View>}
-                        <View style={[pf.goalIconWrap, active && pf.goalIconWrapActive]}>
-                          <Ionicons name={g.icon} size={22} color={active ? colors.lavender : colors.ink2} />
-                        </View>
-                        <Text style={[pf.goalLabel, active && pf.goalLabelActive]} numberOfLines={1}>{g.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
             </View>
 
             <Text style={[pf.sectionLbl, { marginTop: spacing.lg }]}>BODY MEASUREMENTS</Text>
@@ -1501,46 +1471,6 @@ const pf = StyleSheet.create({
   label: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.6, color: colors.ink3, marginBottom: 2 },
   input: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
   value: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
-  // Purpose-of-account goal blocks (3 across)
-  goalRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
-  goalBlock: {
-    flex: 1,
-    minHeight: 92,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-    backgroundColor: colors.layer2,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.line2,
-  },
-  goalBlockActive: {
-    backgroundColor: colors.purpleTint,
-    borderColor: colors.purple,
-    borderWidth: 2,
-    shadowColor: colors.purple,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  goalIconWrap: {
-    width: 40, height: 40,
-    alignItems: 'center', justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.line,
-  },
-  goalIconWrapActive: { backgroundColor: colors.line3 },
-  goalCheck: {
-    position: 'absolute', top: spacing.xs, right: spacing.xs,
-    width: 18, height: 18, borderRadius: radius.pill,
-    backgroundColor: colors.lavender,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  goalLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink2, textAlign: 'center' },
-  goalLabelActive: { color: colors.ink, fontWeight: '800' },
   measureLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   measureInput: { flex: 1, paddingVertical: spacing.xs },
   measureUnit: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink3 },
@@ -1566,14 +1496,6 @@ const pf = StyleSheet.create({
 
 const PF_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// The three account-purpose goals shown as selectable blocks in the editor.
-// `key` is the canonical value stored in appStore.weightGoal (set during onboarding),
-// so the active block reflects whatever the user picked on the goal step.
-const PURPOSE_GOALS: { key: 'lose' | 'maintain' | 'gain'; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'lose',     label: 'Lose weight',     icon: 'trending-down' },
-  { key: 'maintain', label: 'Maintain',        icon: 'pulse' },
-  { key: 'gain',     label: 'Gain muscle',     icon: 'barbell' },
-];
 // Wheel row height — shared by item, snap interval, padding, and indicator band.
 const PICK_ITEM_H = 44;
 const PICK_VISIBLE = 5; // rows visible in the wheel (must be odd to have a center)
