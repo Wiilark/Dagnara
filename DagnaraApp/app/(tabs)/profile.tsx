@@ -679,7 +679,7 @@ export default function ProfileScreen() {
       {/* ── Diet Plan Modal ── */}
       <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietModal(false)}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <FloatingModalHeader scrollY={dietScrollY} title="Diet Plan" onBack={() => setDietModal(false)} action={{ label: 'Save', onPress: () => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); } }} />
+          <FloatingModalHeader scrollY={dietScrollY} title="Diet Plan" staticTitle onBack={() => setDietModal(false)} action={{ label: 'Save', onPress: () => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); } }} />
           <Animated.ScrollView
             contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.xl + spacing.xl, gap: spacing.sm }}
             showsVerticalScrollIndicator={false}
@@ -926,7 +926,7 @@ export default function ProfileScreen() {
       {/* ── Dietary Preferences Modal ── */}
       <Modal visible={dietaryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietaryModal(false)}>
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
-          <FloatingModalHeader scrollY={dietaryScrollY} title="Food Preferences" onBack={() => setDietaryModal(false)} action={{ label: 'Save', onPress: () => {
+          <FloatingModalHeader scrollY={dietaryScrollY} title="Food Preferences" staticTitle onBack={() => setDietaryModal(false)} action={{ label: 'Save', onPress: () => {
             AsyncStorage.multiSet([
               [`${p}_diet_plan`, selectedDiet],
               [`${p}_food_pref`, selectedFoodPref],
@@ -1001,7 +1001,7 @@ export default function ProfileScreen() {
       {/* ── TDEE Modal ── */}
       <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTdeeModal(false)}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <FloatingModalHeader scrollY={tdeeScrollY} title="Calorie & Goals" onBack={() => setTdeeModal(false)} action={{ label: 'Save', onPress: () => {
+          <FloatingModalHeader scrollY={tdeeScrollY} title="Calorie & Goals" staticTitle onBack={() => setTdeeModal(false)} action={{ label: 'Save', onPress: () => {
             const age = parseInt(profile.age ?? '25', 10) || 25;
             const weight = parseFloat(profile.weight ?? '70') || 70;
             const height = parseFloat(profile.height ?? '170') || 170;
