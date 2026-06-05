@@ -289,6 +289,14 @@ export default function ProfileScreen() {
       ...(newName ? { name: newName } : {}),
       ...(editDob ? { dob: editDob, age: age != null ? String(age) : draft.age } : {}),
     });
+    // Recompute the daily calorie goal from the edited body data so the whole app
+    // (diary/log/progress/recipes) stays in sync — Personal Info is a real input to
+    // TDEE, not just display. weight/height are metric here; fall back to the stored
+    // profile when a field wasn't touched. Activity level & weight goal are unchanged.
+    const tdeeAge    = age ?? (parseInt(draft.age ?? '25', 10) || 25);
+    const tdeeWeight = parseFloat(measurePatch.weight ?? draft.weight ?? '70') || 70;
+    const tdeeHeight = parseFloat(measurePatch.height ?? draft.height ?? '170') || 170;
+    void setGoals(activityLevel, weightGoal, calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, sex, activityLevel, weightGoal));
     setEditing(false);
   }
 
@@ -296,6 +304,12 @@ export default function ProfileScreen() {
     const measurePatch = await saveMeasurementsCore();
     if (measurePatch === null) return;
     await setProfile({ ...profile, ...measurePatch });
+    // Keep the calorie goal in sync when weight/height change here too.
+    const tdeeAge    = parseInt(profile.age ?? '25', 10) || 25;
+    const tdeeWeight = parseFloat((measurePatch.weight ?? profile.weight) ?? '70') || 70;
+    const tdeeHeight = parseFloat((measurePatch.height ?? profile.height) ?? '170') || 170;
+    const curSex = (profile.sex as 'male' | 'female') ?? 'male';
+    void setGoals(activityLevel, weightGoal, calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, curSex, activityLevel, weightGoal));
     setMeasureModal(false);
   }
 
