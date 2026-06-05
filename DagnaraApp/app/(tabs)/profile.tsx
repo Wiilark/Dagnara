@@ -700,7 +700,13 @@ export default function ProfileScreen() {
             scrollY={settingsScrollY}
             title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
-            action={settingsPage === 'account' ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } } : undefined}
+            action={
+              settingsPage === 'account'
+                ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } }
+                : settingsPage === 'notifications'
+                ? { label: 'Save', onPress: () => { setSettingsPage(''); setSettingsModal(false); } }
+                : undefined
+            }
           />
 
           <Animated.ScrollView
@@ -843,10 +849,6 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity onPress={() => { setSettingsPage(''); setSettingsModal(false); }}
-                  style={{ backgroundColor: colors.purple, padding: spacing.md, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.md }}>
-                  <Text style={{ color: colors.white, fontWeight: '700' }}>Done</Text>
-                </TouchableOpacity>
               </View>
             )}
 
