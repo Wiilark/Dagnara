@@ -411,15 +411,17 @@ export default function ProfileScreen() {
     title,
     onBack,
     action,
+    staticTitle,
   }: {
     scrollY: Animated.Value;
     title: string;
     onBack: () => void;
     action?: { label: string; onPress: () => void };
+    staticTitle?: boolean; // always show the title (for pages with no big in-body header)
   }) => {
     const blurOp = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
-    const titleOp = scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
-    const titleTY = scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
+    const titleOp = staticTitle ? 1 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
+    const titleTY = staticTitle ? 0 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
     return (
       <View style={pf.fixedHeader}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOp }]}>
@@ -700,6 +702,7 @@ export default function ProfileScreen() {
             scrollY={settingsScrollY}
             title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
+            staticTitle={settingsPage === 'notifications'}
             action={
               settingsPage === 'account'
                 ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } }
