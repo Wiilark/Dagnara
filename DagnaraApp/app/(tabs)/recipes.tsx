@@ -433,8 +433,8 @@ export default function RecipesScreen() {
             </View>
             {hasUnread && <View style={styles.avatarDot} />}
           </TouchableOpacity>
-          <Text style={styles.heading}>Recipes</Text>
-          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+          <View style={styles.headingWrap} pointerEvents="none"><Text style={styles.heading}>Recipes</Text></View>
+          <View style={styles.headerRight}>
             {viewMode === 'recipes' && (
               <TouchableOpacity
                 style={[styles.iconBtn, planMode && styles.iconBtnActive]}
@@ -960,11 +960,13 @@ const styles = StyleSheet.create({
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.lg },
 
-  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.lg, flex: 1 },
+  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
   avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
-  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
+  headingWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
+  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: spacing.xl + spacing.sm, zIndex: 1 },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },

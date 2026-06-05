@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -8,6 +8,8 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { Platform } from 'react-native';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight } from '../../src/lib/units';
@@ -39,6 +41,12 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
   const isUnread = (m: typeof MESSAGES[number]) => !!m.unread && !readMessageIds.includes(m.id);
   const groups = groupMessages();
 
+  // Floating header — blur + centered title fade in on scroll, mirroring the profile header.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const titleOpacity = scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
+  const titleTranslateY = scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
+  const blurOpacity = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={msg.safe} edges={['top', 'bottom']}>
@@ -48,14 +56,34 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.32 }}
           pointerEvents="none"
         />
-        <ScrollView contentContainerStyle={msg.scroll} showsVerticalScrollIndicator={false}>
-          {/* Top bar: circular back button */}
-          <View style={msg.topBar}>
+
+        {/* Fixed floating header — back button stays put; blur + centered title fade in on scroll */}
+        <View style={msg.fixedHeader}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOpacity }]}>
+            <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={['transparent', colors.bg]}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
+              start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
+            />
+          </Animated.View>
+          <View style={msg.fixedHeaderRow}>
             <TouchableOpacity style={msg.backBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <BackChevron size={22} color={colors.ink} />
             </TouchableOpacity>
+            <Animated.Text style={[msg.headerTitle, { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] }]} numberOfLines={1} pointerEvents="none">
+              Inbox
+            </Animated.Text>
+            <View style={msg.headerSpacer} />
           </View>
+        </View>
 
+        <Animated.ScrollView
+          contentContainerStyle={msg.scroll}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        >
           {/* Big left-aligned title */}
           <Text style={msg.bigTitle}>Inbox</Text>
 
@@ -100,7 +128,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
               </View>
             ))
           )}
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -936,14 +964,20 @@ const msg = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.xl + spacing.sm,
     paddingBottom: spacing.xl,
   },
-  topBar: {
+  // Fixed floating header overlay — stays put while content scrolls; blur fades in.
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
+  fixedHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: spacing.sm,
-    minHeight: 48,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
+  headerTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: colors.ink, fontSize: fontSize.md, fontWeight: '800' },
+  headerSpacer: { width: 44, height: 44 },
   backBtn: {
     width: 44,
     height: 44,

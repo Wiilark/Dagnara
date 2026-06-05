@@ -1831,7 +1831,7 @@ export default function DiaryScreen() {
             </View>
             {hasUnread && <View style={st.avatarDot} />}
           </TouchableOpacity>
-          <Text style={st.appTitle}>Diary</Text>
+          <View style={st.appTitleWrap} pointerEvents="none"><Text style={st.appTitle}>Diary</Text></View>
           <View style={st.headerRight}>
             <TouchableOpacity style={st.iconBtn} onPress={handleShareDay}>
               <Ionicons name="share-outline" size={22} color={colors.ink2} />
@@ -2912,15 +2912,16 @@ const st = StyleSheet.create({
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
 
   // Header
-  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.lg, flex: 1 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, position: 'absolute', left: 0, right: 0, textAlign: 'center', zIndex: 0 },
+  appTitleWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
+  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
   upgradeBadge: { backgroundColor: colors.purple + '2e', borderWidth: 1, borderColor: colors.purple + '66', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
   upgradeTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.8 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: spacing.xl + spacing.sm, zIndex: 1 },
   // Action buttons
   actionBtnPrimary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md },
   actionBtnPrimaryIcon: { fontSize: fontSize.lg },
@@ -2955,7 +2956,7 @@ const st = StyleSheet.create({
   browseItemMeta: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
   browseItemKcal: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
   browseItemKcalLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: spacing.xs / 2, backgroundColor: colors.rose },
   avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
 
