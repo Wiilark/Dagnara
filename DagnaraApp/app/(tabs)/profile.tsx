@@ -504,7 +504,7 @@ export default function ProfileScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl + spacing.lg }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl + spacing.md }]}
         showsVerticalScrollIndicator={false}
       >
 
