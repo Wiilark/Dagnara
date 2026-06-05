@@ -285,6 +285,7 @@ export default function ProfileScreen() {
     void setProfile({
       ...draft,
       ...measurePatch,
+      sex,
       ...(newName ? { name: newName } : {}),
       ...(editDob ? { dob: editDob, age: age != null ? String(age) : draft.age } : {}),
     });
@@ -1015,20 +1016,6 @@ export default function ProfileScreen() {
             scrollEventThrottle={16}
             onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: tdeeScrollY } } }], { useNativeDriver: true })}
           >
-            {/* Sex selector */}
-            <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Biological Sex</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
-              {(['male', 'female'] as const).map(s => (
-                <TouchableOpacity key={s} onPress={() => setSex(s)}
-                  style={{ flex: 1, padding: spacing.sm, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
-                    borderColor: sex === s ? colors.lavender : colors.line2,
-                    backgroundColor: sex === s ? colors.purple + '22' : colors.layer2 }}>
-                  <Ionicons name={s === 'male' ? 'male' : 'female'} size={24} color={s === 'male' ? colors.sky : colors.rose} />
-                  <Text style={{ color: sex === s ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: fontSize.sm, textTransform: 'capitalize' }}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
             {/* Activity Level */}
             <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Activity Level</Text>
             <View style={{ gap: spacing.xs, marginBottom: spacing.xs }}>
@@ -1207,6 +1194,22 @@ export default function ProfileScreen() {
                 </View>
                 <View style={pf.lockWrap}>
                   <Ionicons name="lock-closed" size={14} color={colors.ink3} />
+                </View>
+              </View>
+              {/* Biological sex — two icon toggles under email */}
+              <View style={[pf.field, { flexDirection: 'column', alignItems: 'stretch' }]}>
+                <Text style={[pf.label, { marginBottom: spacing.sm }]}>Biological sex</Text>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  {(['male', 'female'] as const).map((s) => (
+                    <TouchableOpacity key={s} activeOpacity={0.85}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSex(s); }}
+                      style={{ flex: 1, padding: spacing.sm, borderRadius: radius.sm + 2, borderWidth: 1.5, alignItems: 'center',
+                        borderColor: sex === s ? colors.lavender : colors.line2,
+                        backgroundColor: sex === s ? colors.purple + '22' : colors.layer2 }}>
+                      <Ionicons name={s === 'male' ? 'male' : 'female'} size={24} color={s === 'male' ? colors.sky : colors.rose} />
+                      <Text style={{ color: sex === s ? colors.lavender : colors.ink2, marginTop: 4, fontWeight: '600', fontSize: fontSize.sm, textTransform: 'capitalize' }}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             </View>
