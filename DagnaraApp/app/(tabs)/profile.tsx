@@ -896,10 +896,12 @@ export default function ProfileScreen() {
                 <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, marginBottom: spacing.md }}>SELECT LANGUAGE</Text>
                 {['English'].map((lang) => (
                   <TouchableOpacity key={lang} onPress={() => { setLanguage(lang); AsyncStorage.setItem(`${p}_language`, lang); setSettingsPage(''); setSettingsModal(false); }}
-                    style={{ padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1.5, borderColor: language === lang ? colors.lavender : colors.line2, marginBottom: spacing.sm }}>
-                    <Text style={{ color: language === lang ? colors.lavender : colors.ink, fontWeight: '600' }}>{lang}</Text>
+                    style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1.5, borderColor: language === lang ? colors.lavender : colors.line2, marginBottom: spacing.sm }}>
+                    <Text style={{ color: language === lang ? colors.lavender : colors.ink, fontWeight: '600', flex: 1 }}>{lang}</Text>
+                    {language === lang && <Ionicons name="checkmark-circle" size={22} color={colors.lavender} />}
                   </TouchableOpacity>
                 ))}
+                <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginTop: spacing.xs, textAlign: 'center' }}>More languages coming soon.</Text>
               </View>
             )}
 
