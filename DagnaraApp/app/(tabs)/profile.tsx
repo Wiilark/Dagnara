@@ -280,7 +280,9 @@ export default function ProfileScreen() {
     const measurePatch = await saveMeasurementsCore();
     if (measurePatch === null) return; // validation failed — keep editor open
     const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
-    await setProfile({
+    // Persist in the background (setProfile updates state + local cache synchronously,
+    // then upserts to Supabase). Don't block the close on the network round-trip.
+    void setProfile({
       ...draft,
       ...measurePatch,
       ...(newName ? { name: newName } : {}),
