@@ -18,19 +18,42 @@ const FIELDS = [
   { key: 'height',          label: 'HEIGHT',             placeholder: 'e.g. 175',       keyboard: 'numeric'    as const, hint: 'Enter in cm — you can change units in setup' },
 ];
 
+// Strip anything that isn't a letter, space, hyphen, apostrophe or period as the
+// user types — keeps the name field clean before it ever reaches validation.
+function sanitizeNameInput(value: string): string {
+  return value.replace(/[^\p{L} '.-]/gu, '');
+}
+
+// Letters/spaces/hyphens/apostrophes/periods only (covers "O'Brien", "Jean-Luc",
+// "J.R."), 2–40 chars, no digits or symbols. Mirrors Personal Info's guard so a
+// bad name can't enter the system at signup.
+function validateName(value: string): string | null {
+  if (!value) return 'Please enter your name.';
+  if (value.length < 2) return 'Name must be at least 2 characters.';
+  if (value.length > 40) return 'Name must be 40 characters or fewer.';
+  if (!/^[\p{L}][\p{L} '.-]*$/u.test(value)) {
+    return 'Names can only contain letters, spaces, hyphens, and apostrophes.';
+  }
+  return null;
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuthStore();
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  function set(key: string, val: string) { setValues(p => ({ ...p, [key]: val })); }
+  function set(key: string, val: string) {
+    setValues(p => ({ ...p, [key]: key === 'name' ? sanitizeNameInput(val) : val }));
+  }
 
   async function handleRegister() {
     if (!values.email || !values.password || !values.name) {
       Alert.alert('Required fields missing', 'Please fill in name, email and password.');
       return;
     }
+    const nameErr = validateName((values.name ?? '').trim());
+    if (nameErr) { Alert.alert('Invalid name', nameErr); return; }
     if (values.password.length < 6) {
       Alert.alert('Password too short', 'Password must be at least 6 characters.');
       return;
@@ -54,7 +77,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(values.email.trim().toLowerCase(), values.password, {
-        name: values.name,
+        name: values.name.trim(),
         age: values.age,
         weight: values.weight,
         height: values.height,
