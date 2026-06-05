@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, TextInput, Modal, Switch, Image, Platform, KeyboardAvoidingView, Keyboard,
+  Alert, TextInput, Modal, Switch, Image, Platform, Keyboard,
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -72,9 +72,6 @@ export default function ProfileScreen() {
   const [notifMeals,   setNotifMeals]   = useState(false);
   const [notifStreak,  setNotifStreak]  = useState(false);
   const calorieGoal = storeCalGoal || 2000;
-  const [waterGoal, setWaterGoal] = useState('8');
-  const [waterGoalModal, setWaterGoalModal] = useState(false);
-  const [waterGoalInput, setWaterGoalInput] = useState('');
   const [sex, setSex] = useState<'male' | 'female'>((profile.sex as 'male' | 'female') ?? 'male');
   const [localActivity, setLocalActivity] = useState<typeof activityLevel>(activityLevel);
   const [localGoal, setLocalGoal] = useState<typeof weightGoal>(weightGoal);
@@ -99,7 +96,7 @@ export default function ProfileScreen() {
     AsyncStorage.multiGet([
       `${p}_body_measurements`,
       `${p}_notif_checkin`, `${p}_notif_meals`, `${p}_notif_streak`,
-      `${p}_language`, `${p}_unit_system`, `${p}_water_goal`, `${p}_plan`,
+      `${p}_language`, `${p}_unit_system`, `${p}_plan`,
       `${p}_diet_plan`, `${p}_food_pref`, `${p}_allergies`,
     ]).then(pairs => {
       const m: Record<string, string | null> = Object.fromEntries(pairs);
@@ -112,7 +109,6 @@ export default function ProfileScreen() {
       if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
       if (m[`${p}_language`])      setLanguage(m[`${p}_language`]!);
       if (m[`${p}_plan`])          setSelectedPlan(m[`${p}_plan`] as 'free' | 'premium');
-      if (m[`${p}_water_goal`])    setWaterGoal(m[`${p}_water_goal`]!);
       if (m[`${p}_diet_plan`])     setSelectedDiet(m[`${p}_diet_plan`]!);
       if (m[`${p}_food_pref`])     setSelectedFoodPref(m[`${p}_food_pref`]!);
       if (m[`${p}_allergies`]) {
@@ -144,11 +140,6 @@ export default function ProfileScreen() {
       setLocalGoal(weightGoal);
     }
   }, [tdeeModal]);
-
-  // Reset water goal input when dialog closes
-  useEffect(() => {
-    if (!waterGoalModal) setWaterGoalInput('');
-  }, [waterGoalModal]);
 
   // Revert unsaved dietary preference changes when the sheet closes without saving
   useEffect(() => {
@@ -578,7 +569,6 @@ export default function ProfileScreen() {
         {/* ── Settings ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'water-outline', label: 'Water Goal', color: colors.sky, value: `${waterGoal} glasses`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
             { icon: 'notifications-outline', label: 'Notification Settings', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
@@ -1318,52 +1308,6 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Water Goal modal — cross-platform replacement for Alert.prompt */}
-      <Modal visible={waterGoalModal} transparent animationType="fade" onRequestClose={() => setWaterGoalModal(false)}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: colors.dim, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
-          <View style={{ backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, padding: spacing.lg, width: '100%', gap: spacing.md }}>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Water Goal</Text>
-            <Text style={{ fontSize: fontSize.sm, color: colors.ink3 }}>Glasses per day (1–20)</Text>
-            <TextInput
-              style={{ backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' }}
-              value={waterGoalInput}
-              onChangeText={setWaterGoalInput}
-              keyboardType="numeric"
-              autoFocus
-              placeholder="8"
-              placeholderTextColor={colors.ink3}
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                const n = parseInt(waterGoalInput, 10);
-                if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
-                else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
-                setWaterGoalModal(false);
-              }}
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <TouchableOpacity onPress={() => setWaterGoalModal(false)}
-                style={{ flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md }}>
-                <Text style={{ color: colors.ink2, fontWeight: '600', fontSize: fontSize.sm }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  const n = parseInt(waterGoalInput, 10);
-                  if (!isNaN(n) && n >= 1 && n <= 20) { setWaterGoal(String(n)); void AsyncStorage.setItem(`${p}_water_goal`, String(n)); }
-                  else Alert.alert('Invalid value', 'Water goal must be between 1 and 20 glasses.');
-                  setWaterGoalModal(false);
-                }}
-                style={{ flex: 2, borderRadius: radius.md, overflow: 'hidden' }}>
-                <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ paddingVertical: spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ color: colors.ink, fontWeight: '700', fontSize: fontSize.sm }}>Save</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
