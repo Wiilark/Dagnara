@@ -551,6 +551,7 @@ export default function ProfileScreen() {
         <View style={styles.menuCard}>
           {[
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
+            { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
             { icon: 'person-outline', label: 'Personal Info', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
@@ -575,7 +576,6 @@ export default function ProfileScreen() {
           {[
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
             { icon: 'notifications-outline', label: 'Notification Settings', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
-            { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
             { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
             { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
           ].map(({ icon, label, color, value, onPress }) => (
