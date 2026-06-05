@@ -13,6 +13,22 @@ interface Profile {
   [key: string]: string | undefined;
 }
 
+// Local cache so the profile (incl. date of birth) survives restarts and is
+// available instantly/offline before the Supabase fetch resolves.
+const profileCacheKey = (email: string) => `dagnara_profile_cache_${email}`;
+
+async function cacheProfile(email: string, profile: Profile): Promise<void> {
+  try { await AsyncStorage.setItem(profileCacheKey(email), JSON.stringify(profile)); }
+  catch { /* non-fatal */ }
+}
+
+async function readCachedProfile(email: string): Promise<Profile | null> {
+  try {
+    const raw = await AsyncStorage.getItem(profileCacheKey(email));
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  } catch { return null; }
+}
+
 interface AuthState {
   email: string | null;
   profile: Profile;
@@ -39,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ profile });
     const email = get().email;
     if (email) {
+      await cacheProfile(email, profile);
       try {
         const { error } = await supabase.from('dagnara_profiles').upsert(
           { email, profile_data: profile, updated_at: new Date().toISOString() },
@@ -67,16 +84,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const session = sessionResult?.data?.session;
       if (session?.user?.email) {
+        const email = session.user.email;
+        // Show the cached profile immediately so DOB/name/etc. are present even
+        // before (or without) a successful Supabase fetch.
+        const cached = await readCachedProfile(email);
+        if (cached) {
+          set({
+            email,
+            profile: cached,
+            isPremium: (cached.subscriptionStatus as string | undefined) === 'active',
+          });
+        }
         const { data } = await supabase
           .from('dagnara_profiles')
           .select('profile_data')
-          .eq('email', session.user.email)
+          .eq('email', email)
           .maybeSingle();
         // Existing users are considered onboarded
-        await AsyncStorage.setItem(`dagnara_onboarded_${session.user.email}`, 'true');
-        const profileData = data?.profile_data ?? {};
+        await AsyncStorage.setItem(`dagnara_onboarded_${email}`, 'true');
+        // Prefer remote data when present; otherwise keep the cached profile.
+        const profileData = (data?.profile_data ?? cached ?? {}) as Profile;
+        if (data?.profile_data) await cacheProfile(email, profileData);
         set({
-          email: session.user.email,
+          email,
           profile: profileData,
           isPremium: (profileData.subscriptionStatus as string | undefined) === 'active',
           isLoading: false,
@@ -85,7 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
       }
     } catch {
-      // Timeout or network error — let the user proceed to login
+      // Timeout or network error — keep whatever cached profile we already set.
       set({ isLoading: false });
     }
   },
@@ -100,7 +130,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .eq('email', email)
       .maybeSingle();
     await AsyncStorage.setItem(`dagnara_onboarded_${email}`, 'true');
-    const profileData = data?.profile_data ?? {};
+    const profileData = (data?.profile_data ?? {}) as Profile;
+    await cacheProfile(email, profileData);
     set({
       email,
       profile: profileData,
@@ -125,11 +156,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // eslint-disable-next-line no-console
       console.error('[authStore.register] profile upsert network error:', e?.message ?? e);
     }
+    await cacheProfile(email, profile);
     set({ email, profile });
   },
 
   logout: async () => {
+    const email = get().email;
     await supabase.auth.signOut();
+    if (email) { try { await AsyncStorage.removeItem(profileCacheKey(email)); } catch { /* non-fatal */ } }
     // Reset all user-specific store state so next user starts clean
     require('./appStore').useAppStore.getState().reset();
     require('./diaryStore').useDiaryStore.getState().reset();
