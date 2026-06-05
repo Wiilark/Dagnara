@@ -550,7 +550,7 @@ export default function ProfileScreen() {
         {/* ── Customization ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
+            { icon: 'chatbubble-ellipses-outline', label: 'Help', color: colors.sky, value: '', onPress: () => Alert.alert('Help', 'Coming soon.') },
             { icon: 'person-outline', label: 'Personal Info', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
