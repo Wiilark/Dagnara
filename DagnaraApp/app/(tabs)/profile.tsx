@@ -703,7 +703,7 @@ export default function ProfileScreen() {
             scrollY={settingsScrollY}
             title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
-            staticTitle={settingsPage === 'notifications' || settingsPage === 'account' || settingsPage === 'health'}
+            staticTitle={settingsPage === 'notifications' || settingsPage === 'account' || settingsPage === 'health' || settingsPage === 'about'}
             action={
               settingsPage === 'account'
                 ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } }
