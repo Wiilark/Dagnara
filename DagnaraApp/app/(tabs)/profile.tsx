@@ -19,7 +19,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { BackChevron } from '../../src/components/BackChevron';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
-import { COUNTRIES, getCountry } from '../../src/lib/currency';
+import { COUNTRIES, getCountry, formatMoneyFromUsd } from '../../src/lib/currency';
 import { fmt } from '../../src/lib/format';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
 import { useDiaryStore } from '../../src/store/diaryStore';
@@ -163,9 +163,8 @@ export default function ProfileScreen() {
     });
   }, [dietaryModal]);
 
-  // Populate display-unit inputs when measurements modal opens
-  useEffect(() => {
-    if (!measureModal) return;
+  // Populate display-unit inputs from stored metric measurements
+  function seedMeasureInputs() {
     setMeasureInputs({
       weight: measurements.weight ? kgToInput(parseFloat(measurements.weight), unitSystem) : '',
       height: measurements.height ? cmToInput(parseFloat(measurements.height), unitSystem) : '',
@@ -174,6 +173,12 @@ export default function ProfileScreen() {
       hips:   measurements.hips   ? cmLenToInput(parseFloat(measurements.hips),   unitSystem) : '',
       arms:   measurements.arms   ? cmLenToInput(parseFloat(measurements.arms),   unitSystem) : '',
     });
+  }
+
+  // Populate display-unit inputs when the standalone measurements modal opens
+  useEffect(() => {
+    if (!measureModal) return;
+    seedMeasureInputs();
   }, [measureModal]);
 
   useEffect(() => {
@@ -182,6 +187,7 @@ export default function ProfileScreen() {
     setEditFirstName(parts[0] ?? '');
     setEditLastName(parts.slice(1).join(' '));
     setEditDob(profile.dob ?? '');
+    seedMeasureInputs();
   }, [editing]);
 
   async function handleHealthConnect() {
@@ -227,23 +233,11 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleSave() {
-    const age = ageFromDob(editDob);
-    if (editDob && age != null && (age < 16 || age > 100)) {
-      Alert.alert('Invalid date of birth', 'Age must be between 16 and 100 years.');
-      return;
-    }
-    const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
-    await setProfile({
-      ...draft,
-      ...(newName ? { name: newName } : {}),
-      ...(editDob ? { dob: editDob, age: age != null ? String(age) : draft.age } : {}),
-    });
-    setEditing(false);
-  }
-
-  async function handleSaveMeasurements() {
-    // Parse display-unit inputs back to metric for storage
+  // Validate + persist body measurements (display-unit inputs → metric storage).
+  // Returns the weight/height patch to merge into the profile, or null on a
+  // validation failure (an alert is shown). Does not touch the profile or any
+  // modal — callers decide how to apply the patch and what to close.
+  async function saveMeasurementsCore(): Promise<{ weight?: string; height?: string } | null> {
     const wKg    = parseWeight(measureInputs.weight, unitSystem);
     const hCm    = parseHeight(measureInputs.height, unitSystem);
     const waistCm = parseLength(measureInputs.waist, unitSystem);
@@ -253,22 +247,22 @@ export default function ProfileScreen() {
     if (wKg != null && (wKg < 30 || wKg > 300)) {
       const bounds = unitSystem === 'Metric' ? '30–300 kg' : unitSystem === 'UK' ? '4 st 10 lb – 47 st 3 lb' : '66–661 lb';
       Alert.alert('Invalid weight', `Weight must be between ${bounds}.`);
-      return;
+      return null;
     }
     if (hCm != null && (hCm < 100 || hCm > 250)) {
       const bounds = unitSystem === 'Metric' ? '100–250 cm' : "3'4\"–8'2\"";
       Alert.alert('Invalid height', `Height must be between ${bounds}.`);
-      return;
+      return null;
     }
     if ((waistCm != null && (waistCm < 40 || waistCm > 200)) ||
         (chestCm != null && (chestCm < 40 || chestCm > 200)) ||
         (hipsCm  != null && (hipsCm  < 40 || hipsCm  > 200))) {
       Alert.alert('Invalid measurement', 'Waist, chest, and hips must be between 40–200 cm (16–79 in).');
-      return;
+      return null;
     }
     if (armsCm != null && (armsCm < 10 || armsCm > 100)) {
       Alert.alert('Invalid measurement', 'Arm circumference must be between 10–100 cm (4–39 in).');
-      return;
+      return null;
     }
     const newMeasurements = {
       weight: wKg    != null ? String(Math.round(wKg    * 10) / 10) : measurements.weight,
@@ -280,13 +274,34 @@ export default function ProfileScreen() {
     };
     setMeasurements(newMeasurements);
     await AsyncStorage.setItem(`${p}_body_measurements`, JSON.stringify(newMeasurements));
-    // Sync weight & height (metric) back into the profile
-    const updated = {
-      ...profile,
+    return {
       ...(wKg != null ? { weight: String(Math.round(wKg * 10) / 10) } : {}),
       ...(hCm != null ? { height: String(Math.round(hCm)) } : {}),
     };
-    await setProfile(updated);
+  }
+
+  async function handleSave() {
+    const age = ageFromDob(editDob);
+    if (editDob && age != null && (age < 16 || age > 100)) {
+      Alert.alert('Invalid date of birth', 'Age must be between 16 and 100 years.');
+      return;
+    }
+    const measurePatch = await saveMeasurementsCore();
+    if (measurePatch === null) return; // validation failed — keep editor open
+    const newName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ');
+    await setProfile({
+      ...draft,
+      ...measurePatch,
+      ...(newName ? { name: newName } : {}),
+      ...(editDob ? { dob: editDob, age: age != null ? String(age) : draft.age } : {}),
+    });
+    setEditing(false);
+  }
+
+  async function handleSaveMeasurements() {
+    const measurePatch = await saveMeasurementsCore();
+    if (measurePatch === null) return;
+    await setProfile({ ...profile, ...measurePatch });
     setMeasureModal(false);
   }
 
@@ -350,7 +365,7 @@ export default function ProfileScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const firstNameRef = useRef<TextInput>(null);
   const lastNameRef = useRef<TextInput>(null);
-  const purposeRef = useRef<TextInput>(null);
+  const measureRefs = useRef<Record<string, TextInput | null>>({});
 
   // Super-smoothed interpolation for high-end Revolut feel
   const headerNameOpacity = scrollY.interpolate({
@@ -371,12 +386,75 @@ export default function ProfileScreen() {
     extrapolate: 'clamp',
   });
 
-  // Reusable Back Button component for modals
-  const ModalBackBtn = ({ onPress }: { onPress: () => void }) => (
-    <TouchableOpacity onPress={onPress} style={styles.closeBtn}>
-      <Ionicons name="chevron-back" size={22} color={colors.ink} />
-    </TouchableOpacity>
-  );
+  // Edit Profile modal — its own scroll value so the floating header behaves
+  // exactly like the profile header (blur + title fade-in on scroll).
+  const editScrollY = useRef(new Animated.Value(0)).current;
+  // Each sub-screen modal gets its own scroll value for the same floating header.
+  const measureScrollY = useRef(new Animated.Value(0)).current;
+  const dietScrollY = useRef(new Animated.Value(0)).current;
+  const settingsScrollY = useRef(new Animated.Value(0)).current;
+  const dietaryScrollY = useRef(new Animated.Value(0)).current;
+  const tdeeScrollY = useRef(new Animated.Value(0)).current;
+  const editTitleOpacity = editScrollY.interpolate({
+    inputRange: [40, 90],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const editTitleTranslateY = editScrollY.interpolate({
+    inputRange: [40, 90],
+    outputRange: [12, 0],
+    extrapolate: 'clamp',
+  });
+  const editBlurOpacity = editScrollY.interpolate({
+    inputRange: [10, 70],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  // Floating header shared by all sub-screen modals — blur + title fade on scroll,
+  // matching the profile header and Personal Info.
+  const FloatingModalHeader = ({
+    scrollY,
+    title,
+    onBack,
+    action,
+  }: {
+    scrollY: Animated.Value;
+    title: string;
+    onBack: () => void;
+    action?: { label: string; onPress: () => void };
+  }) => {
+    const blurOp = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
+    const titleOp = scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
+    const titleTY = scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
+    return (
+      <View style={pf.fixedHeader}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOp }]}>
+          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={['transparent', colors.bg]}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
+          />
+        </Animated.View>
+        <View style={pf.fixedHeaderRow}>
+          <TouchableOpacity style={styles.closeBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          </TouchableOpacity>
+          <Animated.Text style={[styles.modalHeaderTitle, { opacity: titleOp, transform: [{ translateY: titleTY }] }]} numberOfLines={1} pointerEvents="none">
+            {title}
+          </Animated.Text>
+          {action ? (
+            <TouchableOpacity onPress={action.onPress} activeOpacity={0.85} style={styles.modalAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.modalActionTxt}>{action.label}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 44, height: 44 }} />
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.safe}>
@@ -399,15 +477,16 @@ export default function ProfileScreen() {
         </Animated.View>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={22} color={colors.ink} />
+            <Ionicons name="close" size={26} color={colors.ink} />
           </TouchableOpacity>
 
           <Animated.View style={{
             opacity: headerNameOpacity,
             flex: 1,
             minWidth: 0,
-            alignItems: 'center',
-            paddingHorizontal: spacing.sm,
+            alignItems: 'flex-start',
+            paddingLeft: spacing.sm,
+            paddingRight: spacing.sm,
             transform: [{ translateY: headerNameTranslateY }]
           }}>
             <Text style={styles.headerNameText} numberOfLines={1}>{profile.name ?? 'Your Name'}</Text>
@@ -417,7 +496,7 @@ export default function ProfileScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSettingsPage('subscription'); setSettingsModal(true); }}
             style={{ flexShrink: 0, borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
             <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
-              <Ionicons name="diamond" size={16} color={colors.white} />
+              <Ionicons name="diamond" size={18} color={colors.white} />
               <Text style={styles.upgradeTxt}>{selectedPlan === 'premium' ? 'Premium' : 'Upgrade'}</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -430,7 +509,7 @@ export default function ProfileScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
-        contentContainerStyle={[styles.scroll, { paddingTop: 60 + insets.top }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl + spacing.lg }]}
         showsVerticalScrollIndicator={false}
       >
 
@@ -458,7 +537,7 @@ export default function ProfileScreen() {
               <Ionicons name="diamond-outline" size={20} color={colors.purple} />
             </View>
             <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>{selectedPlan === 'premium' ? 'Premium' : 'Free'}</Text>
+              <Text style={styles.quickVal}>{selectedPlan === 'premium' ? 'Premium' : 'Standard'}</Text>
               <Text style={styles.quickLbl}>Your plan</Text>
             </View>
           </View>
@@ -481,7 +560,6 @@ export default function ProfileScreen() {
             { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'body-outline', label: 'Body Measurements', color: colors.rose, value: measurements.weight ? formatWeight(parseFloat(measurements.weight), unitSystem) : 'Not set', onPress: () => setMeasureModal(true) },
             { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
           ].map(({ icon, label, color, value, badge, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
@@ -502,7 +580,7 @@ export default function ProfileScreen() {
           {[
             { icon: 'water-outline', label: 'Water Goal', color: colors.sky, value: `${waterGoal} glasses`, onPress: () => { setWaterGoalInput(waterGoal); setWaterGoalModal(true); } },
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
-            { icon: 'notifications-outline', label: 'Notifications', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
+            { icon: 'notifications-outline', label: 'Notification Settings', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
             { icon: 'chatbubble-ellipses-outline', label: 'Support', color: colors.sky, value: '', onPress: () => Alert.alert('Support', 'Coming soon.') },
             { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
             { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
@@ -536,13 +614,16 @@ export default function ProfileScreen() {
 
       {/* ── Measurements Modal ── */}
       <Modal visible={measureModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMeasureModal(false)}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <ModalBackBtn onPress={() => setMeasureModal(false)} />
-            <Text style={styles.modalTitle}>Body Measurements</Text>
-            <TouchableOpacity onPress={handleSaveMeasurements}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <FloatingModalHeader scrollY={measureScrollY} title="Body Measurements" onBack={() => setMeasureModal(false)} action={{ label: 'Save', onPress: handleSaveMeasurements }} />
+          <Animated.ScrollView
+            contentContainerStyle={[styles.modalScroll, { paddingTop: spacing.xl + spacing.xl }]}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: measureScrollY } } }], { useNativeDriver: true })}
+          >
             {/* BMI Card */}
             {(() => {
               const w = parseFloat(measurements.weight || String(profile.weight ?? ''));
@@ -596,44 +677,49 @@ export default function ProfileScreen() {
                 </View>
               </View>
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Diet Plan Modal ── */}
       <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietModal(false)}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <ModalBackBtn onPress={() => setDietModal(false)} />
-            <Text style={styles.modalTitle}>Diet Plan</Text>
-            <TouchableOpacity onPress={() => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); }}><Text style={styles.saveText}>Done</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <FloatingModalHeader scrollY={dietScrollY} title="Diet Plan" onBack={() => setDietModal(false)} action={{ label: 'Save', onPress: () => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); } }} />
+          <Animated.ScrollView
+            contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.xl + spacing.xl, gap: spacing.sm }}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dietScrollY } } }], { useNativeDriver: true })}
+          >
             {DIET_PLANS.map((plan) => (
               <TouchableOpacity key={plan} style={[styles.dietOption, selectedDiet === plan && styles.dietOptionSel]} onPress={() => setSelectedDiet(plan)}>
                 <Text style={[styles.dietOptionTxt, selectedDiet === plan && { color: colors.lavender }]}>{plan}</Text>
                 {selectedDiet === plan && <Ionicons name="checkmark" size={18} color={colors.lavender} />}
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Settings Modal ── */}
       <Modal visible={settingsModal} animationType="slide" presentationStyle="pageSheet" onDismiss={() => setSettingsPage('')} onRequestClose={() => { setSettingsPage(''); setSettingsModal(false); }}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <ModalBackBtn onPress={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }} />
-            <Text style={styles.modalTitle}>
-              {settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notifications' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
-            </Text>
-            {settingsPage === 'account'
-              ? <TouchableOpacity onPress={async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-              : <View style={{ width: 40 }} />
-            }
-          </View>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <FloatingModalHeader
+            scrollY={settingsScrollY}
+            title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+            onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
+            action={settingsPage === 'account' ? { label: 'Save', onPress: async () => { await handleSaveAccount(); setSettingsPage(''); setSettingsModal(false); } } : undefined}
+          />
 
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+          <Animated.ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            scrollEventThrottle={16}
+            contentContainerStyle={{ paddingTop: spacing.xl + spacing.xl }}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: settingsScrollY } } }], { useNativeDriver: true })}
+          >
             {settingsPage === 'account' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
                 <Text style={{ color: colors.ink3, fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1 }}>PREFERENCES</Text>
@@ -787,8 +873,8 @@ export default function ProfileScreen() {
             {settingsPage === 'subscription' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
                 {[
-                  { key: 'free', name: 'Free', price: '$0 / mo', icon: 'person-outline', color: colors.ink2 },
-                  { key: 'premium', name: 'Premium', price: '$4.99 / mo', icon: 'star', color: colors.lavender },
+                  { key: 'free', name: 'Standard', price: `${formatMoneyFromUsd(0, country)} / mo`, icon: 'person-outline', color: colors.ink2 },
+                  { key: 'premium', name: 'Premium', price: `${formatMoneyFromUsd(4.99, country)} / mo`, icon: 'star', color: colors.lavender },
                 ].map((plan) => (
                   <TouchableOpacity key={plan.key} onPress={() => { setSelectedPlan(plan.key as 'free' | 'premium'); AsyncStorage.setItem(`${p}_plan`, plan.key); setSettingsPage(''); setSettingsModal(false); }}
                     style={[subst.planCard, selectedPlan === plan.key && { borderColor: colors.purple, borderWidth: 2 }]}>
@@ -835,26 +921,27 @@ export default function ProfileScreen() {
 
             {/* If we end up with an empty page somehow, show nothing or return */}
             {settingsPage === '' && <View style={{ padding: spacing.xl, alignItems: 'center' }}><Text style={{ color: colors.ink3 }}>Select a setting to edit.</Text></View>}
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Dietary Preferences Modal ── */}
       <Modal visible={dietaryModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietaryModal(false)}>
         <SafeAreaView style={dp.safe} edges={['top', 'bottom']}>
-          <View style={dp.header}>
-            <ModalBackBtn onPress={() => setDietaryModal(false)} />
-            <Text style={dp.title}>Food Preferences</Text>
-            <TouchableOpacity onPress={() => {
-              AsyncStorage.multiSet([
-                [`${p}_diet_plan`, selectedDiet],
-                [`${p}_food_pref`, selectedFoodPref],
-                [`${p}_allergies`, JSON.stringify(selectedAllergies)],
-              ]);
-              setDietaryModal(false);
-            }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={dp.scroll} showsVerticalScrollIndicator={false}>
+          <FloatingModalHeader scrollY={dietaryScrollY} title="Food Preferences" onBack={() => setDietaryModal(false)} action={{ label: 'Save', onPress: () => {
+            AsyncStorage.multiSet([
+              [`${p}_diet_plan`, selectedDiet],
+              [`${p}_food_pref`, selectedFoodPref],
+              [`${p}_allergies`, JSON.stringify(selectedAllergies)],
+            ]);
+            setDietaryModal(false);
+          } }} />
+          <Animated.ScrollView
+            contentContainerStyle={[dp.scroll, { paddingTop: spacing.xl + spacing.xl }]}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dietaryScrollY } } }], { useNativeDriver: true })}
+          >
             {/* Food preferences — single select */}
             <Text style={dp.sectionLbl}>FOOD PREFERENCES</Text>
             <View style={dp.listCard}>
@@ -909,27 +996,28 @@ export default function ProfileScreen() {
                 );
               })}
             </View>
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── TDEE Modal ── */}
       <Modal visible={tdeeModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setTdeeModal(false)}>
-        <SafeAreaView style={styles.safe} edges={['bottom']}>
-          <View style={styles.modalHeader}>
-            <ModalBackBtn onPress={() => setTdeeModal(false)} />
-            <Text style={styles.modalTitle}>Calorie & Goals</Text>
-            <TouchableOpacity onPress={() => {
-              const age = parseInt(profile.age ?? '25', 10) || 25;
-              const weight = parseFloat(profile.weight ?? '70') || 70;
-              const height = parseFloat(profile.height ?? '170') || 170;
-              const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
-              setGoals(localActivity, localGoal, cal);
-              setProfile({ ...profile, sex });
-              setTdeeModal(false);
-            }}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <FloatingModalHeader scrollY={tdeeScrollY} title="Calorie & Goals" onBack={() => setTdeeModal(false)} action={{ label: 'Save', onPress: () => {
+            const age = parseInt(profile.age ?? '25', 10) || 25;
+            const weight = parseFloat(profile.weight ?? '70') || 70;
+            const height = parseFloat(profile.height ?? '170') || 170;
+            const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
+            setGoals(localActivity, localGoal, cal);
+            setProfile({ ...profile, sex });
+            setTdeeModal(false);
+          } }} />
+          <Animated.ScrollView
+            contentContainerStyle={[styles.modalScroll, { paddingTop: spacing.xl + spacing.xl }]}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: tdeeScrollY } } }], { useNativeDriver: true })}
+          >
             {/* Sex selector */}
             <Text style={[styles.inputLabel, { marginBottom: 4 }]}>Biological Sex</Text>
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
@@ -999,27 +1087,47 @@ export default function ProfileScreen() {
                 </View>
               );
             })()}
-          </ScrollView>
+          </Animated.ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Edit Profile Modal (Revolut-style "Your profile") ── */}
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <ScrollView contentContainerStyle={pf.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-            {/* Top bar: back + Save */}
-            <View style={pf.topBar}>
-              <TouchableOpacity style={pf.backBtn} onPress={() => setEditing(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          {/* Floating header — blur + centered title fade in on scroll, just like the profile header */}
+          <View style={pf.fixedHeader}>
+            <Animated.View style={[StyleSheet.absoluteFill, { opacity: editBlurOpacity }]}>
+              <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+              <LinearGradient
+                colors={['transparent', colors.bg]}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
+                start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
+              />
+            </Animated.View>
+            <View style={pf.fixedHeaderRow}>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => setEditing(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="chevron-back" size={22} color={colors.ink} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSave} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Text style={styles.saveText}>Save</Text>
+              <Animated.Text style={[styles.modalHeaderTitle, { opacity: editTitleOpacity, transform: [{ translateY: editTitleTranslateY }] }]} numberOfLines={1} pointerEvents="none">
+                Personal Info
+              </Animated.Text>
+              <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={styles.modalAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.modalActionTxt}>Save</Text>
               </TouchableOpacity>
             </View>
+          </View>
 
+          <Animated.ScrollView
+            contentContainerStyle={pf.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: editScrollY } } }], { useNativeDriver: true })}
+          >
             {/* Title + avatar */}
             <View style={pf.titleRow}>
-              <Text style={pf.bigTitle}>Your profile</Text>
+              <Text style={pf.bigTitle}>Personal Info</Text>
               <TouchableOpacity style={pf.avatarWrap} onPress={handlePickPhoto} activeOpacity={0.85}>
                 {profile.photoUri
                   ? <Image source={{ uri: profile.photoUri }} style={pf.avatarImg} />
@@ -1104,39 +1212,111 @@ export default function ProfileScreen() {
                   <Ionicons name="lock-closed" size={14} color={colors.ink3} />
                 </View>
               </View>
-              {/* Purpose = fitness goal */}
-              <View style={[pf.field, pf.fieldLast]}>
-                <View style={pf.fieldBody}>
-                  <Text style={pf.label}>Purpose</Text>
-                  <TextInput
-                    ref={purposeRef}
-                    style={pf.input}
-                    value={draft.goal ?? ''}
-                    onChangeText={(v) => setDraft((d) => ({ ...d, goal: v }))}
-                    placeholder="e.g. Lose weight, build muscle"
-                    placeholderTextColor={colors.ink3}
-                    maxLength={80}
-                    returnKeyType="done"
-                    onSubmitEditing={() => Keyboard.dismiss()}
-                  />
+              {/* Purpose of account = fitness goal, picked from 3 blocks */}
+              <View style={[pf.field, { flexDirection: 'column', alignItems: 'stretch' }]}>
+                <Text style={[pf.label, { marginBottom: spacing.sm }]}>Purpose of account</Text>
+                <View style={pf.goalRow}>
+                  {PURPOSE_GOALS.map((g) => {
+                    const active = localGoal === g.key;
+                    return (
+                      <TouchableOpacity
+                        key={g.key}
+                        activeOpacity={0.85}
+                        style={[pf.goalBlock, active && pf.goalBlockActive]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setLocalGoal(g.key);
+                          setDraft((d) => ({ ...d, goal: g.label }));
+                          const age = parseInt(profile.age ?? '25', 10) || 25;
+                          const weight = parseFloat(profile.weight ?? '70') || 70;
+                          const height = parseFloat(profile.height ?? '170') || 170;
+                          setGoals(localActivity, g.key, calcTDEE(age, weight, height, sex, localActivity, g.key));
+                        }}>
+                        {active && <View style={pf.goalCheck}><Ionicons name="checkmark" size={12} color={colors.bg} /></View>}
+                        <View style={[pf.goalIconWrap, active && pf.goalIconWrapActive]}>
+                          <Ionicons name={g.icon} size={22} color={active ? colors.lavender : colors.ink2} />
+                        </View>
+                        <Text style={[pf.goalLabel, active && pf.goalLabelActive]} numberOfLines={1}>{g.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                <TouchableOpacity style={pf.pencil} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); purposeRef.current?.focus(); }}>
-                  <Ionicons name="pencil" size={16} color={colors.lavender} />
-                </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
+
+            <Text style={[pf.sectionLbl, { marginTop: spacing.lg }]}>BODY MEASUREMENTS</Text>
+            {(() => {
+              const w = parseFloat(measureInputs.weight || measurements.weight || String(profile.weight ?? ''));
+              const h = parseFloat(measureInputs.height || measurements.height || String(profile.height ?? ''));
+              const bmi = w > 0 && h > 0 ? (w / ((h / 100) ** 2)) : null;
+              const bmiLabel = bmi === null ? 'Log your weight & height' :
+                bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal weight' :
+                bmi < 30 ? 'Overweight' : 'Obese';
+              const bmiColor = bmi === null ? colors.ink3 :
+                bmi < 18.5 ? colors.sky : bmi < 25 ? colors.green :
+                bmi < 30 ? colors.honey : colors.rose;
+              return (
+                <View style={styles.bmiCard}>
+                  <Text style={styles.bmiSectionLbl}>Body Mass Index</Text>
+                  <Text style={[styles.bmiNum, { color: bmiColor }]}>{bmi ? fmt(bmi, 1) : '--'}</Text>
+                  <Text style={styles.bmiLbl}>{bmiLabel}</Text>
+                  <View style={styles.bmiScale}>
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.sky }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.green, flex: 1.2 }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.honey }]} />
+                    <View style={[styles.bmiSeg, { backgroundColor: colors.rose }]} />
+                  </View>
+                  <View style={styles.bmiScaleLbls}>
+                    {['Under', 'Normal', 'Over', 'Obese'].map(l => <Text key={l} style={styles.bmiScaleLbl}>{l}</Text>)}
+                  </View>
+                </View>
+              );
+            })()}
+            <View style={pf.card}>
+              {([
+                { key: 'weight', label: 'Weight', unit: weightUnit(unitSystem), keyboard: 'decimal-pad' as const },
+                { key: 'height', label: 'Height', unit: heightUnit(unitSystem), keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as 'decimal-pad' | 'default' },
+                { key: 'waist',  label: 'Waist',  unit: lengthUnit(unitSystem), keyboard: 'decimal-pad' as const },
+                { key: 'chest',  label: 'Chest',  unit: lengthUnit(unitSystem), keyboard: 'decimal-pad' as const },
+                { key: 'hips',   label: 'Hips',   unit: lengthUnit(unitSystem), keyboard: 'decimal-pad' as const },
+                { key: 'arms',   label: 'Arms',   unit: lengthUnit(unitSystem), keyboard: 'decimal-pad' as const },
+              ]).map((f) => (
+                <View style={pf.field} key={f.key}>
+                  <View style={pf.fieldBody}>
+                    <Text style={pf.label}>{f.label}</Text>
+                    <View style={pf.measureLine}>
+                      <TextInput
+                        ref={(r) => { measureRefs.current[f.key] = r; }}
+                        style={[pf.input, pf.measureInput]}
+                        value={measureInputs[f.key] ?? ''}
+                        onChangeText={(v) => setMeasureInputs((m) => ({ ...m, [f.key]: v }))}
+                        placeholder="—"
+                        placeholderTextColor={colors.ink3}
+                        keyboardType={f.keyboard}
+                        returnKeyType="done"
+                        onSubmitEditing={() => Keyboard.dismiss()}
+                      />
+                      <Text style={pf.measureUnit}>{f.unit}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={pf.pencil} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); measureRefs.current[f.key]?.focus(); }}>
+                    <Ionicons name="pencil" size={16} color={colors.lavender} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </Animated.ScrollView>
+
+          {/* ── Date of birth picker (nested inside the editor so iOS can present it) ── */}
+          <DobPicker
+            visible={dobPickerOpen}
+            value={editDob}
+            onClose={() => setDobPickerOpen(false)}
+            onSelect={(iso) => { setEditDob(iso); setDobPickerOpen(false); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+          />
         </SafeAreaView>
       </Modal>
-
-      {/* ── Date of birth picker ── */}
-      <DobPicker
-        visible={dobPickerOpen}
-        value={editDob}
-        onClose={() => setDobPickerOpen(false)}
-        onSelect={(iso) => { setEditDob(iso); setDobPickerOpen(false); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
-      />
 
       {/* Water Goal modal — cross-platform replacement for Alert.prompt */}
       <Modal visible={waterGoalModal} transparent animationType="fade" onRequestClose={() => setWaterGoalModal(false)}>
@@ -1223,17 +1403,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: colors.line2,
-    shadowColor: colors.purpleGlow,
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 15,
   },
   upgradeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     height: spacing.xl + spacing.sm,
     justifyContent: 'center',
   },
@@ -1241,10 +1416,10 @@ const styles = StyleSheet.create({
 
   hero: { alignItems: 'center', gap: 14, paddingBottom: 8 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 110, height: 110, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.white, fontSize: 40, fontWeight: '800' },
-  avatarImg: { width: 110, height: 110, borderRadius: radius.pill },
-  avatarAdd: { position: 'absolute', bottom: 2, right: 2, width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 3.5, borderColor: colors.bg },
+  avatar: { width: 82, height: 82, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
+  avatarImg: { width: 82, height: 82, borderRadius: radius.pill },
+  avatarAdd: { position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.bg },
   heroName: { color: colors.ink, fontSize: 32, fontWeight: '800', textAlign: 'center' },
   heroEmail: { color: colors.ink3, fontSize: 16, maxWidth: 280, textAlign: 'center', marginTop: 6, opacity: 0.7 },
 
@@ -1268,8 +1443,20 @@ const styles = StyleSheet.create({
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
   dietOptionTxt: { color: colors.ink, fontSize: fontSize.base, fontWeight: '500' },
 
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  modalTitle: { color: colors.ink, fontSize: fontSize.base, fontWeight: '700' },
+  // Absolutely centered so the title sits dead-center regardless of side button widths.
+  modalHeaderTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: colors.ink, fontSize: fontSize.md, fontWeight: '800' },
+  // Right action: a pill the same height as the circular back button (proportional to the left).
+  modalAction: {
+    height: spacing.xl + spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.purpleTint,
+    borderWidth: 1.5,
+    borderColor: colors.line3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalActionTxt: { color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' },
   saveText: { color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' },
   modalScroll: { padding: spacing.md, gap: spacing.sm },
   inputLabel: { color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.xs },
@@ -1331,9 +1518,6 @@ const act = StyleSheet.create({
 // ── Dietary preferences modal styles ──────────────────────────────────────────
 const dp = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
-  backBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
   scroll: { padding: spacing.md, paddingBottom: spacing.xl * 3 },
   sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm, marginTop: spacing.xs },
   listCard: { backgroundColor: colors.layer1, borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.lg },
@@ -1346,9 +1530,10 @@ const dp = StyleSheet.create({
 
 // Revolut-style "Your profile" edit screen
 const pf = StyleSheet.create({
-  scroll: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl * 3 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
-  backBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.xl, paddingBottom: spacing.xl * 3 },
+  // Floating header overlay — sits above the scroll, blur + title fade in on scroll (mirrors profile header).
+  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
+  fixedHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.lg },
   bigTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, flex: 1 },
   avatarWrap: { position: 'relative' },
@@ -1358,34 +1543,163 @@ const pf = StyleSheet.create({
   avatarCam: { position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.purple2, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.bg },
   sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm },
   card: { backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line2, overflow: 'hidden' },
-  field: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
-  fieldLast: { borderBottomWidth: 0 },
+  field: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   fieldBody: { flex: 1 },
-  pencil: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  pencil: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   lockWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 0.6, color: colors.ink3, marginBottom: 2 },
   input: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
   value: { fontSize: fontSize.base, color: colors.ink, paddingVertical: spacing.xs },
+  // Purpose-of-account goal blocks (3 across)
+  goalRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
+  goalBlock: {
+    flex: 1,
+    minHeight: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.layer2,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.line2,
+  },
+  goalBlockActive: {
+    backgroundColor: colors.purpleTint,
+    borderColor: colors.purple,
+    borderWidth: 2,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  goalIconWrap: {
+    width: 40, height: 40,
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.pill,
+    backgroundColor: colors.line,
+  },
+  goalIconWrapActive: { backgroundColor: colors.line3 },
+  goalCheck: {
+    position: 'absolute', top: spacing.xs, right: spacing.xs,
+    width: 18, height: 18, borderRadius: radius.pill,
+    backgroundColor: colors.lavender,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  goalLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink2, textAlign: 'center' },
+  goalLabelActive: { color: colors.ink, fontWeight: '800' },
+  measureLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  measureInput: { flex: 1, paddingVertical: spacing.xs },
+  measureUnit: { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink3 },
   // DOB picker
   pickerBackdrop: { flex: 1, backgroundColor: colors.dim, justifyContent: 'flex-end' },
   pickerSheet: { backgroundColor: colors.layer3, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: spacing.md, paddingBottom: spacing.xl },
   pickerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   pickerTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
   pickerDone: { fontSize: fontSize.base, fontWeight: '700', color: colors.lavender },
-  pickerCols: { flexDirection: 'row', height: 220 },
+  pickerCols: { flexDirection: 'row' },
+  pickerIndicator: {
+    position: 'absolute',
+    left: spacing.md, right: spacing.md,
+    backgroundColor: colors.purpleTint,
+    borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.line3,
+  },
   pickerCol: { flex: 1 },
-  pickerColInner: { paddingVertical: spacing.xl * 2.5 },
-  pickerItem: { height: 40, alignItems: 'center', justifyContent: 'center' },
-  pickerItemTxt: { fontSize: fontSize.base, color: colors.ink3 },
-  pickerItemActive: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink },
+  pickerItem: { alignItems: 'center', justifyContent: 'center' },
+  // Base style for every wheel row; per-row opacity/scale is animated from scroll.
+  pickerItemTxt: { fontSize: fontSize.lg, fontWeight: '700', color: colors.ink },
 });
 
 const PF_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// The three account-purpose goals shown as selectable blocks in the editor.
+// `key` is the canonical value stored in appStore.weightGoal (set during onboarding),
+// so the active block reflects whatever the user picked on the goal step.
+const PURPOSE_GOALS: { key: 'lose' | 'maintain' | 'gain'; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'lose',     label: 'Lose weight',     icon: 'trending-down' },
+  { key: 'maintain', label: 'Maintain',        icon: 'pulse' },
+  { key: 'gain',     label: 'Gain muscle',     icon: 'barbell' },
+];
+// Wheel row height — shared by item, snap interval, padding, and indicator band.
+const PICK_ITEM_H = 44;
+const PICK_VISIBLE = 5; // rows visible in the wheel (must be odd to have a center)
+const PF_MONTH_IDX = PF_MONTHS.map((_, i) => i); // stable [0..11] so the column never re-creates its data
+
+// One wheel column. Hoisted to module scope so its identity is stable — the
+// parent re-rendering on each snap won't unmount/remount it (the old jank).
+// Active-row emphasis is driven by an Animated scroll value on the native
+// thread, so scrolling never triggers a React re-render.
+function PickerCol({ visible, data, selected, render, onPick }: {
+  visible: boolean; data: number[]; selected: number; render: (n: number) => string; onPick: (n: number) => void;
+}) {
+  const ref = useRef<ScrollView>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const selIdx = Math.max(0, data.indexOf(selected));
+
+  // Center the current value only when the sheet (re)opens — never mid-scroll,
+  // so it can't fight the user's gesture.
+  useEffect(() => {
+    if (!visible) return;
+    const id = requestAnimationFrame(() =>
+      ref.current?.scrollTo({ y: selIdx * PICK_ITEM_H, animated: false })
+    );
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  return (
+    <View style={pf.pickerCol}>
+      <Animated.ScrollView
+        ref={ref}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingVertical: PICK_ITEM_H * 2 }}
+        snapToInterval={PICK_ITEM_H}
+        disableIntervalMomentum
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(e.nativeEvent.contentOffset.y / PICK_ITEM_H);
+          const clamped = Math.max(0, Math.min(idx, data.length - 1));
+          if (data[clamped] !== selected) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onPick(data[clamped]);
+          }
+        }}
+      >
+        {data.map((n, i) => {
+          // Distance (in rows) of this item from the center band, as the user scrolls.
+          const dist = Animated.divide(scrollY, PICK_ITEM_H).interpolate({
+            inputRange: [i - 2, i, i + 2],
+            outputRange: [2, 0, 2],
+            extrapolate: 'clamp',
+          });
+          const scale = dist.interpolate({ inputRange: [0, 1, 2], outputRange: [1.18, 1, 0.9], extrapolate: 'clamp' });
+          const opacity = dist.interpolate({ inputRange: [0, 1, 2], outputRange: [1, 0.5, 0.28], extrapolate: 'clamp' });
+          return (
+            <TouchableOpacity key={n} style={[pf.pickerItem, { height: PICK_ITEM_H }]} activeOpacity={0.8}
+              onPress={() => ref.current?.scrollTo({ y: i * PICK_ITEM_H, animated: true })}>
+              <Animated.Text style={[pf.pickerItemTxt, { opacity, transform: [{ scale }] }]}>{render(n)}</Animated.Text>
+            </TouchableOpacity>
+          );
+        })}
+      </Animated.ScrollView>
+    </View>
+  );
+}
 
 function DobPicker({ visible, value, onClose, onSelect }: {
   visible: boolean; value: string; onClose: () => void; onSelect: (iso: string) => void;
 }) {
   const now = new Date();
+  // Allowed DOB window: exactly 16 years ago (latest) back to exactly 100 years
+  // ago (earliest), measured to the day so the picker can never offer a date
+  // the Save validation would reject.
+  const maxDob = new Date(now.getFullYear() - 16, now.getMonth(), now.getDate());
+  const minDob = new Date(now.getFullYear() - 100, now.getMonth(), now.getDate());
   const init = value ? new Date(`${value}T00:00:00`) : new Date(now.getFullYear() - 25, 0, 1);
   const [day, setDay] = useState(init.getDate());
   const [month, setMonth] = useState(init.getMonth());
@@ -1401,31 +1715,23 @@ function DobPicker({ visible, value, onClose, onSelect }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // Years 16→100 ago. The boundary years are partially valid (depends on the
+  // month/day), so confirm() clamps the final date into [minDob, maxDob].
   const years: number[] = [];
-  for (let y = now.getFullYear() - 16; y >= now.getFullYear() - 100; y--) years.push(y);
+  for (let y = maxDob.getFullYear(); y >= minDob.getFullYear(); y--) years.push(y);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days: number[] = [];
   for (let dd = 1; dd <= daysInMonth; dd++) days.push(dd);
   const clampedDay = Math.min(day, daysInMonth);
 
-  const Col = ({ data, selected, render, onPick }: {
-    data: number[]; selected: number; render: (n: number) => string; onPick: (n: number) => void;
-  }) => (
-    <ScrollView style={pf.pickerCol} contentContainerStyle={pf.pickerColInner} showsVerticalScrollIndicator={false}>
-      {data.map((n) => {
-        const active = n === selected;
-        return (
-          <TouchableOpacity key={n} style={pf.pickerItem} activeOpacity={0.7}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPick(n); }}>
-            <Text style={active ? pf.pickerItemActive : pf.pickerItemTxt}>{render(n)}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  );
 
   function confirm() {
-    const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+    let picked = new Date(year, month, clampedDay);
+    // Clamp into the 16–100 window: a boundary-year date can fall just outside
+    // (e.g. born this year's month but 16 years ago → still 15 today).
+    if (picked.getTime() > maxDob.getTime()) picked = maxDob;
+    if (picked.getTime() < minDob.getTime()) picked = minDob;
+    const iso = `${picked.getFullYear()}-${String(picked.getMonth() + 1).padStart(2, '0')}-${String(picked.getDate()).padStart(2, '0')}`;
     onSelect(iso);
   }
 
@@ -1442,10 +1748,12 @@ function DobPicker({ visible, value, onClose, onSelect }: {
               <Text style={pf.pickerDone}>Done</Text>
             </TouchableOpacity>
           </View>
-          <View style={pf.pickerCols}>
-            <Col data={days} selected={clampedDay} render={(n) => String(n)} onPick={setDay} />
-            <Col data={PF_MONTHS.map((_, i) => i)} selected={month} render={(n) => PF_MONTHS[n]} onPick={setMonth} />
-            <Col data={years} selected={year} render={(n) => String(n)} onPick={setYear} />
+          <View style={[pf.pickerCols, { height: PICK_ITEM_H * PICK_VISIBLE }]}>
+            {/* Center selection band — shows which row is the active pick */}
+            <View pointerEvents="none" style={[pf.pickerIndicator, { top: PICK_ITEM_H * 2, height: PICK_ITEM_H }]} />
+            <PickerCol visible={visible} data={days} selected={clampedDay} render={(n) => String(n)} onPick={setDay} />
+            <PickerCol visible={visible} data={PF_MONTH_IDX} selected={month} render={(n) => PF_MONTHS[n]} onPick={setMonth} />
+            <PickerCol visible={visible} data={years} selected={year} render={(n) => String(n)} onPick={setYear} />
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
