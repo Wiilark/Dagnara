@@ -554,15 +554,15 @@ export default function OnboardingScreen() {
               <Text style={s.calLabel}>kcal / day</Text>
               <View style={s.macroRow}>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.5 / 4)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.45 / 4)}g</Text>
                   <Text style={s.macroName}>Carbs</Text>
                 </View>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.3 / 4)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.30 / 4)}g</Text>
                   <Text style={s.macroName}>Protein</Text>
                 </View>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.2 / 9)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.25 / 9)}g</Text>
                   <Text style={s.macroName}>Fat</Text>
                 </View>
               </View>
