@@ -1045,7 +1045,7 @@ export default function ProfileScreen() {
             const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
             setGoals(localActivity, localGoal, cal);
             // Re-derive the macro split — changing the goal should reshape macros too.
-            setMacroPcts(macrosFor(localGoal, dietaryPreferences));
+            setMacroPcts(macrosFor(localGoal, dietaryPreferences, weight, cal));
             setProfile({ ...profile, sex });
             setTdeeModal(false);
           } }} />

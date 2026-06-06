@@ -72,9 +72,9 @@ export default function OnboardingScreen() {
     return calcTDEE(a, wKg, hCm, sex, activity, goal);
   })();
 
-  // Personalised macro split from the goal + diet the user picks — keeps the
-  // summary preview and the persisted value identical.
-  const macros = macrosFor(goal, dietaryPref);
+  // Personalised macro split from the goal + diet + bodyweight the user gives us —
+  // keeps the summary preview and the persisted value identical.
+  const macros = macrosFor(goal, dietaryPref, wKg, calorieGoal);
 
   async function finish() {
     if (submittingRef.current) return;

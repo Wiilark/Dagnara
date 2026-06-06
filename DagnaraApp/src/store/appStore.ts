@@ -366,28 +366,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 }));
 
-// Personalised macro split (carbs/protein/fat %, always sums to 100) derived from
-// the goal + diet the user already picks in onboarding. Diet wins when it dictates
-// carbs (Keto/Low Carb are defined by carb ceilings); otherwise the goal drives it.
+// Round three percentages that should sum to 100 so they still sum to exactly 100
+// after integer rounding (largest-remainder method). Guarantees the macroPcts
+// contract is never off-by-one from naive Math.round.
+function roundTo100(carbs: number, protein: number, fat: number): { carbs: number; protein: number; fat: number } {
+  const raw = [carbs, protein, fat];
+  const floors = raw.map(Math.floor);
+  let remainder = 100 - floors.reduce((a, b) => a + b, 0);
+  // Hand the leftover units to the largest fractional parts first.
+  const order = raw
+    .map((v, i) => ({ i, frac: v - floors[i] }))
+    .sort((a, b) => b.frac - a.frac);
+  const out = [...floors];
+  for (let k = 0; k < order.length && remainder > 0; k++, remainder--) out[order[k].i]++;
+  return { carbs: out[0], protein: out[1], fat: out[2] };
+}
+
+// Personalised macro split (carbs/protein/fat %, always sums to exactly 100),
+// derived from the goal + diet + bodyweight the user already gives us. Protein is
+// anchored to bodyweight (g/kg) — the evidence-based way — rather than a flat % that
+// breaks at the extremes; fat gets a hormonal-health floor; carbs flex to fill the
+// rest. Diet ceilings (Keto/Low Carb) override the carb target.
 export function macrosFor(
   weightGoal: 'lose' | 'maintain' | 'gain',
   dietaryPref: string | null,
+  weightKg = 70,
+  calories = 2000,
 ): { carbs: number; protein: number; fat: number } {
-  switch (dietaryPref) {
-    case 'Keto':         return { carbs: 10, protein: 30, fat: 60 };
-    case 'Low Carb':     return { carbs: 25, protein: 35, fat: 40 };
-    case 'High Protein': return { carbs: 35, protein: 40, fat: 25 };
-    // Plant-based: protein is harder to hit, so lean carb-forward.
-    case 'Vegan':
-    case 'Vegetarian':   return { carbs: 50, protein: 25, fat: 25 };
-    default: break;
-  }
-  // Goal-driven default (covers Mediterranean / no preference too).
-  switch (weightGoal) {
-    case 'lose': return { carbs: 40, protein: 35, fat: 25 }; // higher protein preserves muscle in a deficit
-    case 'gain': return { carbs: 45, protein: 30, fat: 25 }; // carbs fuel training & surplus
-    default:     return { carbs: 45, protein: 30, fat: 25 }; // maintain
-  }
+  const w = Math.max(35, Math.min(weightKg || 70, 250));
+  const kcal = Math.max(800, Math.min(calories || 2000, 8000));
+
+  // 1) Protein target in g/kg, by goal — plant-based eats slightly less (harder to hit).
+  const plant = dietaryPref === 'Vegan' || dietaryPref === 'Vegetarian';
+  let proteinPerKg = weightGoal === 'lose' ? 2.0 : weightGoal === 'gain' ? 1.8 : 1.6;
+  if (dietaryPref === 'High Protein') proteinPerKg = 2.2;
+  if (plant) proteinPerKg = Math.min(proteinPerKg, 1.6) - 0.2; // ease the plant ceiling
+  proteinPerKg = Math.max(1.2, Math.min(proteinPerKg, 2.4));
+  const proteinG = proteinPerKg * w;
+  let proteinPct = (proteinG * 4 / kcal) * 100;
+
+  // 2) Fat — diet-driven ceiling for Keto/Low Carb, else a 25% target with a 20% floor.
+  let fatPct =
+    dietaryPref === 'Keto'     ? 65 :
+    dietaryPref === 'Low Carb' ? 40 :
+    25;
+
+  // 3) Clamp protein so the two non-carb macros leave room for some carbs (except Keto,
+  // which is intentionally carb-minimal).
+  const carbFloor = dietaryPref === 'Keto' ? 5 : 10;
+  const maxProtein = 100 - fatPct - carbFloor;
+  proteinPct = Math.max(15, Math.min(proteinPct, maxProtein));
+
+  // 4) Carbs take whatever calories remain.
+  const carbsPct = Math.max(carbFloor, 100 - proteinPct - fatPct);
+
+  return roundTo100(carbsPct, proteinPct, fatPct);
 }
 
 export function calcTDEE(age: number, weightKg: number, heightCm: number, sex: 'male' | 'female', activityLevel: string, weightGoal: string): number {
