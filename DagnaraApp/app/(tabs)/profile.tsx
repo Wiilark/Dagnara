@@ -1255,8 +1255,12 @@ export default function ProfileScreen() {
 
             <Text style={[pf.sectionLbl, { marginTop: spacing.lg }]}>BODY MEASUREMENTS</Text>
             {(() => {
-              const w = parseFloat(measureInputs.weight || measurements.weight || String(profile.weight ?? ''));
-              const h = parseFloat(measureInputs.height || measurements.height || String(profile.height ?? ''));
+              // Live input is in display units (lb/stone, ft'in") — parse to metric
+              // before BMI, falling back to the stored metric measurements/profile.
+              const w = parseWeight(measureInputs.weight, unitSystem)
+                ?? parseFloat(measurements.weight || String(profile.weight ?? ''));
+              const h = parseHeight(measureInputs.height, unitSystem)
+                ?? parseFloat(measurements.height || String(profile.height ?? ''));
               const bmi = w > 0 && h > 0 ? (w / ((h / 100) ** 2)) : null;
               const bmiLabel = bmi === null ? 'Log your weight & height' :
                 bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal weight' :
