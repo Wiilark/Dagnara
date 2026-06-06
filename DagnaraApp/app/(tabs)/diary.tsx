@@ -103,6 +103,9 @@ interface AiItem {
   weight_g?: number;
   per100?: { kcal: number; carbs: number; protein: number; fat: number };
   multiplier: number; // user-editable: 0.5 / 1 / 1.5 / 2
+  // Unrounded per-serving macros captured at multiplier=1. Scaling always reads
+  // from this so repeated portion changes never compound rounding error.
+  base?: { kcal: number; carbs: number; protein: number; fat: number };
 }
 
 interface ProgramsCardData {
@@ -1012,10 +1015,14 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
   function setMultiplier(idx: number, m: number) {
     setList(prev => prev.map((it, i) => {
       if (i !== idx) return it;
-      const base = it.per100 && it.weight_g
-        ? { kcal: it.per100.kcal * it.weight_g / 100, carbs: it.per100.carbs * it.weight_g / 100, protein: it.per100.protein * it.weight_g / 100, fat: it.per100.fat * it.weight_g / 100 }
-        : { kcal: it.kcal / it.multiplier, carbs: it.carbs / it.multiplier, protein: it.protein / it.multiplier, fat: it.fat / it.multiplier };
-      return { ...it, multiplier: m, kcal: Math.round(base.kcal * m), carbs: Math.round(base.carbs * m), protein: Math.round(base.protein * m), fat: Math.round(base.fat * m) };
+      // Resolve the unrounded per-serving base exactly once: prefer per100×weight,
+      // then a cached base, then back out the current values by the live multiplier
+      // (first edit only — afterwards the cached base is authoritative).
+      const base = it.base
+        ?? (it.per100 && it.weight_g
+          ? { kcal: it.per100.kcal * it.weight_g / 100, carbs: it.per100.carbs * it.weight_g / 100, protein: it.per100.protein * it.weight_g / 100, fat: it.per100.fat * it.weight_g / 100 }
+          : { kcal: it.kcal / it.multiplier, carbs: it.carbs / it.multiplier, protein: it.protein / it.multiplier, fat: it.fat / it.multiplier });
+      return { ...it, base, multiplier: m, kcal: Math.round(base.kcal * m), carbs: Math.round(base.carbs * m), protein: Math.round(base.protein * m), fat: Math.round(base.fat * m) };
     }));
   }
 
