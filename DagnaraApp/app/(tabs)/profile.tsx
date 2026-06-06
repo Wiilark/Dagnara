@@ -943,6 +943,7 @@ export default function ProfileScreen() {
                     { icon: 'logo-x', label: 'Follow us on X', color: colors.ink, onPress: () => Alert.alert('Follow Us', 'Opening X...') },
                     { icon: 'logo-facebook', label: 'Like us on Facebook', color: '#1877F2', onPress: () => Alert.alert('Facebook', 'Opening Facebook...') },
                     { icon: 'logo-instagram', label: 'Watch our stories on Instagram', color: colors.rose, onPress: () => Alert.alert('Instagram', 'Opening Instagram...') },
+                    { icon: 'logo-tiktok', label: 'Keep up with us on TikTok', color: colors.teal, onPress: () => Alert.alert('TikTok', 'Opening TikTok...') },
                   ].map(({ icon, label, color, onPress }, i, arr) => (
                     <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]} onPress={onPress}>
                       <Ionicons name={icon as any} size={20} color={color} style={{ width: 28, textAlign: 'center' }} />
