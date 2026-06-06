@@ -99,6 +99,10 @@ export function parseWeight(val: string, sys: UnitSystem): number | null {
     // "11 4" or "11st 4lb" = 11 stone 4 lbs
     const m = s.match(/^(\d+(?:\.\d+)?)\s*(?:st)?\s+(\d+(?:\.\d+)?)/i);
     if (m) return (parseFloat(m[1]) * 14 + parseFloat(m[2])) / 2.2046;
+    // A bare number in UK mode means stone (e.g. "11" = 11 st), not pounds.
+    const st = parseFloat(s);
+    if (isNaN(st) || st <= 0) return null;
+    return (st * 14) / 2.2046;
   }
   const n = parseFloat(s);
   if (isNaN(n) || n <= 0) return null;
