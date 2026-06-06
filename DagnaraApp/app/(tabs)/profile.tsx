@@ -11,7 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { useAppStore, calcTDEE } from '../../src/store/appStore';
+import { useAppStore, calcTDEE, macrosFor } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, requestNotificationPermission } from '../../src/lib/notifications';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
@@ -29,7 +29,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setMacroPcts } = useAppStore();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
@@ -1044,6 +1044,8 @@ export default function ProfileScreen() {
             const height = parseFloat(profile.height ?? '170') || 170;
             const cal = calcTDEE(age, weight, height, sex, localActivity, localGoal);
             setGoals(localActivity, localGoal, cal);
+            // Re-derive the macro split — changing the goal should reshape macros too.
+            setMacroPcts(macrosFor(localGoal, dietaryPreferences));
             setProfile({ ...profile, sex });
             setTdeeModal(false);
           } }} />

@@ -366,6 +366,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 }));
 
+// Personalised macro split (carbs/protein/fat %, always sums to 100) derived from
+// the goal + diet the user already picks in onboarding. Diet wins when it dictates
+// carbs (Keto/Low Carb are defined by carb ceilings); otherwise the goal drives it.
+export function macrosFor(
+  weightGoal: 'lose' | 'maintain' | 'gain',
+  dietaryPref: string | null,
+): { carbs: number; protein: number; fat: number } {
+  switch (dietaryPref) {
+    case 'Keto':         return { carbs: 10, protein: 30, fat: 60 };
+    case 'Low Carb':     return { carbs: 25, protein: 35, fat: 40 };
+    case 'High Protein': return { carbs: 35, protein: 40, fat: 25 };
+    // Plant-based: protein is harder to hit, so lean carb-forward.
+    case 'Vegan':
+    case 'Vegetarian':   return { carbs: 50, protein: 25, fat: 25 };
+    default: break;
+  }
+  // Goal-driven default (covers Mediterranean / no preference too).
+  switch (weightGoal) {
+    case 'lose': return { carbs: 40, protein: 35, fat: 25 }; // higher protein preserves muscle in a deficit
+    case 'gain': return { carbs: 45, protein: 30, fat: 25 }; // carbs fuel training & surplus
+    default:     return { carbs: 45, protein: 30, fat: 25 }; // maintain
+  }
+}
+
 export function calcTDEE(age: number, weightKg: number, heightCm: number, sex: 'male' | 'female', activityLevel: string, weightGoal: string): number {
   // Clamp inputs to realistic ranges
   const safeAge    = Math.max(10, Math.min(age    || 25,  100));

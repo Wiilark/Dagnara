@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../src/store/authStore';
-import { useAppStore, calcTDEE } from '../src/store/appStore';
+import { useAppStore, calcTDEE, macrosFor } from '../src/store/appStore';
 import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput, type UnitSystem } from '../src/lib/units';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, scheduleDailySummaryReminder } from '../src/lib/notifications';
 import { COUNTRIES, getCountry } from '../src/lib/currency';
@@ -42,7 +42,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { email, profile, setProfile } = useAuthStore();
   const { setGoals, unitSystem, setUnitSystem, country: persistedCountry, setCountry,
-          setDietaryPreferences, setPillDefaultTime } = useAppStore();
+          setDietaryPreferences, setPillDefaultTime, setMacroPcts } = useAppStore();
 
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState<Goal>('maintain');
@@ -72,6 +72,10 @@ export default function OnboardingScreen() {
     return calcTDEE(a, wKg, hCm, sex, activity, goal);
   })();
 
+  // Personalised macro split from the goal + diet the user picks — keeps the
+  // summary preview and the persisted value identical.
+  const macros = macrosFor(goal, dietaryPref);
+
   async function finish() {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -84,6 +88,7 @@ export default function OnboardingScreen() {
 
     try {
       await setGoals(activity, goal, calorieGoal);
+      await setMacroPcts(macros);
       await setDietaryPreferences(dietaryPref);
       await setPillDefaultTime(pillDefaultTime);
       // Persist country selection — drives currency in Programs (money saved, etc.)
@@ -507,15 +512,15 @@ export default function OnboardingScreen() {
               <Text style={s.calLabel}>kcal / day</Text>
               <View style={s.macroRow}>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.45 / 4)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * macros.carbs / 100 / 4)}g</Text>
                   <Text style={s.macroName}>Carbs</Text>
                 </View>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.30 / 4)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * macros.protein / 100 / 4)}g</Text>
                   <Text style={s.macroName}>Protein</Text>
                 </View>
                 <View style={s.macroBox}>
-                  <Text style={s.macroVal}>{Math.round(calorieGoal * 0.25 / 9)}g</Text>
+                  <Text style={s.macroVal}>{Math.round(calorieGoal * macros.fat / 100 / 9)}g</Text>
                   <Text style={s.macroName}>Fat</Text>
                 </View>
               </View>
