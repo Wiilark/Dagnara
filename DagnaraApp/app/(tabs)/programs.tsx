@@ -1921,16 +1921,19 @@ function estimateAchHours(
   a: QsAchievement, cigsPerDay: number, cigsPerPack: number, costPerPack: number,
 ): number {
   if (a.type === 'time')  return a.threshold;
-  if (a.type === 'cigs')  return cigsPerDay > 0 ? (a.threshold * 24) / cigsPerDay : Infinity;
+  // Runtime unlock keys off cigsAvoided = floor(hours × cigsPerDay/24), so a
+  // partial cig never counts — round cig-derived thresholds UP to the whole cig
+  // that actually trips the unlock, keeping the estimated date on the real one.
+  if (a.type === 'cigs')  return cigsPerDay > 0 ? (Math.ceil(a.threshold) * 24) / cigsPerDay : Infinity;
   if (a.type === 'life') {
     // life-hours → cigs needed → real hours of abstinence
-    const cigsNeeded = (a.threshold * 60) / MIN_PER_CIG;
+    const cigsNeeded = Math.ceil((a.threshold * 60) / MIN_PER_CIG);
     return cigsPerDay > 0 ? (cigsNeeded * 24) / cigsPerDay : Infinity;
   }
   // money → cigs equivalent → hours
   const moneyPerCig = cigsPerPack > 0 ? (costPerPack / cigsPerPack) : 0;
   if (moneyPerCig <= 0 || cigsPerDay <= 0) return Infinity;
-  const cigs = a.threshold / moneyPerCig;
+  const cigs = Math.ceil(a.threshold / moneyPerCig);
   return (cigs * 24) / cigsPerDay;
 }
 
