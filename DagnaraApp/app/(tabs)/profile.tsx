@@ -154,11 +154,16 @@ export default function ProfileScreen() {
     });
   }, [dietaryModal]);
 
-  // Populate display-unit inputs from stored metric measurements
+  // Populate display-unit inputs from stored metric values. Weight/height fall
+  // back to the profile (set during onboarding) so the editor isn't blank for
+  // users who never opened the standalone measurements sheet — the BMI card uses
+  // the same fallback, keeping all three readers consistent.
   function seedMeasureInputs() {
+    const wSrc = measurements.weight || (profile.weight != null ? String(profile.weight) : '');
+    const hSrc = measurements.height || (profile.height != null ? String(profile.height) : '');
     setMeasureInputs({
-      weight: measurements.weight ? kgToInput(parseFloat(measurements.weight), unitSystem) : '',
-      height: measurements.height ? cmToInput(parseFloat(measurements.height), unitSystem) : '',
+      weight: wSrc ? kgToInput(parseFloat(wSrc), unitSystem) : '',
+      height: hSrc ? cmToInput(parseFloat(hSrc), unitSystem) : '',
       waist:  measurements.waist  ? cmLenToInput(parseFloat(measurements.waist),  unitSystem) : '',
       chest:  measurements.chest  ? cmLenToInput(parseFloat(measurements.chest),  unitSystem) : '',
       hips:   measurements.hips   ? cmLenToInput(parseFloat(measurements.hips),   unitSystem) : '',
