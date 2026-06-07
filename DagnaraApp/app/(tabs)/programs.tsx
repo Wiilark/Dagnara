@@ -2257,7 +2257,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [bestHours, setBestHours] = useState<number>(0); // personal-best streak in hours
   const [cravings, setCravings] = useState<Craving[]>([]); // every logged craving (won or lost)
   const [elapsed, setElapsed] = useState(0); // ms
-  const intervalRef = useRef<any>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Reasons-I'm-quitting anchor list. The strongest evidence-based craving tool
   // — reading back why you started is more effective than any tip or breathing
   // exercise. Surfaced as a reminder banner on the cravings view and a card on main.
@@ -2569,7 +2569,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   }, [visible]);
 
   useEffect(() => {
-    if (!data) { clearInterval(intervalRef.current); return; }
+    if (!data) { if (intervalRef.current) clearInterval(intervalRef.current); return; }
     function tick() {
       // Guard a corrupt persisted quitDate (NaN → 0) and clamp negatives so a
       // bad or future date can never produce negative stats.
@@ -2578,7 +2578,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     }
     tick();
     intervalRef.current = setInterval(tick, 1000);
-    return () => clearInterval(intervalRef.current);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [data]);
 
   function saveSetup() {
@@ -2993,7 +2993,10 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     );
     const prev = prevUnlockedRefGlobal.current;
     if (prev == null || !isSettled) {
+      // First settled pass: seed the historical unlock set without firing, then
+      // flip isSettled so subsequent ticks go live and fire on new crossings.
       prevUnlockedRefGlobal.current = unlockedNow;
+      if (!isSettled) setIsSettled(true);
       return;
     }
     const newly: QsAchievement[] = [];
@@ -3531,14 +3534,10 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
                   bar. Reuses the same fmtKr formatter for the readouts. */}
               <Text style={m.qsDetailSectionTitle}>Money-saved goal</Text>
               {moneyGoal ? (() => {
-                // moneySaved is in USD — convert to display currency so the bar
-                // compares like-for-like with the stored goal amount.
-                const savedDisplay = moneyPer.year > 0
-                  ? (moneySaved * (moneyPer.day / Math.max(0.0001, moneySaved * (data?.cigsPerDay ?? 0) / 365)))
-                  : 0;
-                // Simpler: moneyPer.day is display-currency per day. cumulative
-                // saved in display currency = moneyPer.day × full days quit. We
-                // already compute hours; use hours/24 for the day fraction.
+                // moneyPer.day is display-currency per day, so cumulative saved
+                // in display currency = moneyPer.day × full days quit. We already
+                // compute hours; use hours/24 for the day fraction. This compares
+                // like-for-like with the stored goal amount (also display currency).
                 const savedCurr = moneyPer.day * (hours / 24);
                 const pct = Math.max(0, Math.min(1, savedCurr / moneyGoal.amount));
                 const remaining = Math.max(0, moneyGoal.amount - savedCurr);
@@ -5305,7 +5304,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [slips, setSlips] = useState<string[]>([]);
   const [bestHours, setBestHours] = useState<number>(0);
   const [elapsed, setElapsed] = useState(0);
-  const intervalRef = useRef<any>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [formDate, setFormDate] = useState('');
   const [formDpd, setFormDpd] = useState('2');
@@ -5445,7 +5444,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   }, [visible]);
 
   useEffect(() => {
-    if (!data) { clearInterval(intervalRef.current); return; }
+    if (!data) { if (intervalRef.current) clearInterval(intervalRef.current); return; }
     function tick() {
       // Guard a corrupt persisted quitDate (NaN → 0) and clamp negatives so a
       // bad or future date can never produce negative stats.
@@ -5454,7 +5453,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     }
     tick();
     intervalRef.current = setInterval(tick, 1000);
-    return () => clearInterval(intervalRef.current);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [data]);
 
   function saveSetup() {
@@ -5768,7 +5767,10 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     );
     const prev = prevQdUnlockedRefGlobal.current;
     if (prev == null || !isSettled) {
+      // First settled pass: seed the historical unlock set without firing, then
+      // flip isSettled so subsequent ticks go live and fire on new crossings.
       prevQdUnlockedRefGlobal.current = unlockedNow;
+      if (!isSettled) setIsSettled(true);
       return;
     }
     const newly: typeof QD_ACHIEVEMENTS[number][] = [];
@@ -7945,7 +7947,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                   {/* Day progress bar */}
                   <View style={m.todayBarBg}>
                     <View style={[m.todayBarFill, {
-                      width: `${todayPct}%` as any,
+                      width: `${todayPct}%`,
                       backgroundColor: allDoneToday ? colors.green : colors.purple,
                     }]} />
                   </View>
@@ -8082,7 +8084,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
                     </View>
                     <View style={m.doseBar}>
                       <View style={[m.doseFill, {
-                        width: `${Math.round((courseProgress ?? 0) * 100)}%` as any,
+                        width: `${Math.round((courseProgress ?? 0) * 100)}%`,
                         backgroundColor: courseComplete ? colors.green : colors.teal,
                       }]} />
                     </View>
@@ -8248,7 +8250,7 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
               <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.green }}>{Math.round(pct * 100)}%</Text>
             </View>
             <View style={{ height: 6, backgroundColor: colors.layer2, borderRadius: radius.pill, overflow: 'hidden' }}>
-              <View style={{ height: '100%', width: `${Math.round(pct * 100)}%` as any, backgroundColor: colors.green, borderRadius: radius.pill }} />
+              <View style={{ height: '100%', width: `${Math.round(pct * 100)}%`, backgroundColor: colors.green, borderRadius: radius.pill }} />
             </View>
           </View>
         )}
