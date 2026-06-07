@@ -1372,7 +1372,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: 16, gap: 24, paddingBottom: 40 },
+  scroll: { padding: spacing.md, gap: spacing.lg, paddingBottom: spacing.xl + 4 },
 
   fixedHeader: {
     position: 'absolute',
@@ -1426,16 +1426,16 @@ const styles = StyleSheet.create({
   heroEmail: { color: colors.ink3, fontSize: 16, maxWidth: 280, textAlign: 'center', marginTop: 6, opacity: 0.7 },
 
   quickRow: { flexDirection: 'row', gap: 12 },
-  quickCard: { backgroundColor: colors.layer1, borderRadius: 20, padding: 16, minHeight: 110, justifyContent: 'center', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  quickIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
+  quickCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, padding: spacing.md, minHeight: 110, justifyContent: 'center', alignItems: 'flex-start', shadowColor: colors.purple, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  quickIconWrap: { width: 34, height: 34, borderRadius: radius.sm, backgroundColor: colors.purpleTint, alignItems: 'center', justifyContent: 'center' },
   quickTexts: { gap: 2, marginTop: 12 },
-  quickVal: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  quickVal: { fontSize: fontSize.md, fontWeight: '800', color: colors.ink },
   quickLbl: { fontSize: 12, color: colors.ink3, fontWeight: '600', opacity: 0.7 },
 
 
-  menuCard: { backgroundColor: colors.layer1, borderRadius: 20, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
-  menuLabel: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '600' },
+  menuCard: { backgroundColor: colors.layer1, borderRadius: radius.lg, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm2, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
+  menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.base, fontWeight: '600' },
 
   footer: { textAlign: 'center', color: colors.ink3, fontSize: 12, marginTop: 4, opacity: 0.4 },
 
