@@ -43,7 +43,7 @@ const VEG_GOAL = 3; const FRUIT_GOAL = 3;
 const RING_SW = 12;
 
 function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
-function addDays(date: string, days: number) { const d = new Date(date); d.setDate(d.getDate() + days); return dateStr(d); }
+function addDays(date: string, days: number) { const [y, m, dd] = date.split('-').map(Number); const d = new Date(y, m - 1, dd); d.setDate(d.getDate() + days); return dateStr(d); }
 function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)); }
 /** Format a number to at most 2 decimal places, stripping trailing zeros */
 function r2(v: number): string { return parseFloat(v.toFixed(2)).toString(); }
@@ -1641,6 +1641,8 @@ export default function DiaryScreen() {
         sodium: 0,
       };
       await saveRecipe(recipe);
+      await checkAndUpdateStreak(selectedDate);
+      await addXp(items.length * 10);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setRecipeUrl('');
       setSearchVisible(false);
@@ -1797,6 +1799,7 @@ export default function DiaryScreen() {
     };
     await addCardioSession(selectedDate, session);
     await addXp(20);
+    await checkAndUpdateStreak(selectedDate);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(`${name}: ${kcal} kcal burned ✓`, 'Exercise logged! +20 XP');
   }
@@ -1804,6 +1807,7 @@ export default function DiaryScreen() {
   async function handleAddStrengthSession(session: StrengthSession) {
     await addStrengthSession(selectedDate, session);
     await addXp(20);
+    await checkAndUpdateStreak(selectedDate);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(`Weight Training: ${session.totalKcal} kcal burned ✓`, 'Workout logged! +20 XP');
   }
