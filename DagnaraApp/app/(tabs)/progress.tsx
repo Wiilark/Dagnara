@@ -1226,7 +1226,7 @@ export default function ProgressScreen() {
             </View>
           )}
           {(() => {
-            const tgt = parseFloat((profile as any).targetWeight ?? '');
+            const tgt = parseFloat(profile?.targetWeight ?? '');
             const latest = weightHistory[weightHistory.length - 1]?.kg;
             if (!tgt || !latest) return null;
             const diff = tgt - latest;
