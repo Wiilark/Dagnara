@@ -29,7 +29,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry } = useAppStore();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
@@ -325,7 +325,13 @@ export default function ProfileScreen() {
     const tdeeAge    = age ?? (parseInt(draft.age ?? '25', 10) || 25);
     const tdeeWeight = parseFloat(measurePatch.weight ?? draft.weight ?? '70') || 70;
     const tdeeHeight = parseFloat(measurePatch.height ?? draft.height ?? '170') || 170;
-    void setGoals(activityLevel, weightGoal, calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, sex, activityLevel, weightGoal));
+    const newCal = calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, sex, activityLevel, weightGoal);
+    void setGoals(activityLevel, weightGoal, newCal);
+    // macrosFor is anchored to bodyweight + calories, so a weight edit must reshape
+    // the split too — mirrors the TDEE/Diet modals, which were the only paths doing this.
+    void setMacroPcts(macrosFor(weightGoal, dietaryPreferences, tdeeWeight, newCal));
+    // Log the new weight to history so the Progress chart/trend reflects it.
+    if (measurePatch.weight != null) void addWeightEntry(tdeeWeight);
     setEditing(false);
   }
 
@@ -338,7 +344,11 @@ export default function ProfileScreen() {
     const tdeeWeight = parseFloat((measurePatch.weight ?? profile.weight) ?? '70') || 70;
     const tdeeHeight = parseFloat((measurePatch.height ?? profile.height) ?? '170') || 170;
     const curSex = (profile.sex as 'male' | 'female') ?? 'male';
-    void setGoals(activityLevel, weightGoal, calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, curSex, activityLevel, weightGoal));
+    const newCal = calcTDEE(tdeeAge, tdeeWeight, tdeeHeight, curSex, activityLevel, weightGoal);
+    void setGoals(activityLevel, weightGoal, newCal);
+    // Keep the macro split and weight history in sync with the new bodyweight too.
+    void setMacroPcts(macrosFor(weightGoal, dietaryPreferences, tdeeWeight, newCal));
+    if (measurePatch.weight != null) void addWeightEntry(tdeeWeight);
     setMeasureModal(false);
   }
 
