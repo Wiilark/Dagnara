@@ -1024,10 +1024,10 @@ export default function ProfileScreen() {
                 { key: 'paleo', label: 'Paleo' },
                 { key: 'halal', label: 'Halal' },
                 { key: 'kosher', label: 'Kosher' },
-              ].map(({ key, label }, i, arr) => {
+              ].map(({ key, label }) => {
                 const isOn = selectedFoodPref === key;
                 return (
-                  <TouchableOpacity key={key} style={[dp.prefRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                  <TouchableOpacity key={key} style={dp.prefRow}
                     onPress={() => setSelectedFoodPref(key)}>
                     <Text style={dp.prefLabel}>{label}</Text>
                     <View style={[dp.toggle, isOn && dp.toggleOn]}>
@@ -1048,10 +1048,10 @@ export default function ProfileScreen() {
                 { key: 'Eggs', label: 'Allergic to egg' },
                 { key: 'Shellfish', label: 'Allergic to shellfish' },
                 { key: 'Soy', label: 'Allergic to soy' },
-              ].map(({ key, label }, i, arr) => {
+              ].map(({ key, label }) => {
                 const isOn = key === 'none' ? selectedAllergies.length === 0 : selectedAllergies.includes(key);
                 return (
-                  <TouchableOpacity key={key} style={[dp.prefRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                  <TouchableOpacity key={key} style={dp.prefRow}
                     onPress={() => {
                       if (key === 'none') { setSelectedAllergies([]); return; }
                       setSelectedAllergies(prev =>
@@ -1523,7 +1523,7 @@ const dp = StyleSheet.create({
   scroll: { padding: spacing.md, paddingBottom: spacing.xl * 3 },
   sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.sm, marginTop: spacing.xs },
   listCard: { backgroundColor: colors.layer1, borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.lg },
-  prefRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  prefRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
   prefLabel: { fontSize: fontSize.base, color: colors.ink },
   toggle: { width: 50, height: 28, borderRadius: radius.pill, backgroundColor: colors.layer2, position: 'relative', overflow: 'hidden' },
   toggleOn: { backgroundColor: colors.purple },
