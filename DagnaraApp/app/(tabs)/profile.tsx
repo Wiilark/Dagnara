@@ -29,7 +29,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setMacroPcts } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts } = useAppStore();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
@@ -109,7 +109,11 @@ export default function ProfileScreen() {
       if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
       if (m[`${p}_language`])      setLanguage(m[`${p}_language`]!);
       if (m[`${p}_plan`])          setSelectedPlan(m[`${p}_plan`] as 'free' | 'premium');
-      if (m[`${p}_diet_plan`])     setSelectedDiet(m[`${p}_diet_plan`]!);
+      // Diet plan = the store's dietaryPreferences (set at onboarding / Diet Plan
+      // save). Fall back to the legacy AsyncStorage key only if the store is null,
+      // so an onboarded user's choice shows here instead of defaulting to Balanced.
+      if (dietaryPreferences)      setSelectedDiet(dietaryPreferences);
+      else if (m[`${p}_diet_plan`]) setSelectedDiet(m[`${p}_diet_plan`]!);
       if (m[`${p}_food_pref`])     setSelectedFoodPref(m[`${p}_food_pref`]!);
       if (m[`${p}_allergies`]) {
         try { setSelectedAllergies(JSON.parse(m[`${p}_allergies`]!)); } catch { /* ignore */ }
@@ -129,7 +133,10 @@ export default function ProfileScreen() {
       if (m[`${p}_health_sleep`])     setHealthSyncSleep(m[`${p}_health_sleep`] === 'true');
       if (m[`${p}_health_last_sync`]) setHealthLastSync(m[`${p}_health_last_sync`]);
     });
-    // `setUnitSystem` is a stable Zustand action — safe to omit. `p` already covers email changes.
+    // `setUnitSystem` is a stable Zustand action — safe to omit. `p` already covers
+    // email changes. `dietaryPreferences` is read once here to seed the Diet Plan row
+    // from the already-hydrated store; it must NOT re-trigger this loader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p]);
 
   // Reset local TDEE state when modal opens
@@ -141,12 +148,23 @@ export default function ProfileScreen() {
     }
   }, [tdeeModal]);
 
+  // Revert an unsaved Diet Plan pick when that sheet closes without saving, so the
+  // menu row + next open reflect the persisted plan, not a dangling selection.
+  // Precedence matches the seed: store dietaryPreferences → legacy key → Balanced.
+  useEffect(() => {
+    if (dietModal) return;
+    if (dietaryPreferences) { setSelectedDiet(dietaryPreferences); return; }
+    AsyncStorage.getItem(`${p}_diet_plan`).then(v => setSelectedDiet(v ?? 'Balanced'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dietModal]);
+
   // Revert unsaved dietary preference changes when the sheet closes without saving
   useEffect(() => {
     if (dietaryModal) return;
-    AsyncStorage.multiGet([`${p}_diet_plan`, `${p}_food_pref`, `${p}_allergies`]).then(pairs => {
+    // selectedDiet is owned by the Diet Plan sheet's own revert effect — only the
+    // food-pref + allergies fields belong to this (Dietary Preferences) sheet.
+    AsyncStorage.multiGet([`${p}_food_pref`, `${p}_allergies`]).then(pairs => {
       const m = Object.fromEntries(pairs);
-      if (m[`${p}_diet_plan`]) setSelectedDiet(m[`${p}_diet_plan`]!);
       if (m[`${p}_food_pref`]) setSelectedFoodPref(m[`${p}_food_pref`]!);
       if (m[`${p}_allergies`]) {
         try { setSelectedAllergies(JSON.parse(m[`${p}_allergies`]!)); } catch { /* ignore */ }
@@ -724,7 +742,18 @@ export default function ProfileScreen() {
       {/* ── Diet Plan Modal ── */}
       <Modal visible={dietModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDietModal(false)}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <FloatingModalHeader scrollY={dietScrollY} title="Diet Plan" staticTitle onBack={() => setDietModal(false)} action={{ label: 'Save', onPress: () => { void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet); setDietModal(false); } }} />
+          <FloatingModalHeader scrollY={dietScrollY} title="Diet Plan" staticTitle onBack={() => setDietModal(false)} action={{ label: 'Save', onPress: () => {
+            void AsyncStorage.setItem(`${p}_diet_plan`, selectedDiet);
+            // The diet plan IS the dietary preference macrosFor reads. Persist it to
+            // the store and re-derive the macro split so picking e.g. Keto here
+            // actually reshapes macros (it was previously cosmetic-only). 'Balanced'
+            // and 'Mediterranean' carry no macro override → treat as no preference.
+            const pref = selectedDiet === 'Balanced' || selectedDiet === 'Mediterranean' ? null : selectedDiet;
+            void setDietaryPreferences(pref);
+            const weight = parseFloat(profile.weight ?? '70') || 70;
+            void setMacroPcts(macrosFor(weightGoal, pref, weight, calorieGoal));
+            setDietModal(false);
+          } }} />
           <Animated.ScrollView
             contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.xl + spacing.xl, gap: spacing.sm }}
             showsVerticalScrollIndicator={false}
@@ -946,7 +975,7 @@ export default function ProfileScreen() {
                 <View style={sst.card}>
                   {[
                     { icon: 'logo-x', label: 'Follow us on X', color: colors.ink, onPress: () => Alert.alert('Follow Us', 'Opening X...') },
-                    { icon: 'logo-facebook', label: 'Like us on Facebook', color: '#1877F2', onPress: () => Alert.alert('Facebook', 'Opening Facebook...') },
+                    { icon: 'logo-facebook', label: 'Like us on Facebook', color: colors.sky, onPress: () => Alert.alert('Facebook', 'Opening Facebook...') },
                     { icon: 'logo-instagram', label: 'Watch our stories on Instagram', color: colors.rose, onPress: () => Alert.alert('Instagram', 'Opening Instagram...') },
                     { icon: 'logo-tiktok', label: 'Keep up with us on TikTok', color: colors.teal, onPress: () => Alert.alert('TikTok', 'Opening TikTok...') },
                   ].map(({ icon, label, color, onPress }, i, arr) => (
