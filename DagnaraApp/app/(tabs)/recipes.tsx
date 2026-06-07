@@ -822,8 +822,9 @@ export default function RecipesScreen() {
                 ))}
               </View>
 
-              {/* Fits budget indicator */}
-              {selected.kcal <= remaining && remaining > 0 && (
+              {/* Fits budget indicator — compares the scaled total (what will
+                  actually be logged) against the remaining budget. */}
+              {selected.kcal * servings <= remaining && remaining > 0 && (
                 <View style={styles.fitsBadge}>
                   <Ionicons name="checkmark-circle" size={16} color={colors.green} />
                   <Text style={styles.fitsTxt}>Fits your {remaining} kcal remaining budget</Text>
