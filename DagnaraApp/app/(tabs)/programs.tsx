@@ -2274,9 +2274,6 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [nrtFormNote, setNrtFormNote] = useState('');
   // Tip personalization — liked/skipped IDs influence daily-tip rotation.
   const [tipPrefs, setTipPrefs] = useState<TipPrefs>(DEFAULT_TIP_PREFS);
-  // Confetti overlay — fired when a new achievement unlocks (#6). We diff the
-  // unlocked set against the previous render to detect "new this tick".
-  const [unlockOverlayAch, setUnlockOverlayAch] = useState<QsAchievement | null>(null);
   const [isSettled, setIsSettled] = useState(false);
   // Setup form state
   const [showSetup, setShowSetup] = useState(false);
@@ -2442,7 +2439,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   // Reset detail-view state any time the modal closes so the next open lands on main
   useEffect(() => {
-    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); setCravingFormOpen(false); setNrtFormOpen(false); }
+    if (!visible) { setQsView('main'); setSelectedAch(null); setReasonsEditing(false); setCravingFormOpen(false); setNrtFormOpen(false); }
   }, [visible]);
 
   // Scroll to top whenever the inner view changes so first item is always visible
@@ -3004,9 +3001,6 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       if (unlockedNow.has(a.id) && !prev.has(a.id)) newly.push(a);
     }
     if (newly.length > 0) {
-      // Pick the highest-tier (last in list) for the centerpiece animation
-      const headliner = newly[newly.length - 1];
-      setUnlockOverlayAch(headliner);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       // Cross-feature XP grant — earned milestones feed the app-wide leveling
       // system so quitting smoking pays into the same dopamine bank as the rest
@@ -3087,27 +3081,39 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
         <View style={m.sheetHeader}>
           {qsView === 'main' ? (
             <>
-              <Text style={m.sheetTitle}>🚭 Quit Smoking</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (data) {
-                      setFormDate(data.quitDate.slice(0, 10));
-                      setFormCpd(String(data.cigsPerDay));
-                      // costPerPack is stored in USD — convert to display currency for editing.
-                      setFormCpp(usdToLocal(data.costPerPack, country).toFixed(minorUnits(country)));
-                      setFormCigsPerPack(String(data.cigsPerPack));
-                    }
-                    setShowSetup(true);
-                  }}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Ionicons name="pencil" size={20} color={colors.ink2} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Ionicons name="close" size={22} color={colors.ink2} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{
+                  width: spacing.xl + spacing.sm,
+                  height: spacing.xl + spacing.sm,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.layer2,
+                  borderWidth: 1.5,
+                  borderColor: colors.line2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BackChevron size={22} color={colors.ink} />
+              </TouchableOpacity>
+              <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]}>Quit Smoking</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (data) {
+                    setFormDate(data.quitDate.slice(0, 10));
+                    setFormCpd(String(data.cigsPerDay));
+                    // costPerPack is stored in USD — convert to display currency for editing.
+                    setFormCpp(usdToLocal(data.costPerPack, country).toFixed(minorUnits(country)));
+                    setFormCigsPerPack(String(data.cigsPerPack));
+                  }
+                  setShowSetup(true);
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="pencil" size={20} color={colors.ink2} />
+              </TouchableOpacity>
             </>
           ) : (
             <>
@@ -4925,125 +4931,6 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
           );
         })()}
 
-        {/* ════════════════════════════════════════════════════════════════
-            ACHIEVEMENT UNLOCK CELEBRATION — full-screen overlay fired by
-            the newly-unlocked diff effect (#6). Tap anywhere to dismiss.
-        ════════════════════════════════════════════════════════════════ */}
-        {unlockOverlayAch && (
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              setUnlockOverlayAch(null);
-            }}
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                backgroundColor: colors.bg + 'F2',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: spacing.xl,
-                zIndex: 50,
-              },
-            ]}
-          >
-            {/* Confetti — scattered theme-coloured shards framing the card */}
-            <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-              <Svg width="100%" height="100%" viewBox="0 0 100 170" preserveAspectRatio="xMidYMid slice">
-                {Array.from({ length: 30 }).map((_, i) => {
-                  const palette = [colors.honey, colors.purple2, colors.purple3, colors.green, colors.sky, colors.rose, colors.lavender];
-                  const fill = palette[i % palette.length];
-                  const x = (i * 67 + 11) % 100;
-                  const y = (i * 41 + 7) % 170;
-                  if (i % 4 === 0) {
-                    return (
-                      <Path
-                        key={`cf-${i}`}
-                        d={`M ${x} ${y - 2.6} L ${x + 0.8} ${y - 0.8} L ${x + 2.6} ${y} L ${x + 0.8} ${y + 0.8} L ${x} ${y + 2.6} L ${x - 0.8} ${y + 0.8} L ${x - 2.6} ${y} L ${x - 0.8} ${y - 0.8} Z`}
-                        fill={fill}
-                        opacity={0.9}
-                      />
-                    );
-                  }
-                  return (
-                    <Rect
-                      key={`cf-${i}`}
-                      x={x}
-                      y={y}
-                      width={3.2}
-                      height={1.9}
-                      rx={0.5}
-                      fill={fill}
-                      opacity={0.92}
-                      transform={`rotate(${(i * 57) % 360} ${x + 1.6} ${y + 0.95})`}
-                    />
-                  );
-                })}
-              </Svg>
-            </View>
-
-            {/* Celebration card */}
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 320,
-                backgroundColor: colors.layer3,
-                borderWidth: 1,
-                borderColor: colors.line3,
-                borderRadius: radius.lg,
-                paddingVertical: spacing.xl,
-                paddingHorizontal: spacing.lg,
-                alignItems: 'center',
-                gap: spacing.sm,
-                shadowColor: colors.purple,
-                shadowOpacity: 0.45,
-                shadowRadius: 30,
-                shadowOffset: { width: 0, height: 14 },
-                elevation: 16,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: fontSize.xs,
-                  fontWeight: '700',
-                  letterSpacing: 1.4,
-                  color: colors.honey,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Achievement unlocked
-              </Text>
-
-              <View style={{ width: 200, height: 143, alignItems: 'center', justifyContent: 'center' }}>
-                <QsIllo kind={unlockOverlayAch.illo} id={unlockOverlayAch.id} />
-              </View>
-
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' }}>
-                {unlockOverlayAch.title}
-              </Text>
-
-              <Text style={{ fontSize: fontSize.sm, color: colors.ink2, textAlign: 'center' }}>
-                {formatAchStat(unlockOverlayAch, country, data?.productType ?? 'cigarettes')}
-              </Text>
-
-              <View
-                style={{
-                  marginTop: spacing.sm,
-                  backgroundColor: colors.line,
-                  borderWidth: 1,
-                  borderColor: colors.line2,
-                  borderRadius: radius.pill,
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.xs,
-                }}
-              >
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 0.8 }}>
-                  TAP TO CONTINUE
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
       </SafeAreaView>
     </Modal>
 
@@ -5335,10 +5222,6 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   const [reasonsDraft, setReasonsDraft]     = useState<string[]>([]);
   const [reasonsEditing, setReasonsEditing] = useState(false);
   const [reasonsInput, setReasonsInput]     = useState('');
-  // Confetti unlock overlay — fired when a new achievement unlocks. We diff the
-  // unlocked set across renders so historical unlocks don't carpet-bomb the user
-  // when they reopen the modal. Mirrors the QS implementation exactly.
-  const [unlockOverlayAch, setUnlockOverlayAch] = useState<typeof QD_ACHIEVEMENTS[number] | null>(null);
   const [isSettled, setIsSettled] = useState(false);
 
   // Scroll to top whenever we change views — same UX as the QS modal.
@@ -5349,7 +5232,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
   // Reset detail-view state any time the modal closes so the next open lands on
   // the main view — mirrors QS, prevents resuming half-finished reasons-editor.
   useEffect(() => {
-    if (!visible) { setQdView('main'); setSelectedAch(null); setReasonsEditing(false); setUnlockOverlayAch(null); setCravingFormOpen(false); }
+    if (!visible) { setQdView('main'); setSelectedAch(null); setReasonsEditing(false); setCravingFormOpen(false); }
   }, [visible]);
 
   useEffect(() => {
@@ -5778,9 +5661,6 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
       if (unlockedNow.has(String(a.hours)) && !prev.has(String(a.hours))) newly.push(a);
     }
     if (newly.length > 0) {
-      // Pick the highest-tier (last in list) for the centerpiece celebration
-      const headliner = newly[newly.length - 1];
-      setUnlockOverlayAch(headliner);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       // Cross-feature XP grant — earned milestones feed the app-wide leveling
       // system so quitting drinking pays into the same dopamine bank as QS.
@@ -5883,26 +5763,38 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
         <View style={m.sheetHeader}>
           {qdView === 'main' ? (
             <>
-              <Text style={m.sheetTitle}>🍺 Quit Drinking</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (data) {
-                      setFormDate(data.quitDate.slice(0, 10));
-                      setFormDpd(String(data.drinksPerDay));
-                      // costPerDrink is stored in USD — convert to display currency for editing.
-                      setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
-                    }
-                    setShowSetup(true);
-                  }}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Ionicons name="pencil" size={20} color={colors.ink2} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Ionicons name="close" size={24} color={colors.ink3} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{
+                  width: spacing.xl + spacing.sm,
+                  height: spacing.xl + spacing.sm,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.layer2,
+                  borderWidth: 1.5,
+                  borderColor: colors.line2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BackChevron size={22} color={colors.ink} />
+              </TouchableOpacity>
+              <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]}>Quit Drinking</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (data) {
+                    setFormDate(data.quitDate.slice(0, 10));
+                    setFormDpd(String(data.drinksPerDay));
+                    // costPerDrink is stored in USD — convert to display currency for editing.
+                    setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
+                  }
+                  setShowSetup(true);
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="pencil" size={20} color={colors.ink2} />
+              </TouchableOpacity>
             </>
           ) : (
             <>
@@ -7110,131 +7002,6 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
           );
         })()}
 
-        {/* ════════════════════════════════════════════════════════════════
-            ACHIEVEMENT UNLOCK CELEBRATION — full-screen overlay fired by
-            the newly-unlocked diff effect. Tap anywhere to dismiss.
-            Confetti + celebration card mirror QS exactly so the moment is
-            identical between programs.
-        ════════════════════════════════════════════════════════════════ */}
-        {unlockOverlayAch && (
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              setUnlockOverlayAch(null);
-            }}
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                backgroundColor: colors.bg + 'F2',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: spacing.xl,
-                zIndex: 50,
-              },
-            ]}
-          >
-            {/* Confetti — scattered theme-coloured shards framing the card */}
-            <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-              <Svg width="100%" height="100%" viewBox="0 0 100 170" preserveAspectRatio="xMidYMid slice">
-                {Array.from({ length: 30 }).map((_, i) => {
-                  const palette = [colors.honey, colors.purple2, colors.purple3, colors.green, colors.sky, colors.rose, colors.lavender];
-                  const fill = palette[i % palette.length];
-                  const x = (i * 67 + 11) % 100;
-                  const y = (i * 41 + 7) % 170;
-                  if (i % 4 === 0) {
-                    return (
-                      <Path
-                        key={`qd-cf-${i}`}
-                        d={`M ${x} ${y - 2.6} L ${x + 0.8} ${y - 0.8} L ${x + 2.6} ${y} L ${x + 0.8} ${y + 0.8} L ${x} ${y + 2.6} L ${x - 0.8} ${y + 0.8} L ${x - 2.6} ${y} L ${x - 0.8} ${y - 0.8} Z`}
-                        fill={fill}
-                        opacity={0.9}
-                      />
-                    );
-                  }
-                  return (
-                    <Rect
-                      key={`qd-cf-${i}`}
-                      x={x}
-                      y={y}
-                      width={3.2}
-                      height={1.9}
-                      rx={0.5}
-                      fill={fill}
-                      opacity={0.92}
-                      transform={`rotate(${(i * 57) % 360} ${x + 1.6} ${y + 0.95})`}
-                    />
-                  );
-                })}
-              </Svg>
-            </View>
-
-            {/* Celebration card */}
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 320,
-                backgroundColor: colors.layer3,
-                borderWidth: 1,
-                borderColor: colors.line3,
-                borderRadius: radius.lg,
-                paddingVertical: spacing.xl,
-                paddingHorizontal: spacing.lg,
-                alignItems: 'center',
-                gap: spacing.sm,
-                shadowColor: colors.purple,
-                shadowOpacity: 0.45,
-                shadowRadius: 30,
-                shadowOffset: { width: 0, height: 14 },
-                elevation: 16,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: fontSize.xs,
-                  fontWeight: '700',
-                  letterSpacing: 1.4,
-                  color: colors.honey,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Achievement unlocked
-              </Text>
-
-              {/* Hero illo — same QsIllo SVG family as the QS overlay so the
-                  unlock moment reads as the same trophy class the user will
-                  later revisit on the achievement-detail page. 200x143 frame
-                  matches the QS overlay exactly. */}
-              <View style={{ width: 200, height: 143, alignItems: 'center', justifyContent: 'center' }}>
-                <QsIllo kind={unlockOverlayAch.illo} id={unlockOverlayAch.id} />
-              </View>
-
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' }}>
-                {unlockOverlayAch.title}
-              </Text>
-
-              <Text style={{ fontSize: fontSize.sm, color: colors.ink2, textAlign: 'center' }}>
-                {unlockOverlayAch.desc}
-              </Text>
-
-              <View
-                style={{
-                  marginTop: spacing.sm,
-                  backgroundColor: colors.line,
-                  borderWidth: 1,
-                  borderColor: colors.line2,
-                  borderRadius: radius.pill,
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.xs,
-                }}
-              >
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 0.8 }}>
-                  TAP TO CONTINUE
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
       </SafeAreaView>
     </Modal>
 
