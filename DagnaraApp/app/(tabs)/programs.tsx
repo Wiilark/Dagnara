@@ -8231,12 +8231,41 @@ function GroceryModal({ visible, onClose }: { visible: boolean; onClose: () => v
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={m.sheetHeader}>
-          <TouchableOpacity onPress={onClose} style={{ padding: spacing.xs }}>
-            <Ionicons name="chevron-down" size={22} color={colors.ink2} />
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              width: spacing.xl + spacing.sm,
+              height: spacing.xl + spacing.sm,
+              borderRadius: radius.pill,
+              backgroundColor: colors.layer2,
+              borderWidth: 1.5,
+              borderColor: colors.line2,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BackChevron size={22} color={colors.ink} />
           </TouchableOpacity>
           <Text style={m.sheetTitle}>Grocery List</Text>
-          <TouchableOpacity onPress={() => save(items.filter(i => !i.checked))} disabled={checkedCount === 0} style={{ padding: spacing.xs }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: checkedCount > 0 ? colors.green : colors.ink3 }}>Clear done</Text>
+          <TouchableOpacity
+            onPress={() => save(items.filter(i => !i.checked))}
+            disabled={checkedCount === 0}
+            activeOpacity={0.85}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              height: spacing.xl + spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: radius.pill,
+              backgroundColor: colors.purpleTint,
+              borderWidth: 1.5,
+              borderColor: colors.line3,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: checkedCount > 0 ? 1 : 0.4,
+            }}
+          >
+            <Text style={{ fontSize: fontSize.base, fontWeight: '700', color: colors.lavender }}>Clear</Text>
           </TouchableOpacity>
         </View>
 
