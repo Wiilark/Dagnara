@@ -7732,8 +7732,24 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
         <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>💊 Pill Reminder</Text>
-          <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              width: spacing.xl + spacing.sm,
+              height: spacing.xl + spacing.sm,
+              borderRadius: radius.pill,
+              backgroundColor: colors.layer2,
+              borderWidth: 1.5,
+              borderColor: colors.line2,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BackChevron size={22} color={colors.ink} />
+          </TouchableOpacity>
+          <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]}>Pill Reminder</Text>
+          <View style={{ width: spacing.xl + spacing.sm }} />
         </View>
 
         {/* Add medication sheet */}
