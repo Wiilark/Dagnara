@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -53,6 +53,40 @@ function makeKeys(email: string) {
     PILLS:    `dagnara_pill_meds_${email}`,
     PILL_LOG: (day: string) => `dagnara_pill_log_${day}_${email}`,
   };
+}
+
+// ── Shared program sheet header ───────────────────────────────────────────────
+// Profile-style header for every sheet/detail view inside Programs: a circular
+// back-chevron pill on the left, a dead-centered title, and an optional right
+// node (status badge / action). When `right` is omitted a same-width spacer
+// keeps the title perfectly centered. Mirrors src/components/FloatingModalHeader.
+function ProgramSheetHeader({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
+  return (
+    <View style={m.sheetHeader}>
+      <TouchableOpacity
+        onPress={onBack}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{
+          width: spacing.xl + spacing.sm,
+          height: spacing.xl + spacing.sm,
+          borderRadius: radius.pill,
+          backgroundColor: colors.layer2,
+          borderWidth: 1.5,
+          borderColor: colors.line2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <BackChevron size={22} color={colors.ink} />
+      </TouchableOpacity>
+      <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]} numberOfLines={1}>{title}</Text>
+      {right != null ? (
+        <View style={{ minWidth: spacing.xl + spacing.sm, alignItems: 'flex-end', justifyContent: 'center' }}>{right}</View>
+      ) : (
+        <View style={{ width: spacing.xl + spacing.sm }} />
+      )}
+    </View>
+  );
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -3015,10 +3049,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
           <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-            <View style={m.sheetHeader}>
-              <Text style={m.sheetTitle}>🚭 Quit Setup</Text>
-              <TouchableOpacity onPress={() => (data ? setShowSetup(false) : onClose())}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
-            </View>
+            <ProgramSheetHeader title="Quit Setup" onBack={() => (data ? setShowSetup(false) : onClose())} />
             <ScrollView
               contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
               automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
@@ -3077,109 +3108,83 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
     <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-        {/* ── Header: back-arrow on detail views, X close on main ─────────── */}
-        <View style={m.sheetHeader}>
-          {qsView === 'main' ? (
-            <>
-              <TouchableOpacity
-                onPress={onClose}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{
-                  width: spacing.xl + spacing.sm,
-                  height: spacing.xl + spacing.sm,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.layer2,
-                  borderWidth: 1.5,
-                  borderColor: colors.line2,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BackChevron size={22} color={colors.ink} />
-              </TouchableOpacity>
-              <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]}>Quit Smoking</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (data) {
-                    setFormDate(data.quitDate.slice(0, 10));
-                    setFormCpd(String(data.cigsPerDay));
-                    // costPerPack is stored in USD — convert to display currency for editing.
-                    setFormCpp(usdToLocal(data.costPerPack, country).toFixed(minorUnits(country)));
-                    setFormCigsPerPack(String(data.cigsPerPack));
-                  }
-                  setShowSetup(true);
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="pencil" size={20} color={colors.ink2} />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                onPress={() => {
-                  // Detail-view back navigation:
-                  //  • 'achievement'                       → achievements list
-                  //  • tip / quitline / breathing          → cravings list
-                  //  • anything else (progress, ach list,
-                  //    health, cravings)                   → main
-                  if (qsView === 'achievement') { setSelectedAch(null); setQsView('achievements'); }
-                  else if (qsView === 'tip' || qsView === 'quitline' || qsView === 'breathing' || qsView === 'rescue' || qsView === 'patterns') setQsView('cravings');
-                  else if (qsView === 'goal') setQsView('progress');
-                  else { setReasonsEditing(false); setQsView('main'); }
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <BackChevron
-                  size={28}
-                  color={colors.green}
-                />
-              </TouchableOpacity>
-              <Text style={m.sheetTitle}>
-                {qsView === 'progress'     && 'Overall progress'}
-                {qsView === 'achievements' && 'Achievements'}
-                {qsView === 'achievement'  && ''}
-                {qsView === 'health'       && 'Health improvements'}
-                {qsView === 'cravings'     && 'Beat your cravings'}
-                {qsView === 'tip'          && 'Tip of the day'}
-                {qsView === 'quitline'     && 'Quit lines'}
-                {qsView === 'breathing'    && 'Calm breathing'}
-                {qsView === 'reasons'      && 'My reasons'}
-                {qsView === 'nrt'          && 'NRT log'}
-                {qsView === 'rescue'       && 'Ride the wave'}
-                {qsView === 'patterns'     && 'Your patterns'}
-                {qsView === 'goal'         && 'Money-saved goal'}
-              </Text>
-              {qsView === 'health' ? (
-                <View style={m.qsHealthHeartCount}>
-                  <Ionicons name="heart" size={20} color={colors.rose} />
-                  <Text style={m.qsHealthHeartCountTxt}>
-                    {QS_MILESTONES.filter(ms => hours >= ms.hours).length}/{QS_MILESTONES.length}
-                  </Text>
-                </View>
-              ) : qsView === 'achievements' ? (
-                <View style={m.qsHealthHeartCount}>
-                  <Ionicons name="trophy" size={20} color={colors.honey} />
-                  <Text style={m.qsHealthHeartCountTxt}>
-                    {totalUnlockedAch}/{totalAchAll}
-                  </Text>
-                </View>
-              ) : qsView === 'achievement' && selectedAch ? (
+        {/* ── Header: back-chevron pill + centered title on every view ─────── */}
+        {qsView === 'main' ? (
+            <ProgramSheetHeader
+              title="Quit Smoking"
+              onBack={onClose}
+              right={
                 <TouchableOpacity
-                  onPress={() => { if (selectedAch) void shareAchievement(selectedAch); }}
+                  onPress={() => {
+                    if (data) {
+                      setFormDate(data.quitDate.slice(0, 10));
+                      setFormCpd(String(data.cigsPerDay));
+                      // costPerPack is stored in USD — convert to display currency for editing.
+                      setFormCpp(usdToLocal(data.costPerPack, country).toFixed(minorUnits(country)));
+                      setFormCigsPerPack(String(data.cigsPerPack));
+                    }
+                    setShowSetup(true);
+                  }}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Ionicons name="share-outline" size={22} color={colors.green} />
+                  <Ionicons name="pencil" size={20} color={colors.ink2} />
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Ionicons name="close" size={22} color={colors.ink2} />
-                </TouchableOpacity>
-              )}
-            </>
+              }
+            />
+          ) : (
+            <ProgramSheetHeader
+              // Detail-view back navigation:
+              //  • 'achievement'              → achievements list
+              //  • tip / quitline / breathing → cravings list
+              //  • goal                       → progress
+              //  • anything else              → main
+              onBack={() => {
+                if (qsView === 'achievement') { setSelectedAch(null); setQsView('achievements'); }
+                else if (qsView === 'tip' || qsView === 'quitline' || qsView === 'breathing' || qsView === 'rescue' || qsView === 'patterns') setQsView('cravings');
+                else if (qsView === 'goal') setQsView('progress');
+                else { setReasonsEditing(false); setQsView('main'); }
+              }}
+              title={
+                qsView === 'progress'     ? 'Overall progress' :
+                qsView === 'achievements' ? 'Achievements' :
+                qsView === 'health'       ? 'Health improvements' :
+                qsView === 'cravings'     ? 'Beat your cravings' :
+                qsView === 'tip'          ? 'Tip of the day' :
+                qsView === 'quitline'     ? 'Quit lines' :
+                qsView === 'breathing'    ? 'Calm breathing' :
+                qsView === 'reasons'      ? 'My reasons' :
+                qsView === 'nrt'          ? 'NRT log' :
+                qsView === 'rescue'       ? 'Ride the wave' :
+                qsView === 'patterns'     ? 'Your patterns' :
+                qsView === 'goal'         ? 'Money-saved goal' : ''
+              }
+              right={
+                qsView === 'health' ? (
+                  <View style={m.qsHealthHeartCount}>
+                    <Ionicons name="heart" size={20} color={colors.rose} />
+                    <Text style={m.qsHealthHeartCountTxt}>
+                      {QS_MILESTONES.filter(ms => hours >= ms.hours).length}/{QS_MILESTONES.length}
+                    </Text>
+                  </View>
+                ) : qsView === 'achievements' ? (
+                  <View style={m.qsHealthHeartCount}>
+                    <Ionicons name="trophy" size={20} color={colors.honey} />
+                    <Text style={m.qsHealthHeartCountTxt}>
+                      {totalUnlockedAch}/{totalAchAll}
+                    </Text>
+                  </View>
+                ) : qsView === 'achievement' && selectedAch ? (
+                  <TouchableOpacity
+                    onPress={() => { if (selectedAch) void shareAchievement(selectedAch); }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Ionicons name="share-outline" size={22} color={colors.green} />
+                  </TouchableOpacity>
+                ) : undefined
+              }
+            />
           )}
-        </View>
 
         <ScrollView ref={qsScrollRef} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* ════════════════════════════════════════════════════════════════
@@ -4945,12 +4950,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       onRequestClose={() => setCravingFormOpen(false)}
     >
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-        <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>Log a craving</Text>
-          <TouchableOpacity onPress={() => setCravingFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-        </View>
+        <ProgramSheetHeader title="Log a craving" onBack={() => setCravingFormOpen(false)} />
         <ScrollView
           contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
           keyboardShouldPersistTaps="handled"
@@ -5101,12 +5101,7 @@ function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClose: () 
       onRequestClose={() => setNrtFormOpen(false)}
     >
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-        <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>Log NRT</Text>
-          <TouchableOpacity onPress={() => setNrtFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-        </View>
+        <ProgramSheetHeader title="Log NRT" onBack={() => setNrtFormOpen(false)} />
         <ScrollView
           contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
           keyboardShouldPersistTaps="handled"
@@ -5722,10 +5717,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
           <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-            <View style={m.sheetHeader}>
-              <Text style={m.sheetTitle}>🍺 Quit Drinking Setup</Text>
-              <TouchableOpacity onPress={() => (data ? setShowSetup(false) : onClose())}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
-            </View>
+            <ProgramSheetHeader title="Quit Drinking Setup" onBack={() => (data ? setShowSetup(false) : onClose())} />
             <ScrollView
               contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
               automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
@@ -5759,77 +5751,50 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
     <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-        {/* ── Header: edit + X on main; back-arrow + dynamic title on detail ── */}
-        <View style={m.sheetHeader}>
-          {qdView === 'main' ? (
-            <>
-              <TouchableOpacity
-                onPress={onClose}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{
-                  width: spacing.xl + spacing.sm,
-                  height: spacing.xl + spacing.sm,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.layer2,
-                  borderWidth: 1.5,
-                  borderColor: colors.line2,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BackChevron size={22} color={colors.ink} />
-              </TouchableOpacity>
-              <Text style={[m.sheetTitle, { flex: 1, textAlign: 'center' }]}>Quit Drinking</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (data) {
-                    setFormDate(data.quitDate.slice(0, 10));
-                    setFormDpd(String(data.drinksPerDay));
-                    // costPerDrink is stored in USD — convert to display currency for editing.
-                    setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
-                  }
-                  setShowSetup(true);
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="pencil" size={20} color={colors.ink2} />
-              </TouchableOpacity>
-            </>
+        {/* ── Header: back-chevron pill + centered title on every view ─────── */}
+        {qdView === 'main' ? (
+            <ProgramSheetHeader
+              title="Quit Drinking"
+              onBack={onClose}
+              right={
+                <TouchableOpacity
+                  onPress={() => {
+                    if (data) {
+                      setFormDate(data.quitDate.slice(0, 10));
+                      setFormDpd(String(data.drinksPerDay));
+                      // costPerDrink is stored in USD — convert to display currency for editing.
+                      setFormCpd(usdToLocal(data.costPerDrink, country).toFixed(minorUnits(country)));
+                    }
+                    setShowSetup(true);
+                  }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Ionicons name="pencil" size={20} color={colors.ink2} />
+                </TouchableOpacity>
+              }
+            />
           ) : (
-            <>
-              <TouchableOpacity
-                onPress={() => {
-                  // Detail-view back navigation mirrors QuitSmokingModal:
-                  //  • 'achievement'                       → achievements list
-                  //  • tip / quitline / breathing          → cravings list
-                  //  • anything else                       → main
-                  if (qdView === 'achievement') { setSelectedAch(null); setQdView('achievements'); }
-                  else if (qdView === 'tip' || qdView === 'quitline' || qdView === 'breathing') setQdView('cravings');
-                  else { setReasonsEditing(false); setQdView('main'); }
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <BackChevron size={28} color={colors.green} />
-              </TouchableOpacity>
-              <Text style={m.sheetTitle}>
-                {qdView === 'progress'     && 'Overall progress'}
-                {qdView === 'achievements' && 'Achievements'}
-                {qdView === 'achievement'  && ''}
-                {qdView === 'health'       && 'Health improvements'}
-                {qdView === 'cravings'     && 'Beat your cravings'}
-                {qdView === 'tip'          && 'Tip of the day'}
-                {qdView === 'quitline'     && 'Helplines'}
-                {qdView === 'breathing'    && 'Calm breathing'}
-                {qdView === 'reasons'      && 'My reasons'}
-                {qdView === 'support'      && 'Recovery support'}
-              </Text>
-              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Ionicons name="close" size={22} color={colors.ink2} />
-              </TouchableOpacity>
-            </>
+            <ProgramSheetHeader
+              // Detail-view back navigation mirrors QuitSmokingModal.
+              onBack={() => {
+                if (qdView === 'achievement') { setSelectedAch(null); setQdView('achievements'); }
+                else if (qdView === 'tip' || qdView === 'quitline' || qdView === 'breathing') setQdView('cravings');
+                else { setReasonsEditing(false); setQdView('main'); }
+              }}
+              title={
+                qdView === 'progress'     ? 'Overall progress' :
+                qdView === 'achievements' ? 'Achievements' :
+                qdView === 'health'       ? 'Health improvements' :
+                qdView === 'cravings'     ? 'Beat your cravings' :
+                qdView === 'tip'          ? 'Tip of the day' :
+                qdView === 'quitline'     ? 'Helplines' :
+                qdView === 'breathing'    ? 'Calm breathing' :
+                qdView === 'reasons'      ? 'My reasons' :
+                qdView === 'support'      ? 'Recovery support' : ''
+              }
+            />
           )}
-        </View>
         <ScrollView ref={qdScrollRef} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
           {/* ════════════════════════════════════════════════════════════════
               MAIN VIEW — timer + stats + achievements + health (existing content)
@@ -7017,12 +6982,7 @@ function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onClose: ()
       onRequestClose={() => setCravingFormOpen(false)}
     >
       <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-        <View style={m.sheetHeader}>
-          <Text style={m.sheetTitle}>Log a craving</Text>
-          <TouchableOpacity onPress={() => setCravingFormOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-        </View>
+        <ProgramSheetHeader title="Log a craving" onBack={() => setCravingFormOpen(false)} />
         <ScrollView
           contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
           keyboardShouldPersistTaps="handled"
@@ -7522,10 +7482,7 @@ function PillReminderModal({ visible, onClose }: { visible: boolean; onClose: ()
         {/* Add medication sheet */}
         <Modal visible={editSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditSheet(false)}>
             <SafeAreaView style={m.sheet} edges={['top', 'bottom']}>
-              <View style={m.sheetHeader}>
-                <Text style={m.sheetTitle}>{editMed ? 'Edit Medication' : 'Add Medication'}</Text>
-                <TouchableOpacity onPress={() => setEditSheet(false)}><Ionicons name="close" size={24} color={colors.ink3} /></TouchableOpacity>
-              </View>
+              <ProgramSheetHeader title={editMed ? 'Edit Medication' : 'Add Medication'} onBack={() => setEditSheet(false)} />
               <ScrollView
                 contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
                 automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
