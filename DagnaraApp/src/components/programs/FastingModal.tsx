@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing, fontSize, radius } from '../../theme';
+import { BackChevron } from '../BackChevron';
 import { useAuthStore } from '../../store/authStore';
 import { useDiaryStore } from '../../store/diaryStore';
 
@@ -154,12 +155,25 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={24} color={colors.ink2} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{
+              width: spacing.xl + spacing.sm,
+              height: spacing.xl + spacing.sm,
+              borderRadius: radius.pill,
+              backgroundColor: colors.layer2,
+              borderWidth: 1.5,
+              borderColor: colors.line2,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BackChevron size={22} color={colors.ink} />
           </TouchableOpacity>
           <Text style={{ flex: 1, textAlign: 'center', fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Intermittent Fasting</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: spacing.xl + spacing.sm }} />
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} showsVerticalScrollIndicator={false}>
