@@ -15,7 +15,7 @@ import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
-import { MESSAGES, MSG_COLORS, groupMessages } from '../../src/lib/messages';
+import { MESSAGES, MSG_COLORS, groupMessages, countUnread } from '../../src/lib/messages';
 
 const TODAY = () => new Date().toLocaleDateString('en-CA');
 
@@ -38,6 +38,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
   const readMessageIds = useAppStore((s) => s.readMessageIds);
   const markMessageRead = useAppStore((s) => s.markMessageRead);
   const isUnread = (m: typeof MESSAGES[number]) => !!m.unread && !readMessageIds.includes(m.id);
+  const unreadCount = countUnread(readMessageIds);
   const groups = groupMessages();
 
   // Floating header — blur + centered title fade in on scroll, mirroring the profile header.
@@ -61,8 +62,15 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
           scrollEventThrottle={16}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         >
-          {/* Big left-aligned title */}
-          <Text style={msg.bigTitle}>Inbox</Text>
+          {/* Big left-aligned title + unread counter badge */}
+          <View style={msg.titleRow}>
+            <Text style={msg.bigTitle}>Inbox</Text>
+            {unreadCount > 0 && (
+              <View style={msg.countBadge}>
+                <Text style={msg.countTxt}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
 
           {MESSAGES.length === 0 ? (
             <View style={msg.emptyWrap}>
@@ -944,13 +952,32 @@ const msg = StyleSheet.create({
     paddingTop: spacing.xl + spacing.sm,
     paddingBottom: spacing.xl,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
   bigTitle: {
     fontSize: fontSize['2xl'],
     fontWeight: '800',
     color: colors.ink,
     letterSpacing: -0.5,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  },
+  countBadge: {
+    minWidth: spacing.lg + spacing.xs,
+    height: spacing.lg + spacing.xs,
+    borderRadius: radius.sm,
+    backgroundColor: colors.rose,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  countTxt: {
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    color: colors.white,
   },
   emptyWrap: {
     alignItems: 'center',

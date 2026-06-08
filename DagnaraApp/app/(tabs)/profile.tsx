@@ -585,7 +585,7 @@ export default function ProfileScreen() {
             { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
           ].map(({ icon, label, color, value, badge, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
-              <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
+              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.menuLabel}>{label}</Text>
               {!!badge && badge > 0 && (
                 <View style={styles.inboxBadge}>
@@ -606,7 +606,7 @@ export default function ProfileScreen() {
             { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
-              <Ionicons name={icon as any} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
+              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.menuLabel}>{label}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
             </TouchableOpacity>
@@ -676,7 +676,7 @@ export default function ProfileScreen() {
             <Text style={styles.inputLabel}>Current Measurements</Text>
             {([
               { key: 'weight', label: 'Weight', unit: weightUnit(unitSystem),  keyboard: 'decimal-pad' as const },
-              { key: 'height', label: 'Height', unit: heightUnit(unitSystem),  keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as any },
+              { key: 'height', label: 'Height', unit: heightUnit(unitSystem),  keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as 'decimal-pad' | 'default' },
               { key: 'waist',  label: 'Waist',  unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
               { key: 'chest',  label: 'Chest',  unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
               { key: 'hips',   label: 'Hips',   unit: lengthUnit(unitSystem),  keyboard: 'decimal-pad' as const },
@@ -770,7 +770,7 @@ export default function ProfileScreen() {
                 ].map(({ label, value, icon, color, page }) => (
                   <TouchableOpacity key={label} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSettingsPage(page); }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2 }}>
-                    <Ionicons name={icon as any} size={22} color={color} style={{ width: 28, textAlign: 'center' }} />
+                    <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={22} color={color} style={{ width: 28, textAlign: 'center' }} />
                     <Text style={{ color: colors.ink, fontSize: fontSize.base, fontWeight: '600', flex: 1 }}>{label}</Text>
                     <Text style={{ color: colors.ink3, fontSize: fontSize.sm }} numberOfLines={1}>{value}</Text>
                     <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
@@ -939,20 +939,9 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
-                {/* What Standard includes */}
-                <View style={subst.planCard}>
-                  <Text style={subst.featHeading}>Standard — always free</Text>
-                  {['Food logging & diary', 'AI food scan', 'All Programs', 'Water, steps, weight & macros', 'Life Score & weekly check-in'].map((t) => (
-                    <View key={t} style={subst.featRow}>
-                      <Ionicons name="checkmark" size={16} color={colors.green} />
-                      <Text style={subst.featTxt}>{t}</Text>
-                    </View>
-                  ))}
-                </View>
-
                 {/* What Premium adds */}
                 <View style={[subst.planCard, isPremium && subst.planCardActive]}>
-                  <Text style={subst.featHeading}>Premium — everything in Standard, plus</Text>
+                  <Text style={subst.featHeading}>What Premium unlocks</Text>
                   {[
                     { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
                     { icon: 'calendar-outline', t: 'Full progress history', d: 'See every day, not just the last 7' },
@@ -1014,7 +1003,7 @@ export default function ProfileScreen() {
                     { icon: 'logo-tiktok', label: 'Keep up with us on TikTok', color: colors.teal, onPress: () => Alert.alert('TikTok', 'Opening TikTok...') },
                   ].map(({ icon, label, color, onPress }, i, arr) => (
                     <TouchableOpacity key={label} style={[sst.row, i === arr.length - 1 && { borderBottomWidth: 0 }]} onPress={onPress}>
-                      <Ionicons name={icon as any} size={20} color={color} style={{ width: 28, textAlign: 'center' }} />
+                      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} style={{ width: 28, textAlign: 'center' }} />
                       <Text style={sst.label}>{label}</Text>
                       <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
                     </TouchableOpacity>
@@ -1511,8 +1500,6 @@ const subst = StyleSheet.create({
   featIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
   featTitle: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
   featDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: spacing.xs / 2 },
-  featRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  featTxt: { fontSize: fontSize.sm, color: colors.ink2, flex: 1 },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   primaryBtnTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
   secondaryBtn: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },

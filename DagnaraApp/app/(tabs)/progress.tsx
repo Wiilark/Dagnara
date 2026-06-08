@@ -15,6 +15,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
+import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { fmt } from '../../src/lib/format';
 import { usePremium, PremiumBadge } from '../../src/components/Premium';
 
@@ -49,6 +50,30 @@ function calcLifeScore(answers: number[]) {
     else score += unit * 0.4;
   });
   return Math.min(150, Math.max(0, Math.round(score)));
+}
+
+/**
+ * The Life Score is a *weekly* check-in. It resets every Sunday at 22:00 local
+ * time — once that boundary passes, the previous week's score is treated as
+ * expired so the user is prompted to input the new week.
+ *
+ * Returns the most recent Sunday-22:00 instant at or before `now`.
+ */
+function lastWeeklyReset(now = new Date()): Date {
+  const reset = new Date(now);
+  reset.setHours(22, 0, 0, 0);
+  // Step back to the most recent Sunday (getDay() === 0).
+  reset.setDate(reset.getDate() - reset.getDay());
+  // If that lands in the future (e.g. it's Sunday before 22:00), use last week's.
+  if (reset > now) reset.setDate(reset.getDate() - 7);
+  return reset;
+}
+
+/** True when a check-in taken on `dateStr` (YYYY-MM-DD) predates this week's reset. */
+function isLifeScoreExpired(dateStr: string | null, now = new Date()): boolean {
+  if (!dateStr) return false;
+  const taken = new Date(dateStr + 'T12:00');
+  return taken < lastWeeklyReset(now);
 }
 
 function scoreColor(s: number) {
@@ -356,6 +381,7 @@ function StatisticsModal({ visible, onClose, entries, lifestyle }: {
   lifestyle: { label: string; pct: number; color: string }[];
 }) {
   const [period, setPeriod] = useState<StatPeriod>('Week');
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const allDays = useMemo(() => {
     const keys = Object.keys(entries).sort();
@@ -385,15 +411,14 @@ function StatisticsModal({ visible, onClose, entries, lifestyle }: {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={stat.safe} edges={['top', 'bottom']}>
-        <View style={stat.header}>
-          <TouchableOpacity onPress={onClose} style={stat.backBtn}>
-            <BackChevron size={20} />
-          </TouchableOpacity>
-          <Text style={stat.title}>Statistics</Text>
-          <View style={{ width: 34 }} />
-        </View>
+        <FloatingModalHeader scrollY={scrollY} title="Statistics" onBack={onClose} staticTitle />
 
-        <ScrollView contentContainerStyle={stat.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          contentContainerStyle={stat.scroll}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        >
           {/* Period tabs */}
           <View style={stat.tabs}>
             {STAT_PERIODS.map(p => (
@@ -451,13 +476,13 @@ function StatisticsModal({ visible, onClose, entries, lifestyle }: {
               <View key={r.label} style={stat.lsRow}>
                 <Text style={stat.lsLbl}>{r.label}</Text>
                 <View style={stat.lsTrack}>
-                  <View style={[stat.lsBar, { width: `${r.pct}%` as any, backgroundColor: r.color }]} />
+                  <View style={[stat.lsBar, { width: `${r.pct}%`, backgroundColor: r.color }]} />
                 </View>
                 <Text style={[stat.lsPct, { color: r.color }]}>{r.pct}%</Text>
               </View>
             ))}
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -565,7 +590,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
               </View>
               <View style={dp2.intakeTrack}>
                 <View style={[dp2.intakeFill, {
-                  width: `${Math.min(100, goal > 0 ? (val / goal) * 100 : 0)}%` as any,
+                  width: `${Math.min(100, goal > 0 ? (val / goal) * 100 : 0)}%`,
                   backgroundColor: color,
                 }]} />
               </View>
@@ -886,10 +911,14 @@ interface ProgressPhoto { uri: string; date: string; }
 
 export default function ProgressScreen() {
   const { entries, selectedDate } = useDiaryStore();
-  const { lifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, setMessagesOpen, calorieGoal, weightGoal, hasUnread, addXp, unitSystem, macroPcts } = useAppStore();
+  const { lifeScore: rawLifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, setMessagesOpen, calorieGoal, weightGoal, hasUnread, addXp, unitSystem, macroPcts } = useAppStore();
   const { email, profile } = useAuthStore();
+  // Life Score resets every Sunday 22:00 — once expired it reads as "not taken"
+  // so the card prompts a fresh weekly check-in. The stored number is untouched.
+  const lifeScore = isLifeScoreExpired(lifeScoreDate) ? null : rawLifeScore;
 
   const [lsVisible, setLsVisible] = useState(false);
+  const lsScrollY = useRef(new Animated.Value(0)).current;
   const [statsVisible, setStatsVisible] = useState(false);
   const [dailyProgressVisible, setDailyProgressVisible] = useState(false);
   const [insightDetailVisible, setInsightDetailVisible] = useState(false);
@@ -1079,7 +1108,7 @@ export default function ProgressScreen() {
                     <Text style={st.milestoneProg}>{streak} / {nextMilestone.days} days</Text>
                   </View>
                   <View style={st.milestoneTrack}>
-                    <View style={[st.milestoneBar, { width: `${Math.min(milestoneProgress, 1) * 100}%` as any }]} />
+                    <View style={[st.milestoneBar, { width: `${Math.min(milestoneProgress, 1) * 100}%` }]} />
                   </View>
                 </View>
               </View>
@@ -1140,7 +1169,7 @@ export default function ProgressScreen() {
                   <Text style={{ fontSize: fontSize.base + 1 }}>{p.emoji}</Text>
                   <Text style={st.pillarLabel}>{p.label}</Text>
                   <View style={st.pillarTrack}>
-                    <View style={[st.pillarBar, { width: `${(p.score / p.max) * 100}%` as any, backgroundColor: p.color }]} />
+                    <View style={[st.pillarBar, { width: `${(p.score / p.max) * 100}%`, backgroundColor: p.color }]} />
                   </View>
                   <Text style={[st.pillarScore, { color: p.color }]}>{p.score}/{p.max}</Text>
                 </View>
@@ -1173,7 +1202,7 @@ export default function ProgressScreen() {
               <View key={`${label}_${i}`} style={st.barCol}>
                 {kcal > 0 && <Text style={st.barVal}>{kcal}</Text>}
                 <View style={st.barTrack}>
-                  <View style={[st.bar, { height: `${(kcal / maxKcal) * 100}%` as any }]} />
+                  <View style={[st.bar, { height: `${(kcal / maxKcal) * 100}%` }]} />
                 </View>
                 <Text style={st.barLabel}>{label}</Text>
               </View>
@@ -1188,7 +1217,7 @@ export default function ProgressScreen() {
             <View key={label} style={st.macroRow}>
               <Text style={st.macroLabel}>{label}</Text>
               <View style={st.macroTrack}>
-                <View style={[st.macroBar, { width: `${(val / totalMacros) * 100}%` as any, backgroundColor: color }]} />
+                <View style={[st.macroBar, { width: `${(val / totalMacros) * 100}%`, backgroundColor: color }]} />
               </View>
               <Text style={[st.macroVal, { color }]}>{fmt(val)}g</Text>
             </View>
@@ -1346,25 +1375,26 @@ export default function ProgressScreen() {
       {/* Life Score Quiz Modal */}
       <Modal visible={lsVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setLsVisible(false)}>
         <SafeAreaView style={st.lsModal} edges={['top', 'bottom']}>
-          {/* Header */}
-          <View style={st.lsHeader}>
-            <Text style={st.lsHeaderTitle}>{lsResult === null ? 'Weekly Check-In' : 'Your Life Score'}</Text>
-            {lsResult === null
-              ? <Text style={st.lsStepTxt}>{lsStep + 1} / {LS_QUESTIONS.length}</Text>
-              : <View style={{ width: 34 }} />
-            }
-            <TouchableOpacity onPress={() => setLsVisible(false)} style={st.lsCloseIconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="close" size={22} color={colors.ink2} />
-            </TouchableOpacity>
-          </View>
+          <FloatingModalHeader
+            scrollY={lsScrollY}
+            title={lsResult === null ? 'Weekly Check-In' : 'Your Life Score'}
+            onBack={() => setLsVisible(false)}
+            staticTitle
+          />
 
           {lsResult === null ? (
             <>
               <View style={st.lsProgressTrack}>
-                <View style={[st.lsProgressBar, { width: `${progress}%` as any }]} />
+                <View style={[st.lsProgressBar, { width: `${progress}%` }]} />
               </View>
 
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={st.lsContent} showsVerticalScrollIndicator={false}>
+              <Animated.ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={st.lsContent}
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: lsScrollY } } }], { useNativeDriver: true })}
+              >
                 <Text style={st.lsEmoji}>{q.emoji}</Text>
                 <Text style={st.lsQuestion}>{q.q}</Text>
                 {q.hint ? <Text style={st.lsHint}>{q.hint}</Text> : null}
@@ -1386,7 +1416,7 @@ export default function ProgressScreen() {
                     );
                   })}
                 </View>
-              </ScrollView>
+              </Animated.ScrollView>
 
               <View style={st.lsNav}>
                 {lsStep > 0 && (
@@ -1507,12 +1537,8 @@ const st = StyleSheet.create({
   statLabel: { color: colors.ink2, fontSize: fontSize.sm, marginTop: 2 },
   // Life Score Quiz Modal
   lsModal: { flex: 1, backgroundColor: colors.bg },
-  lsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
-  lsHeaderTitle: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
-  lsCloseIconBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  lsProgressTrack: { height: 3, backgroundColor: colors.layer2 },
+  lsProgressTrack: { height: 3, backgroundColor: colors.layer2, marginTop: spacing.xl + spacing.xl },
   lsProgressBar: { height: 3, backgroundColor: colors.purple },
-  lsStepTxt: { color: colors.ink3, fontSize: fontSize.sm },
   lsContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, alignItems: 'center' },
   lsEmoji: { fontSize: fontSize['2xl'] + 26, marginBottom: spacing.md, marginTop: spacing.lg },
   lsQuestion: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: spacing.xs },
@@ -1528,7 +1554,7 @@ const st = StyleSheet.create({
   lsNextBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm },
   lsNextTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
   // Result
-  lsResultWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
+  lsResultWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, paddingTop: spacing.xl + spacing.xl, gap: spacing.md },
   lsResultEmoji: { fontSize: fontSize['2xl'] + 12 },
   lsResultScore: { fontSize: fontSize['2xl'] + 20, fontWeight: '800' },
   lsResultMax: { fontSize: fontSize.lg, color: colors.ink3, marginTop: -16 },
@@ -1574,10 +1600,7 @@ const st = StyleSheet.create({
 
 const stat = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
-  backBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
-  scroll: { padding: spacing.md, gap: spacing.sm + 4, paddingBottom: spacing.xl + 4 },
+  scroll: { padding: spacing.md, gap: spacing.sm + 4, paddingTop: spacing.xl + spacing.xl, paddingBottom: spacing.xl + 4 },
   tabs: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: radius.sm + 2, padding: 3, gap: 2 },
   tab: { flex: 1, paddingVertical: spacing.xs + 2, borderRadius: radius.sm, alignItems: 'center' },
   tabActive: { backgroundColor: colors.purple },
