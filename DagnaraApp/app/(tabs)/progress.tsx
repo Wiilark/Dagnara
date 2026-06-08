@@ -894,12 +894,13 @@ export default function ProgressScreen() {
   const [dailyProgressVisible, setDailyProgressVisible] = useState(false);
   const [insightDetailVisible, setInsightDetailVisible] = useState(false);
   const isPremium = usePremium();
-  // PRO features (analytics depth). Free during launch ⇒ isPremium is true for
-  // everyone today; when billing ships, a locked tap routes to the PRO screen.
+  // Premium features (analytics depth). Free during launch ⇒ isPremium is true
+  // for everyone today; when billing ships, a locked tap deep-links to the Plans
+  // screen so "tap to unlock" lands exactly where it promises.
   const openPro = (open: () => void) => () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isPremium) open();
-    else router.push('/(tabs)/profile');
+    else router.push('/(tabs)/profile?plans=1');
   };
   const [lsStep, setLsStep] = useState(0);
   const [lsAnswers, setLsAnswers] = useState<number[]>(Array(LS_QUESTIONS.length).fill(0));

@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, calcTDEE, macrosFor } from '../../src/store/appStore';
 import { supabase } from '../../src/lib/supabase';
@@ -58,6 +58,18 @@ export default function ProfileScreen() {
   }
 
   const [language, setLanguage] = useState('English');
+
+  // Deep-link: a locked Premium tap from another screen passes ?plans=1 to open
+  // the Plans screen directly (so "tap to unlock" lands where it promises).
+  const params = useLocalSearchParams<{ plans?: string }>();
+  useEffect(() => {
+    if (params.plans === '1') {
+      setSettingsPage('subscription');
+      setSettingsModal(true);
+      router.setParams({ plans: undefined });
+    }
+  }, [params.plans]);
+
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName,  setEditLastName]  = useState('');
   const [editDob, setEditDob] = useState('');          // ISO YYYY-MM-DD
