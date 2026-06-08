@@ -66,6 +66,7 @@ interface PersistedData {
   dietaryPreferences: string | null;  // maps to a DIET_FILTERS value: 'High Protein', 'Vegan', etc.
   pillDefaultTime: string | null;     // 'HH:MM' 24h, e.g. '07:30'
   readMessageIds: number[];           // ids of inbox messages the user has read
+  premium: boolean;                   // Pro tier. Free during launch → defaults true; flip false when real billing ships.
 }
 
 interface AppState extends PersistedData {
@@ -90,6 +91,7 @@ interface AppState extends PersistedData {
   setFastingWindow: (window: string | null) => Promise<void>;
   setDietaryPreferences: (pref: string | null) => Promise<void>;
   setPillDefaultTime: (time: string | null) => Promise<void>;
+  setPremium: (v: boolean) => Promise<void>;
   setMacroPcts: (pcts: { carbs: number; protein: number; fat: number }) => Promise<void>;
   saveRecipe: (recipe: LocalFood) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
@@ -122,6 +124,7 @@ function pick(s: AppState): PersistedData {
     dietaryPreferences: s.dietaryPreferences,
     pillDefaultTime: s.pillDefaultTime,
     readMessageIds: s.readMessageIds,
+    premium: s.premium,
   };
 }
 
@@ -172,6 +175,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dietaryPreferences: null,
   pillDefaultTime: null,
   readMessageIds: [],
+  premium: true,   // free during launch — everyone gets Pro for now
   userEmail: null,
   messagesOpen: false,
   hasUnread: countUnread([]) > 0,
@@ -244,6 +248,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             dietaryPreferences: cloud.dietaryPreferences ?? local.dietaryPreferences ?? null,
             pillDefaultTime: cloud.pillDefaultTime ?? local.pillDefaultTime ?? null,
             readMessageIds: cloud.readMessageIds ?? local.readMessageIds ?? [],
+            premium: cloud.premium ?? local.premium ?? true,
           };
           const mergedCount = countUnread(merged.readMessageIds);
           set({ ...merged, unreadCount: mergedCount, hasUnread: mergedCount > 0 });
@@ -342,6 +347,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     await persist(pick({ ...get(), pillDefaultTime }), get().userEmail);
   },
 
+  setPremium: async (premium) => {
+    set({ premium });
+    await persist(pick({ ...get(), premium }), get().userEmail);
+  },
+
   setMacroPcts: async (pcts) => {
     set({ macroPcts: pcts });
     await persist(pick({ ...get(), macroPcts: pcts }), get().userEmail);
@@ -362,7 +372,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () => set({
     lifeScore: null, lifeScoreDate: null, streak: 0, lastLoggedDate: null,
     programs: { nutrition: true, hydration: true, movement: false, sleep: false, stress: false, quit_smoking: false, quit_drinking: false, pill_reminder: false },
-    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, readMessageIds: [], unreadCount: countUnread([]), hasUnread: countUnread([]) > 0, userEmail: null, messagesOpen: false,
+    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, readMessageIds: [], premium: true, unreadCount: countUnread([]), hasUnread: countUnread([]) > 0, userEmail: null, messagesOpen: false,
   }),
 }));
 

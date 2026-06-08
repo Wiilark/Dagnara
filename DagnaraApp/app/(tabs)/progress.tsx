@@ -16,6 +16,7 @@ import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../sr
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
 import { fmt } from '../../src/lib/format';
+import { usePremium, PremiumBadge } from '../../src/components/Premium';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
 const LS_QUESTIONS = [
@@ -350,8 +351,9 @@ function WeightChart({
 const STAT_PERIODS = ['Week', '1 Month', '3 Months', 'All'] as const;
 type StatPeriod = typeof STAT_PERIODS[number];
 
-function StatisticsModal({ visible, onClose, entries }: {
+function StatisticsModal({ visible, onClose, entries, lifestyle }: {
   visible: boolean; onClose: () => void; entries: Record<string, any>;
+  lifestyle: { label: string; pct: number; color: string }[];
 }) {
   const [period, setPeriod] = useState<StatPeriod>('Week');
 
@@ -441,17 +443,11 @@ function StatisticsModal({ visible, onClose, entries }: {
           <View style={stat.lifestyleCard}>
             <View style={stat.lifestyleHead}>
               <Text style={stat.cardLbl}>LIFESTYLE BREAKDOWN</Text>
-              <View style={stat.premiumBadge}>
-                <Ionicons name="lock-closed" size={10} color={colors.lavender} />
-                <Text style={stat.premiumTxt}>PRO</Text>
-              </View>
+              <PremiumBadge />
             </View>
-            {[
-              { label: 'Nutrition score', pct: 0, color: colors.green },
-              { label: 'Hydration score', pct: 0, color: colors.sky },
-              { label: 'Sleep quality',  pct: 0, color: colors.violet },
-              { label: 'Activity level', pct: 0, color: colors.honey },
-            ].map(r => (
+            {lifestyle.every(r => r.pct === 0) ? (
+              <Text style={stat.lsEmpty}>Take the Weekly Check-In to see your lifestyle breakdown.</Text>
+            ) : lifestyle.map(r => (
               <View key={r.label} style={stat.lsRow}>
                 <Text style={stat.lsLbl}>{r.label}</Text>
                 <View style={stat.lsTrack}>
@@ -460,10 +456,6 @@ function StatisticsModal({ visible, onClose, entries }: {
                 <Text style={[stat.lsPct, { color: r.color }]}>{r.pct}%</Text>
               </View>
             ))}
-            <View style={stat.blurOverlay} pointerEvents="none">
-              <Ionicons name="lock-closed" size={24} color={colors.lavender} />
-              <Text style={stat.blurTxt}>Unlock with Pro</Text>
-            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -901,6 +893,14 @@ export default function ProgressScreen() {
   const [statsVisible, setStatsVisible] = useState(false);
   const [dailyProgressVisible, setDailyProgressVisible] = useState(false);
   const [insightDetailVisible, setInsightDetailVisible] = useState(false);
+  const isPremium = usePremium();
+  // PRO features (analytics depth). Free during launch ⇒ isPremium is true for
+  // everyone today; when billing ships, a locked tap routes to the PRO screen.
+  const openPro = (open: () => void) => () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPremium) open();
+    else router.push('/(tabs)/profile');
+  };
   const [lsStep, setLsStep] = useState(0);
   const [lsAnswers, setLsAnswers] = useState<number[]>(Array(LS_QUESTIONS.length).fill(0));
   const [lsResult, setLsResult] = useState<number | null>(null);
@@ -1008,6 +1008,11 @@ export default function ProgressScreen() {
     return { ...p, score };
   });
 
+  // Lifestyle breakdown for the Statistics modal: real per-pillar % (0 until checked in).
+  const lifestyle = pillarScores
+    .filter((p) => p.key !== 'mindset')
+    .map((p) => ({ label: p.label, pct: p.max > 0 ? Math.round((p.score / p.max) * 100) : 0, color: p.color }));
+
   const insights = useMemo(
     () => generateInsights(entries, calorieGoal || 2000, weightGoal || 'maintain', weightHistory, macroPcts.protein),
     [entries, calorieGoal, weightGoal, weightHistory, macroPcts.protein]
@@ -1035,8 +1040,8 @@ export default function ProgressScreen() {
           </TouchableOpacity>
           <View style={st.headingWrap} pointerEvents="none"><Text style={st.heading}>Progress</Text></View>
           <View style={st.headerRight}>
-            <TouchableOpacity style={st.iconBtn} onPress={() => setStatsVisible(true)}>
-              <Ionicons name="stats-chart-outline" size={22} color={colors.ink2} />
+            <TouchableOpacity style={st.iconBtn} onPress={openPro(() => setStatsVisible(true))}>
+              <Ionicons name={isPremium ? 'stats-chart-outline' : 'lock-closed-outline'} size={22} color={colors.ink2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1149,12 +1154,12 @@ export default function ProgressScreen() {
           {/* Locked insights */}
           {lifeScore !== null && (
             <TouchableOpacity style={st.insightLocked} activeOpacity={0.8}
-              onPress={() => setInsightDetailVisible(true)}>
+              onPress={openPro(() => setInsightDetailVisible(true))}>
               <View style={st.insightBlur}>
                 <Text style={st.insightBlurText}>Your weekly insight is ready</Text>
-                <Text style={st.insightBlurSub}>Tap to read today's insight</Text>
+                <Text style={st.insightBlurSub}>{isPremium ? "Tap to read today's insight" : 'Tap to unlock with PRO'}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.lavender} />
+              <PremiumBadge />
             </TouchableOpacity>
           )}
         </View>
@@ -1313,7 +1318,7 @@ export default function ProgressScreen() {
         {/* Stats grid */}
         <View style={st.statsGrid}>
           {[
-            { label: 'Kcal today', value: totalKcal, unit: 'kcal', color: colors.lavender, tap: () => setDailyProgressVisible(true) },
+            { label: 'Kcal today', value: totalKcal, unit: 'kcal', color: colors.lavender, tap: openPro(() => setDailyProgressVisible(true)) },
             { label: 'Water', value: entry?.water ?? 0, unit: 'glasses', color: colors.sky, tap: undefined },
             { label: 'Meals logged', value: new Set(foods.map(f => f.meal)).size, unit: 'meals', color: colors.green, tap: undefined },
             { label: 'Food items', value: foods.length, unit: 'items', color: colors.honey, tap: undefined },
@@ -1333,7 +1338,7 @@ export default function ProgressScreen() {
         <View style={{ height: 40 }} />
       </Animated.ScrollView>
 
-      <StatisticsModal visible={statsVisible} onClose={() => setStatsVisible(false)} entries={entries} />
+      <StatisticsModal visible={statsVisible} onClose={() => setStatsVisible(false)} entries={entries} lifestyle={lifestyle} />
       <DailyProgressModal visible={dailyProgressVisible} onClose={() => setDailyProgressVisible(false)} entries={entries} />
       <InsightDetailModal visible={insightDetailVisible} onClose={() => setInsightDetailVisible(false)} />
 
@@ -1592,15 +1597,12 @@ const stat = StyleSheet.create({
   avgTxt: { fontSize: fontSize.xs, color: colors.lavender, fontWeight: '600' },
   lifestyleCard: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.sm + 4, gap: spacing.sm, position: 'relative', overflow: 'hidden' },
   lifestyleHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.purple + '26', borderRadius: spacing.xs, paddingHorizontal: spacing.xs, paddingVertical: 2 },
-  premiumTxt: { fontSize: fontSize.xs, fontWeight: '700', color: colors.lavender, letterSpacing: 0.5 },
   lsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   lsLbl: { fontSize: fontSize.xs, color: colors.ink2, width: 110 },
   lsTrack: { flex: 1, height: 5, backgroundColor: colors.layer3, borderRadius: spacing.xs / 2, overflow: 'hidden' },
   lsBar: { height: '100%', borderRadius: spacing.xs / 2 },
   lsPct: { fontSize: fontSize.xs, fontWeight: '700', width: 34, textAlign: 'right' },
-  blurOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: colors.layer2 + 'cc', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: spacing.md, gap: spacing.xs },
-  blurTxt: { fontSize: fontSize.sm, fontWeight: '700', color: colors.lavender },
+  lsEmpty: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', paddingVertical: spacing.md },
 });
 
 // ── Daily Progress Modal styles ────────────────────────────────────────────────

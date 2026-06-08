@@ -24,13 +24,15 @@ import { COUNTRIES, getCountry, formatMoneyFromUsd } from '../../src/lib/currenc
 import { fmt } from '../../src/lib/format';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
 import { useDiaryStore } from '../../src/store/diaryStore';
+import { usePremium } from '../../src/components/Premium';
 
 const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Mediterranean'];
 
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
+  const isPremium = usePremium();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
@@ -56,7 +58,6 @@ export default function ProfileScreen() {
   }
 
   const [language, setLanguage] = useState('English');
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium'>('free');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName,  setEditLastName]  = useState('');
   const [editDob, setEditDob] = useState('');          // ISO YYYY-MM-DD
@@ -109,7 +110,6 @@ export default function ProfileScreen() {
       if (m[`${p}_notif_meals`])   setNotifMeals(m[`${p}_notif_meals`] === 'true');
       if (m[`${p}_notif_streak`])  setNotifStreak(m[`${p}_notif_streak`] === 'true');
       if (m[`${p}_language`])      setLanguage(m[`${p}_language`]!);
-      if (m[`${p}_plan`])          setSelectedPlan(m[`${p}_plan`] as 'free' | 'premium');
       // Diet plan = the store's dietaryPreferences (set at onboarding / Diet Plan
       // save). Fall back to the legacy AsyncStorage key only if the store is null,
       // so an onboarded user's choice shows here instead of defaulting to Balanced.
@@ -505,7 +505,7 @@ export default function ProfileScreen() {
             style={{ flexShrink: 0, borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
             <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
               <Ionicons name="diamond" size={18} color={colors.white} />
-              <Text style={styles.upgradeTxt}>{selectedPlan === 'premium' ? 'Premium' : 'Upgrade'}</Text>
+              <Text style={styles.upgradeTxt}>{isPremium ? 'PRO' : 'Get PRO'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -545,7 +545,7 @@ export default function ProfileScreen() {
               <Ionicons name="diamond-outline" size={20} color={colors.purple} />
             </View>
             <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>{selectedPlan === 'premium' ? 'Premium' : 'Standard'}</Text>
+              <Text style={styles.quickVal}>{isPremium ? 'PRO' : 'Free'}</Text>
               <Text style={styles.quickLbl}>Your plan</Text>
             </View>
           </View>
@@ -724,7 +724,7 @@ export default function ProfileScreen() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <FloatingModalHeader
             scrollY={settingsScrollY}
-            title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Subscription' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+            title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Dagnara PRO' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
             staticTitle={settingsPage === 'notifications' || settingsPage === 'account' || settingsPage === 'health' || settingsPage === 'about'}
             action={
@@ -890,22 +890,75 @@ export default function ProfileScreen() {
 
             {settingsPage === 'subscription' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
-                {[
-                  { key: 'free', name: 'Standard', price: `${formatMoneyFromUsd(0, country)} / mo`, icon: 'person-outline', color: colors.ink2 },
-                  { key: 'premium', name: 'Premium', price: `${formatMoneyFromUsd(4.99, country)} / mo`, icon: 'star', color: colors.lavender },
-                ].map((plan) => (
-                  <TouchableOpacity key={plan.key} onPress={() => { setSelectedPlan(plan.key as 'free' | 'premium'); AsyncStorage.setItem(`${p}_plan`, plan.key); setSettingsPage(''); setSettingsModal(false); }}
-                    style={[subst.planCard, selectedPlan === plan.key && { borderColor: colors.purple, borderWidth: 2 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                      <Ionicons name={plan.icon as any} size={24} color={plan.color} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.ink, fontWeight: '700' }}>{plan.name}</Text>
-                        <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{plan.price}</Text>
+                {/* Hero card — PRO, free during launch */}
+                <View style={subst.proHero}>
+                  <LinearGradient colors={['rgba(124,77,255,0.22)', 'transparent']} style={StyleSheet.absoluteFillObject} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" />
+                  <View style={subst.proBadge}>
+                    <Ionicons name="diamond" size={28} color={colors.lavender} />
+                  </View>
+                  <Text style={subst.proTitle}>Dagnara PRO</Text>
+                  <View style={subst.proFreePill}>
+                    <Text style={subst.proFreePillTxt}>FREE DURING LAUNCH 🎉</Text>
+                  </View>
+                  <Text style={subst.proSub}>
+                    {isPremium
+                      ? 'You have full access to every PRO insight — on the house while we launch.'
+                      : 'Unlock deeper analytics. No card, no charge — it’s free for everyone right now.'}
+                  </Text>
+                </View>
+
+                {/* What PRO unlocks */}
+                <View style={subst.planCard}>
+                  <Text style={subst.featHeading}>PRO unlocks</Text>
+                  {[
+                    { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
+                    { icon: 'calendar-outline', t: 'Full progress history', d: 'See every day, not just the last 7' },
+                    { icon: 'bulb-outline', t: 'AI Insights', d: 'Personalised guidance from your own data' },
+                    { icon: 'stats-chart-outline', t: 'Advanced Stats', d: 'Trends, averages and deeper charts' },
+                  ].map((f) => (
+                    <View key={f.t} style={subst.featCard}>
+                      <View style={subst.featIcon}>
+                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={colors.lavender} />
                       </View>
-                      {selectedPlan === plan.key && <Ionicons name="checkmark-circle" size={24} color={colors.purple} />}
+                      <View style={{ flex: 1 }}>
+                        <Text style={subst.featTitle}>{f.t}</Text>
+                        <Text style={subst.featDesc}>{f.d}</Text>
+                      </View>
+                      {isPremium && <Ionicons name="checkmark-circle" size={20} color={colors.green} />}
                     </View>
+                  ))}
+                </View>
+
+                {/* Free forever */}
+                <View style={subst.planCard}>
+                  <Text style={subst.featHeading}>Always free</Text>
+                  {['Food logging & diary', 'AI food scan', 'All Programs', 'Water, steps, weight & macros'].map((t) => (
+                    <View key={t} style={subst.featRow}>
+                      <Ionicons name="checkmark" size={16} color={colors.green} />
+                      <Text style={subst.featTxt}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Action */}
+                {isPremium ? (
+                  <TouchableOpacity
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(false); }}
+                    style={subst.secondaryBtn}>
+                    <Text style={subst.secondaryBtnTxt}>Turn off PRO</Text>
                   </TouchableOpacity>
-                ))}
+                ) : (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setPremium(true); }}
+                    style={{ borderRadius: radius.md, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
+                    <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={subst.primaryBtn}>
+                      <Ionicons name="diamond" size={18} color={colors.white} />
+                      <Text style={subst.primaryBtnTxt}>Activate PRO — Free</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                <Text style={subst.legal}>Free for everyone during launch. Paid plans may arrive later — you’ll always be told before anything changes.</Text>
               </View>
             )}
 
@@ -1409,20 +1462,25 @@ const sst = StyleSheet.create({
 
 // ── Subscription modal styles ─────────────────────────────────────────────────
 const subst = StyleSheet.create({
+  proHero: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', gap: spacing.sm, overflow: 'hidden' },
+  proBadge: { width: 56, height: 56, borderRadius: radius.lg, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
+  proTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },
+  proFreePill: { backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  proFreePillTxt: { fontSize: fontSize.xs, fontWeight: '800', color: colors.lavender, letterSpacing: 0.6 },
+  proSub: { fontSize: fontSize.sm, color: colors.ink2, textAlign: 'center', lineHeight: fontSize.lg },
   planCard: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, overflow: 'hidden' },
-  planCardSel: { borderColor: colors.purple, borderWidth: 1.5 },
-  planCardPremium: { borderColor: colors.line2 },
-  planHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  planBadge: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  planName: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
-  planPrice: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
-  planRadio: { width: 20, height: 20, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  planRadioSel: { borderColor: colors.purple },
-  planRadioPremium: { borderColor: colors.line3 },
-  planRadioDot: { width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.ink3 },
-  divider: { borderTopWidth: 1, borderColor: colors.line, marginVertical: spacing.xs },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 2 },
-  featureTxt: { fontSize: fontSize.sm, color: colors.ink2, flex: 1 },
+  featHeading: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: colors.ink3, marginBottom: spacing.xs },
+  featCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  featIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  featTitle: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
+  featDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: spacing.xs / 2 },
+  featRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  featTxt: { fontSize: fontSize.sm, color: colors.ink2, flex: 1 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  primaryBtnTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
+  secondaryBtn: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
+  secondaryBtnTxt: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink2 },
+  legal: { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', lineHeight: fontSize.md, marginTop: spacing.xs },
 });
 
 // ── Account Settings modal styles ────────────────────────────────────────────
