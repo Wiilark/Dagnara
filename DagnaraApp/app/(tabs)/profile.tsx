@@ -18,6 +18,7 @@ import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { BackChevron } from '../../src/components/BackChevron';
+import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
 import { COUNTRIES, getCountry, formatMoneyFromUsd } from '../../src/lib/currency';
 import { fmt } from '../../src/lib/format';
@@ -462,68 +463,6 @@ export default function ProfileScreen() {
   const settingsScrollY = useRef(new Animated.Value(0)).current;
   const dietaryScrollY = useRef(new Animated.Value(0)).current;
   const tdeeScrollY = useRef(new Animated.Value(0)).current;
-  const editTitleOpacity = editScrollY.interpolate({
-    inputRange: [40, 90],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-  const editTitleTranslateY = editScrollY.interpolate({
-    inputRange: [40, 90],
-    outputRange: [12, 0],
-    extrapolate: 'clamp',
-  });
-  const editBlurOpacity = editScrollY.interpolate({
-    inputRange: [10, 70],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  // Floating header shared by all sub-screen modals — blur + title fade on scroll,
-  // matching the profile header and Personal Info.
-  const FloatingModalHeader = ({
-    scrollY,
-    title,
-    onBack,
-    action,
-    staticTitle,
-  }: {
-    scrollY: Animated.Value;
-    title: string;
-    onBack: () => void;
-    action?: { label: string; onPress: () => void };
-    staticTitle?: boolean; // always show the title (for pages with no big in-body header)
-  }) => {
-    const blurOp = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
-    const titleOp = staticTitle ? 1 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
-    const titleTY = staticTitle ? 0 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
-    return (
-      <View style={pf.fixedHeader}>
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOp }]}>
-          <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-          <LinearGradient
-            colors={['transparent', colors.bg]}
-            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
-          />
-        </Animated.View>
-        <View style={pf.fixedHeaderRow}>
-          <TouchableOpacity style={styles.closeBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-back" size={22} color={colors.ink} />
-          </TouchableOpacity>
-          <Animated.Text style={[styles.modalHeaderTitle, { opacity: titleOp, transform: [{ translateY: titleTY }] }]} numberOfLines={1} pointerEvents="none">
-            {title}
-          </Animated.Text>
-          {action ? (
-            <TouchableOpacity onPress={action.onPress} activeOpacity={0.85} style={styles.modalAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={styles.modalActionTxt}>{action.label}</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 44, height: 44 }} />
-          )}
-        </View>
-      </View>
-    );
-  };
 
   return (
     <View style={styles.safe}>
@@ -1162,28 +1101,7 @@ export default function ProfileScreen() {
       {/* ── Edit Profile Modal (Revolut-style "Your profile") ── */}
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          {/* Floating header — blur + centered title fade in on scroll, just like the profile header */}
-          <View style={pf.fixedHeader}>
-            <Animated.View style={[StyleSheet.absoluteFill, { opacity: editBlurOpacity }]}>
-              <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-              <LinearGradient
-                colors={['transparent', colors.bg]}
-                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
-                start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
-              />
-            </Animated.View>
-            <View style={pf.fixedHeaderRow}>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setEditing(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="chevron-back" size={22} color={colors.ink} />
-              </TouchableOpacity>
-              <Animated.Text style={[styles.modalHeaderTitle, { opacity: editTitleOpacity, transform: [{ translateY: editTitleTranslateY }] }]} numberOfLines={1} pointerEvents="none">
-                Personal Info
-              </Animated.Text>
-              <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={styles.modalAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.modalActionTxt}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <FloatingModalHeader scrollY={editScrollY} title="Personal Info" onBack={() => setEditing(false)} action={{ label: 'Save', onPress: handleSave }} />
 
           <Animated.ScrollView
             contentContainerStyle={pf.scroll}
@@ -1455,20 +1373,6 @@ const styles = StyleSheet.create({
   dietOptionSel: { borderColor: colors.purple, backgroundColor: colors.purple + '11' },
   dietOptionTxt: { color: colors.ink, fontSize: fontSize.base, fontWeight: '500' },
 
-  // Absolutely centered so the title sits dead-center regardless of side button widths.
-  modalHeaderTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: colors.ink, fontSize: fontSize.md, fontWeight: '800' },
-  // Right action: a pill the same height as the circular back button (proportional to the left).
-  modalAction: {
-    height: spacing.xl + spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.purpleTint,
-    borderWidth: 1.5,
-    borderColor: colors.line3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalActionTxt: { color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' },
   saveText: { color: colors.lavender, fontSize: fontSize.base, fontWeight: '700' },
   modalScroll: { padding: spacing.md, gap: spacing.sm },
   inputLabel: { color: colors.ink2, fontSize: fontSize.sm, marginBottom: spacing.xs },
@@ -1544,8 +1448,6 @@ const dp = StyleSheet.create({
 const pf = StyleSheet.create({
   scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.xl, paddingBottom: spacing.xl * 3 },
   // Floating header overlay — sits above the scroll, blur + title fade in on scroll (mirrors profile header).
-  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
-  fixedHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.lg },
   bigTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, flex: 1 },
   avatarWrap: { position: 'relative' },
