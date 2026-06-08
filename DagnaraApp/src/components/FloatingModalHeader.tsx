@@ -13,8 +13,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, radius } from '../theme';
+import { BackChevron } from './BackChevron';
 
 type Props = {
   scrollY: Animated.Value;
@@ -42,7 +42,7 @@ export function FloatingModalHeader({ scrollY, title, onBack, action, staticTitl
       </Animated.View>
       <View style={s.fixedHeaderRow}>
         <TouchableOpacity style={s.closeBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <BackChevron size={22} color={colors.ink} />
         </TouchableOpacity>
         <Animated.Text style={[s.modalHeaderTitle, { opacity: titleOp, transform: [{ translateY: titleTY }] }]} numberOfLines={1} pointerEvents="none">
           {title}

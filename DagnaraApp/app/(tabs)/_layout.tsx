@@ -8,10 +8,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { Platform } from 'react-native';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
+import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
@@ -43,9 +42,6 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
 
   // Floating header — blur + centered title fade in on scroll, mirroring the profile header.
   const scrollY = useRef(new Animated.Value(0)).current;
-  const titleOpacity = scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
-  const titleTranslateY = scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
-  const blurOpacity = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -57,26 +53,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
           pointerEvents="none"
         />
 
-        {/* Fixed floating header — back button stays put; blur + centered title fade in on scroll */}
-        <View style={msg.fixedHeader}>
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOpacity }]}>
-            <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={['transparent', colors.bg]}
-              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }}
-              start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
-            />
-          </Animated.View>
-          <View style={msg.fixedHeaderRow}>
-            <TouchableOpacity style={msg.backBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <BackChevron size={22} color={colors.ink} />
-            </TouchableOpacity>
-            <Animated.Text style={[msg.headerTitle, { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] }]} numberOfLines={1} pointerEvents="none">
-              Inbox
-            </Animated.Text>
-            <View style={msg.headerSpacer} />
-          </View>
-        </View>
+        <FloatingModalHeader scrollY={scrollY} title="Inbox" onBack={onClose} />
 
         <Animated.ScrollView
           contentContainerStyle={msg.scroll}
@@ -966,27 +943,6 @@ const msg = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xl + spacing.sm,
     paddingBottom: spacing.xl,
-  },
-  // Fixed floating header overlay — stays put while content scrolls; blur fades in.
-  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
-  fixedHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  headerTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: colors.ink, fontSize: fontSize.md, fontWeight: '800' },
-  headerSpacer: { width: 44, height: 44 },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.layer2,
-    borderWidth: 1,
-    borderColor: colors.line2,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   bigTitle: {
     fontSize: fontSize['2xl'],
