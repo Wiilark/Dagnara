@@ -1157,7 +1157,7 @@ export default function ProgressScreen() {
               onPress={openPro(() => setInsightDetailVisible(true))}>
               <View style={st.insightBlur}>
                 <Text style={st.insightBlurText}>Your weekly insight is ready</Text>
-                <Text style={st.insightBlurSub}>{isPremium ? "Tap to read today's insight" : 'Tap to unlock with PRO'}</Text>
+                <Text style={st.insightBlurSub}>{isPremium ? "Tap to read today's insight" : 'Tap to unlock with Premium'}</Text>
               </View>
               <PremiumBadge />
             </TouchableOpacity>

@@ -505,7 +505,7 @@ export default function ProfileScreen() {
             style={{ flexShrink: 0, borderRadius: radius.pill, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8 }}>
             <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upgradeBtn}>
               <Ionicons name="diamond" size={18} color={colors.white} />
-              <Text style={styles.upgradeTxt}>{isPremium ? 'PRO' : 'Get PRO'}</Text>
+              <Text style={styles.upgradeTxt}>{isPremium ? 'Premium' : 'Upgrade'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -540,15 +540,16 @@ export default function ProfileScreen() {
 
         {/* ── Quick cards ── */}
         <View style={styles.quickRow}>
-          <View style={[styles.quickCard, { flex: 1 }]}>
+          <TouchableOpacity activeOpacity={0.8} style={[styles.quickCard, { flex: 1 }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSettingsPage('subscription'); setSettingsModal(true); }}>
             <View style={styles.quickIconWrap}>
               <Ionicons name="diamond-outline" size={20} color={colors.purple} />
             </View>
             <View style={styles.quickTexts}>
-              <Text style={styles.quickVal}>{isPremium ? 'PRO' : 'Free'}</Text>
+              <Text style={styles.quickVal}>{isPremium ? 'Premium' : 'Standard'}</Text>
               <Text style={styles.quickLbl}>Your plan</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <View style={[styles.quickCard, { flex: 1 }]}>
             <View style={styles.quickIconWrap}>
               <Text style={{ fontSize: fontSize.lg }}>🔥</Text>
@@ -724,7 +725,7 @@ export default function ProfileScreen() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <FloatingModalHeader
             scrollY={settingsScrollY}
-            title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Dagnara PRO' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
+            title={settingsPage === 'about' ? 'About Us' : settingsPage === 'account' ? 'Account Details' : settingsPage === 'unitSystem' ? 'Unit System' : settingsPage === 'country' ? 'Country' : settingsPage === 'language' ? 'Language' : settingsPage === 'notifications' ? 'Notification Settings' : settingsPage === 'subscription' ? 'Plans' : settingsPage === 'health' ? healthPlatformName() : 'Settings'}
             onBack={() => { if (settingsPage === 'unitSystem' || settingsPage === 'country' || settingsPage === 'language') { setSettingsPage('account'); } else { setSettingsPage(''); setSettingsModal(false); } }}
             staticTitle={settingsPage === 'notifications' || settingsPage === 'account' || settingsPage === 'health' || settingsPage === 'about'}
             action={
@@ -890,26 +891,56 @@ export default function ProfileScreen() {
 
             {settingsPage === 'subscription' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
-                {/* Hero card — PRO, free during launch */}
+                {/* Standard / Premium selector */}
+                <View style={subst.selector}>
+                  {([
+                    { key: false, label: 'Standard' },
+                    { key: true, label: 'Premium' },
+                  ] as const).map((opt) => {
+                    const active = isPremium === opt.key;
+                    return (
+                      <TouchableOpacity key={opt.label} activeOpacity={0.85} style={subst.selectorBtn}
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(opt.key); }}>
+                        {active && <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFillObject} />}
+                        <Text style={[subst.selectorTxt, active && subst.selectorTxtActive]}>{opt.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Current plan hero */}
                 <View style={subst.proHero}>
                   <LinearGradient colors={['rgba(124,77,255,0.22)', 'transparent']} style={StyleSheet.absoluteFillObject} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" />
                   <View style={subst.proBadge}>
-                    <Ionicons name="diamond" size={28} color={colors.lavender} />
+                    <Ionicons name={isPremium ? 'diamond' : 'person'} size={28} color={isPremium ? colors.lavender : colors.ink2} />
                   </View>
-                  <Text style={subst.proTitle}>Dagnara PRO</Text>
-                  <View style={subst.proFreePill}>
-                    <Text style={subst.proFreePillTxt}>FREE DURING LAUNCH 🎉</Text>
-                  </View>
+                  <Text style={subst.proTitle}>{isPremium ? 'Premium' : 'Standard'}</Text>
+                  {isPremium && (
+                    <View style={subst.proFreePill}>
+                      <Text style={subst.proFreePillTxt}>FREE DURING LAUNCH 🎉</Text>
+                    </View>
+                  )}
                   <Text style={subst.proSub}>
                     {isPremium
-                      ? 'You have full access to every PRO insight — on the house while we launch.'
-                      : 'Unlock deeper analytics. No card, no charge — it’s free for everyone right now.'}
+                      ? 'Full access to every insight — on the house while we launch.'
+                      : 'Everything you need to track daily. Switch to Premium for deeper analytics.'}
                   </Text>
                 </View>
 
-                {/* What PRO unlocks */}
+                {/* What Standard includes */}
                 <View style={subst.planCard}>
-                  <Text style={subst.featHeading}>PRO unlocks</Text>
+                  <Text style={subst.featHeading}>Standard — always free</Text>
+                  {['Food logging & diary', 'AI food scan', 'All Programs', 'Water, steps, weight & macros', 'Life Score & weekly check-in'].map((t) => (
+                    <View key={t} style={subst.featRow}>
+                      <Ionicons name="checkmark" size={16} color={colors.green} />
+                      <Text style={subst.featTxt}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* What Premium adds */}
+                <View style={[subst.planCard, isPremium && subst.planCardActive]}>
+                  <Text style={subst.featHeading}>Premium — everything in Standard, plus</Text>
                   {[
                     { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
                     { icon: 'calendar-outline', t: 'Full progress history', d: 'See every day, not just the last 7' },
@@ -918,24 +949,13 @@ export default function ProfileScreen() {
                   ].map((f) => (
                     <View key={f.t} style={subst.featCard}>
                       <View style={subst.featIcon}>
-                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={colors.lavender} />
+                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={isPremium ? colors.lavender : colors.ink3} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={subst.featTitle}>{f.t}</Text>
                         <Text style={subst.featDesc}>{f.d}</Text>
                       </View>
-                      {isPremium && <Ionicons name="checkmark-circle" size={20} color={colors.green} />}
-                    </View>
-                  ))}
-                </View>
-
-                {/* Free forever */}
-                <View style={subst.planCard}>
-                  <Text style={subst.featHeading}>Always free</Text>
-                  {['Food logging & diary', 'AI food scan', 'All Programs', 'Water, steps, weight & macros'].map((t) => (
-                    <View key={t} style={subst.featRow}>
-                      <Ionicons name="checkmark" size={16} color={colors.green} />
-                      <Text style={subst.featTxt}>{t}</Text>
+                      <Ionicons name={isPremium ? 'checkmark-circle' : 'lock-closed'} size={20} color={isPremium ? colors.green : colors.ink3} />
                     </View>
                   ))}
                 </View>
@@ -945,7 +965,7 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(false); }}
                     style={subst.secondaryBtn}>
-                    <Text style={subst.secondaryBtnTxt}>Turn off PRO</Text>
+                    <Text style={subst.secondaryBtnTxt}>Switch to Standard</Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
@@ -954,11 +974,11 @@ export default function ProfileScreen() {
                     style={{ borderRadius: radius.md, overflow: 'hidden', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
                     <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={subst.primaryBtn}>
                       <Ionicons name="diamond" size={18} color={colors.white} />
-                      <Text style={subst.primaryBtnTxt}>Activate PRO — Free</Text>
+                      <Text style={subst.primaryBtnTxt}>Upgrade to Premium — Free</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 )}
-                <Text style={subst.legal}>Free for everyone during launch. Paid plans may arrive later — you’ll always be told before anything changes.</Text>
+                <Text style={subst.legal}>Premium is free for everyone during launch. Paid plans may arrive later — you’ll always be told before anything changes.</Text>
               </View>
             )}
 
@@ -1462,6 +1482,11 @@ const sst = StyleSheet.create({
 
 // ── Subscription modal styles ─────────────────────────────────────────────────
 const subst = StyleSheet.create({
+  selector: { flexDirection: 'row', backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.pill, padding: spacing.xs / 2, gap: spacing.xs / 2 },
+  selectorBtn: { flex: 1, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  selectorTxt: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink2 },
+  selectorTxtActive: { color: colors.white },
+  planCardActive: { borderColor: colors.line3 },
   proHero: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', gap: spacing.sm, overflow: 'hidden' },
   proBadge: { width: 56, height: 56, borderRadius: radius.lg, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3, alignItems: 'center', justifyContent: 'center' },
   proTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink },

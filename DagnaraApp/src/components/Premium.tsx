@@ -6,9 +6,9 @@
  * but the gating wiring is already in place, so flipping the default (or a
  * future real-billing entitlement) instantly re-locks the premium surfaces.
  *
- * `PremiumBadge` is the small "PRO" chip shown on premium features. While Pro
- * is free-during-launch it reads "PRO · FREE" to set the expectation that this
- * will eventually be a paid tier.
+ * `PremiumBadge` is the small "PREMIUM" chip shown on premium features. While
+ * Premium is free-during-launch it reads "PREMIUM · FREE" to set the
+ * expectation that this will eventually be a paid tier.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -30,7 +30,7 @@ export function PremiumBadge({ launch = true }: BadgeProps) {
   return (
     <View style={s.badge}>
       <Ionicons name="star" size={fontSize.xs} color={colors.lavender} />
-      <Text style={s.badgeTxt}>{launch ? 'PRO · FREE' : 'PRO'}</Text>
+      <Text style={s.badgeTxt}>{launch ? 'PREMIUM · FREE' : 'PREMIUM'}</Text>
     </View>
   );
 }
