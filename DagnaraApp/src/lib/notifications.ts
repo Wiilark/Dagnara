@@ -24,7 +24,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 async function cancelByTag(tag: string) {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
-    if ((n.content.data as any)?.tag === tag) {
+    if ((n.content.data as { tag?: string })?.tag === tag) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
     }
   }
@@ -102,7 +102,7 @@ export async function scheduleWeightReminder(enabled: boolean) {
 export async function skipMealReminderToday(meal: 'breakfast' | 'lunch' | 'dinner') {
   const tag = `meal_${meal}`;
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const exists = scheduled.some(n => (n.content.data as any)?.tag === tag);
+  const exists = scheduled.some(n => (n.content.data as { tag?: string })?.tag === tag);
   if (!exists) return;
 
   const config: Record<string, [string, string, number, number]> = {

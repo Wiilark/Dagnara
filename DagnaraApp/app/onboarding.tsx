@@ -457,7 +457,7 @@ export default function OnboardingScreen() {
             {[
               { key: 'age',    label: 'AGE',    value: age,    set: setAge,    placeholder: 'e.g. 28', unit: 'years', keyboard: 'numeric' as const,    error: ageErr },
               { key: 'weight', label: 'WEIGHT', value: weight, set: setWeight, placeholder: weightPlaceholder(unitSystem), unit: weightUnit(unitSystem), keyboard: 'decimal-pad' as const, error: weightErr },
-              { key: 'height', label: 'HEIGHT', value: height, set: setHeight, placeholder: heightPlaceholder(unitSystem), unit: heightUnit(unitSystem), keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as any, error: heightErr },
+              { key: 'height', label: 'HEIGHT', value: height, set: setHeight, placeholder: heightPlaceholder(unitSystem), unit: heightUnit(unitSystem), keyboard: (unitSystem === 'Metric' ? 'decimal-pad' : 'default') as 'decimal-pad' | 'default', error: heightErr },
             ].map(f => (
               <View key={f.key} style={s.inputWrap}>
                 <Text style={s.fieldLabel}>{f.label}</Text>

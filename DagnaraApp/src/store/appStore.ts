@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type { LocalFood } from '../lib/foodDatabase';
-import { countUnread } from '../lib/messages';
+import { countUnread, MESSAGES } from '../lib/messages';
 
 export const XP_LEVELS = [
   { level: 1,  name: '🌱 Seed',            min: 0      },
@@ -198,8 +198,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   markAllRead: async () => {
-    const { MESSAGES } = require('../lib/messages');
-    const allIds = MESSAGES.map((m: any) => m.id);
+    const allIds = MESSAGES.map((m) => m.id);
     set({ readMessageIds: allIds, unreadCount: 0, hasUnread: false });
     await persist(pick(get()), get().userEmail);
   },
