@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, G, Text as SvgText, Path, Line } from 'react-native-svg';
-import { useDiaryStore } from '../../src/store/diaryStore';
+import { useDiaryStore, type DiaryEntry } from '../../src/store/diaryStore';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
@@ -106,7 +106,7 @@ function getNextMilestone(streak: number) {
 }
 
 // ── Logging Calendar (Interactive Activity Hub) ──────────────────────────────
-function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
+function LoggingCalendar({ entries }: { entries: Record<string, DiaryEntry> }) {
   const { unitSystem, weightHistory } = useAppStore();
   const [gridWidth, setGridWidth] = useState(0);
   const [viewDate, setViewDate] = useState(new Date());
@@ -128,7 +128,7 @@ function LoggingCalendar({ entries }: { entries: Record<string, any> }) {
     const key = date.toLocaleDateString('en-CA');
     const entry = entries[key];
     const weightEntry = weightHistory.find(w => w.date === key);
-    const kcal = (entry?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
+    const kcal = (entry?.foods ?? []).reduce((s: number, f) => s + f.kcal, 0);
 
     days.push({
       day: d,
@@ -377,7 +377,7 @@ const STAT_PERIODS = ['Week', '1 Month', '3 Months', 'All'] as const;
 type StatPeriod = typeof STAT_PERIODS[number];
 
 function StatisticsModal({ visible, onClose, entries, lifestyle }: {
-  visible: boolean; onClose: () => void; entries: Record<string, any>;
+  visible: boolean; onClose: () => void; entries: Record<string, DiaryEntry>;
   lifestyle: { label: string; pct: number; color: string }[];
 }) {
   const [period, setPeriod] = useState<StatPeriod>('Week');
@@ -395,7 +395,7 @@ function StatisticsModal({ visible, onClose, entries, lifestyle }: {
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toLocaleDateString('en-CA');
-    const kcal = (entries[key]?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
+    const kcal = (entries[key]?.foods ?? []).reduce((s: number, f) => s + f.kcal, 0);
     const label = days <= 7
       ? d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)
       : days <= 30
@@ -490,16 +490,16 @@ function StatisticsModal({ visible, onClose, entries, lifestyle }: {
 
 // ── Daily Progress Modal ──────────────────────────────────────────────────────
 function DailyProgressModal({ visible, onClose, entries }: {
-  visible: boolean; onClose: () => void; entries: Record<string, any>;
+  visible: boolean; onClose: () => void; entries: Record<string, DiaryEntry>;
 }) {
   const { calorieGoal: storeCalGoal, macroPcts } = useAppStore();
   const today = new Date().toLocaleDateString('en-CA');
   const todayEntry = entries[today];
   const foods = todayEntry?.foods ?? [];
-  const kcal = foods.reduce((s: number, f: any) => s + f.kcal, 0);
-  const carbs = foods.reduce((s: number, f: any) => s + f.carbs, 0);
-  const protein = foods.reduce((s: number, f: any) => s + f.protein, 0);
-  const fat = foods.reduce((s: number, f: any) => s + f.fat, 0);
+  const kcal = foods.reduce((s: number, f) => s + f.kcal, 0);
+  const carbs = foods.reduce((s: number, f) => s + f.carbs, 0);
+  const protein = foods.reduce((s: number, f) => s + f.protein, 0);
+  const fat = foods.reduce((s: number, f) => s + f.fat, 0);
 
   const KCAL_GOAL   = storeCalGoal || 2000;
   const CARBS_GOAL  = Math.round(KCAL_GOAL * (macroPcts.carbs / 100) / 4);
@@ -518,7 +518,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
   const weekBars = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
     const key = d.toLocaleDateString('en-CA');
-    const dayKcal = (entries[key]?.foods ?? []).reduce((s: number, f: any) => s + f.kcal, 0);
+    const dayKcal = (entries[key]?.foods ?? []).reduce((s: number, f) => s + f.kcal, 0);
     const label = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1);
     return { key, kcal: dayKcal, label, isToday: key === today };
   });
@@ -768,7 +768,7 @@ interface Insight {
 }
 
 function generateInsights(
-  entries: Record<string, any>,
+  entries: Record<string, DiaryEntry>,
   calorieGoal: number,
   weightGoal: string,
   weightHistory: { date: string; kg: number }[],
@@ -784,10 +784,10 @@ function generateInsights(
     const dow = d.getDay();
     return {
       date: key,
-      kcal:    foods.reduce((s: number, f: any) => s + f.kcal, 0),
-      protein: foods.reduce((s: number, f: any) => s + f.protein, 0),
-      carbs:   foods.reduce((s: number, f: any) => s + f.carbs, 0),
-      fat:     foods.reduce((s: number, f: any) => s + f.fat, 0),
+      kcal:    foods.reduce((s: number, f) => s + f.kcal, 0),
+      protein: foods.reduce((s: number, f) => s + f.protein, 0),
+      carbs:   foods.reduce((s: number, f) => s + f.carbs, 0),
+      fat:     foods.reduce((s: number, f) => s + f.fat, 0),
       isWeekend: dow === 0 || dow === 6,
     };
   });

@@ -1417,7 +1417,7 @@ export default function DiaryScreen() {
 
   // Step tracking — subscribe to pedometer for today
   useEffect(() => {
-    let sub: any;
+    let sub: { remove: () => void } | undefined;
     (async () => {
       const available = await Pedometer.isAvailableAsync();
       if (!available) return;
@@ -1887,7 +1887,7 @@ export default function DiaryScreen() {
                 <Text style={st.xpPts}>/ {fmt(STEP_GOAL)}</Text>
               </View>
               <View style={[st.xpTrack, { width: 90 }]}>
-                <View style={[st.xpFill, { width: `${Math.min(100, (stepCount / STEP_GOAL) * 100)}%` as any, backgroundColor: stepCount >= STEP_GOAL ? colors.green : colors.honey }]} />
+                <View style={[st.xpFill, { width: `${Math.min(100, (stepCount / STEP_GOAL) * 100)}%`, backgroundColor: stepCount >= STEP_GOAL ? colors.green : colors.honey }]} />
               </View>
             </View>
           </View>
@@ -1900,7 +1900,7 @@ export default function DiaryScreen() {
                 <Text style={st.xpName}>{fmt(xp)}</Text>
                 <Text style={st.xpPts}>/ {fmt(xpInfo.nextMin)} XP</Text>
               </View>
-              <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` as any }]} /></View>
+              <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` }]} /></View>
             </View>
           </View>
         </View>
@@ -1960,7 +1960,7 @@ export default function DiaryScreen() {
               <Text style={[st.macroVal, { color }]}>{Math.round(val)} / {goal}g</Text>
               {sub && <Text style={st.macroNetCarbs}>{sub}</Text>}
               <View style={st.macroTrack}>
-                <View style={[st.macroFill, { width: `${clamp(val / goal, 0, 1) * 100}%` as any, backgroundColor: color }]} />
+                <View style={[st.macroFill, { width: `${clamp(val / goal, 0, 1) * 100}%`, backgroundColor: color }]} />
               </View>
             </View>
           ))}

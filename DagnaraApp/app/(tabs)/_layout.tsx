@@ -88,7 +88,7 @@ function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => 
                   const onPress = () => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     markMessageRead(m.id);
-                    if (m.route) { router.push(m.route as any); onClose(); }
+                    if (m.route) { router.push(m.route); onClose(); }
                   };
                   return (
                     <TouchableOpacity key={m.id} style={[msg.card, unread && msg.cardUnread]} onPress={onPress} activeOpacity={0.85}>
@@ -134,7 +134,7 @@ function QuickAddSheet({ visible, onClose, onExercise, onWeight, onMood, onSleep
   function openMeal(meal: string) {
     onClose();
     setPendingAddMeal(meal);
-    setTimeout(() => router.push('/(tabs)/diary' as any), 220);
+    setTimeout(() => router.push('/(tabs)/diary'), 220);
   }
 
   function open(cb: () => void) { onClose(); setTimeout(cb, 280); }
@@ -513,7 +513,7 @@ function ActivityLogger({ visible, onClose }: { visible: boolean; onClose: () =>
             <Text style={al.stepsNum}>{fmt(steps)}</Text>
             <Text style={al.stepsGoal}>of {fmt(STEP_GOAL)} goal</Text>
             <View style={al.progressBarBg}>
-              <View style={[al.progressBarFill, { width: `${pct * 100}%` as any }]} />
+              <View style={[al.progressBarFill, { width: `${pct * 100}%` }]} />
             </View>
             <Text style={al.progressPct}>{Math.round(pct * 100)}% complete</Text>
           </View>
