@@ -196,23 +196,85 @@ function isPrivateUrl(urlString) {
 // ── Allowed image MIME types ───────────────────────────────────────────────────
 const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
-// ── Anthropic call helper — enforces a 20s timeout on every API call ──────────
-async function callAnthropic(body) {
+// ── OpenRouter call helper — enforces a 20s timeout on every API call ─────────
+// Accepts an Anthropic-shaped body ({ model, system, messages, max_tokens,
+// temperature }) and translates it to OpenRouter's OpenAI-compatible chat
+// format. Returns an object with a .json() method that yields an Anthropic-
+// shaped response ({ content: [{ text }] } or { error: { message } }) so call
+// sites and parsing stay unchanged.
+//
+// Anthropic message content is either a string or an array of blocks
+// ({ type:'text'|'image', ... }); OpenAI wants content as a string or an array
+// of { type:'text', text } / { type:'image_url', image_url:{ url } } (base64
+// images are passed as a data: URL). The Anthropic system prompt (string or
+// array of text blocks) becomes a leading { role:'system' } message.
+async function callOpenRouter(body) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  // Flatten Anthropic system (string | [{type:'text',text}]) into one string.
+  let systemText = '';
+  if (typeof body.system === 'string') {
+    systemText = body.system;
+  } else if (Array.isArray(body.system)) {
+    systemText = body.system.map((b) => b?.text ?? '').join('\n');
+  }
+
+  // Map Anthropic messages → OpenAI chat messages.
+  const messages = (body.messages ?? []).map((msg) => {
+    let content;
+    if (typeof msg.content === 'string') {
+      content = msg.content;
+    } else if (Array.isArray(msg.content)) {
+      content = msg.content.map((block) => {
+        if (block.type === 'image') {
+          const { media_type, data } = block.source;
+          return { type: 'image_url', image_url: { url: `data:${media_type};base64,${data}` } };
+        }
+        return { type: 'text', text: block.text ?? '' };
+      });
+    } else {
+      content = '';
+    }
+    return { role: msg.role === 'assistant' ? 'assistant' : 'user', content };
+  });
+  if (systemText) {
+    messages.unshift({ role: 'system', content: systemText });
+  }
+
+  const payload = {
+    model: body.model,
+    messages,
+    temperature: body.temperature ?? 0,
+    max_tokens: body.max_tokens ?? 600,
+    // Force clean JSON for the structured endpoints (analyze/import/estimate).
+    // The coach endpoint passes wantsJson:false to get plain prose.
+    ...(body.wantsJson === false ? {} : { response_format: { type: 'json_object' } }),
+  };
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31',
+        Authorization: `Bearer ${apiKey}`,
+        // Optional attribution headers recommended by OpenRouter.
+        'HTTP-Referer': 'https://www.dagnara.com',
+        'X-Title': 'Dagnara',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    return res;
+    const raw = await res.json();
+    // Normalize to Anthropic shape so call sites read data.content[0].text.
+    return {
+      json: async () => {
+        if (raw.error) return { error: { message: raw.error.message ?? 'OpenRouter API error' } };
+        const text = raw?.choices?.[0]?.message?.content ?? '';
+        return { content: [{ text }] };
+      },
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -220,7 +282,7 @@ async function callAnthropic(body) {
 
 // ── Config endpoint ───────────────────────────────────────────────────────────
 // Returns only the Supabase anon key (public by design) so it's not hardcoded
-// in the HTML file. Never expose ANTHROPIC_API_KEY here.
+// in the HTML file. Never expose OPENROUTER_API_KEY here.
 app.get('/api/config', configLimiter, (req, res) => {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
     return res.status(503).json({ error: 'Server config not set' });
@@ -232,7 +294,7 @@ app.get('/api/config', configLimiter, (req, res) => {
 });
 
 // ── Food photo analysis proxy ────────────────────────────────────────────────
-// Anthropic API key stays on the server — never sent to the browser.
+// OpenRouter API key stays on the server — never sent to the browser.
 app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => {
   const { imageData, mediaType } = req.body;
 
@@ -246,19 +308,18 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
     return res.status(400).json({ error: { message: 'Image too large. Please use a smaller photo.' } });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({ error: { message: 'Food detection not configured on this server' } });
   }
 
   try {
-    const response = await callAnthropic({
-      model: 'claude-sonnet-4-5',
+    const response = await callOpenRouter({
+      model: 'google/gemma-4-26b-a4b-it:free',
       max_tokens: 500,
       temperature: 0,
       system: [{
         type: 'text',
         text: 'You are a precise nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]\nRules: (1) Estimate the ACTUAL visible portion weight carefully — a large plate of pasta is ~400g, a burger is ~250g, a salad is ~300g. (2) Use standard USDA/nutritionist values for per100 macros. (3) kcal must equal (carbs*4 + protein*4 + fat*9) * weight_g/100 — verify this before responding. (4) List each distinct food item separately. (5) Return [] if no food is visible.',
-        cache_control: { type: 'ephemeral' }
       }],
       messages: [{
         role: 'user',
@@ -277,7 +338,7 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
     res.json({ items });
   } catch (err) {
     console.error('[analyze-food]', err.message);
-    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
 });
@@ -307,7 +368,7 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
     return res.status(400).json({ error: { message: 'URL not allowed' } });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({ error: { message: 'Recipe import not configured on this server' } });
   }
 
@@ -344,14 +405,13 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
         .slice(0, 3000);
     }
 
-    const response = await callAnthropic({
-      model: 'claude-sonnet-4-6',
+    const response = await callOpenRouter({
+      model: 'google/gemma-4-26b-a4b-it:free',
       max_tokens: 600,
       temperature: 0,
       system: [{
         type: 'text',
         text: 'You are a nutrition extraction assistant. Return ONLY valid JSON — no prose, no markdown. Format:\n{"name":"recipe name","servings":number,"items":[{"icon":"emoji","name":"ingredient","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"per serving"}]}\nEstimate realistic macros per serving if not provided.',
-        cache_control: { type: 'ephemeral' }
       }],
       messages: [{
         role: 'user',
@@ -430,19 +490,18 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
   if (!description || typeof description !== 'string' || description.trim().length < 2) {
     return res.status(400).json({ error: { message: 'description is required' } });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({ error: { message: 'AI estimation not configured on this server' } });
   }
 
   try {
-    const response = await callAnthropic({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await callOpenRouter({
+      model: 'google/gemma-4-26b-a4b-it:free',
       max_tokens: 400,
       temperature: 0,
       system: [{
         type: 'text',
         text: 'You are a nutrition estimation assistant. Return ONLY valid JSON arrays — no prose, no markdown. Given a food description in natural language, return estimated nutrition. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nReturn [] if you cannot estimate. Never explain, just return JSON.',
-        cache_control: { type: 'ephemeral' }
       }],
       messages: [{ role: 'user', content: `Estimate nutrition for: ${description.trim().slice(0, 500)}` }]
     });
@@ -455,7 +514,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
     res.json({ items });
   } catch (err) {
     console.error('[estimate-nutrition]', err.message);
-    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
 });
@@ -475,7 +534,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: { message: 'messages is required' } });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({ error: { message: 'AI coach not configured on this server' } });
   }
 
@@ -496,10 +555,11 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   ].filter(Boolean).join('\n');
 
   try {
-    const response = await callAnthropic({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await callOpenRouter({
+      model: 'google/gemma-4-26b-a4b-it:free',
       max_tokens: 600,
-      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+      wantsJson: false,
+      system: [{ type: 'text', text: systemPrompt }],
       messages: validMessages,
     });
 
@@ -509,7 +569,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
     res.json({ reply });
   } catch (err) {
     console.error('[coach]', err.message);
-    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact Anthropic API';
+    const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
 });
