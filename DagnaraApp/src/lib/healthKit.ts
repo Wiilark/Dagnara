@@ -58,7 +58,7 @@ async function iosReadData(date: string): Promise<HealthSyncData> {
     const kcal = await new Promise<number>((resolve) => {
       AppleHealthKit.getActiveEnergyBurned(
         { startDate, endDate },
-        (_: unknown, r: Array<{ value: number }>) =>
+        (_: unknown, r: { value: number }[]) =>
           resolve((r ?? []).reduce((a, x) => a + (x?.value ?? 0), 0)),
       );
     });
@@ -66,7 +66,7 @@ async function iosReadData(date: string): Promise<HealthSyncData> {
     const sleepMins = await new Promise<number>((resolve) => {
       AppleHealthKit.getSleepSamples(
         { startDate, endDate },
-        (_: unknown, r: Array<{ value: string; startDate: string; endDate: string }>) => {
+        (_: unknown, r: { value: string; startDate: string; endDate: string }[]) => {
           const mins = (r ?? [])
             .filter((s) => s.value === 'ASLEEP')
             .reduce((a, s) => {

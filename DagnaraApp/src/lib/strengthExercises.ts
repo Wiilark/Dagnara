@@ -13,7 +13,7 @@ export const STRENGTH_EXERCISES = [
   'Plank', 'Crunch', 'Russian Twist', 'Hanging Leg Raise',
 ];
 
-export function estimateStrengthKcal(exercises: Array<{ sets: Array<{ reps: number; weight: number; unit: 'kg' | 'lbs' }> }>): number {
+export function estimateStrengthKcal(exercises: { sets: { reps: number; weight: number; unit: 'kg' | 'lbs' }[] }[]): number {
   let total = 0;
   for (const ex of exercises) {
     for (const set of ex.sets) {

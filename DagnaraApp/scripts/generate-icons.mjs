@@ -14,11 +14,6 @@ const makeSvg = (size) => {
   const tickSw = 2 * s;       // tick stroke width
   const gridSw = 0.8 * s;     // crosshair line width
 
-  // tick endpoints (original: short lines at compass points)
-  const tickOuter = 2 * s;    // distance from center to outer tick end
-  const tickInner = 6.5 * s;  // distance from center to inner tick end
-  const t = (v) => cx + (v - 14) * s; // translate from 28×28 coords
-
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs>
     <radialGradient id="bg" cx="50%" cy="50%" r="60%">
@@ -83,11 +78,6 @@ async function generate() {
   console.log('✓ assets/icon.png (1024×1024)');
 
   // adaptive-icon.png — 1024×1024 (Android foreground, centered with padding)
-  const adaptiveSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
-    <rect width="1024" height="1024" fill="#0c0818"/>
-    ${makeSvg(720).replace(/<svg[^>]*>/, '').replace('</svg>', '')}
-  </svg>`;
-
   // For adaptive icon: logo centered in 1024, logo itself is 720px centered → offset 152px
   const logoBuffer = await sharp(Buffer.from(makeSvg(720))).resize(720, 720).png().toBuffer();
   await sharp({

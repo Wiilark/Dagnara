@@ -141,7 +141,7 @@ async function queueAppSync(data: PersistedData, email: string | null) {
       );
     } catch (e) {
       // Retry logic or fail silently (AsyncStorage still has it)
-      // eslint-disable-next-line no-console
+       
       console.error('[appStore] cloud sync failed:', e);
     }
   }, 5000); // 5s debounce

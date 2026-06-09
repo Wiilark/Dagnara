@@ -17,10 +17,9 @@ import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, r
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { BackChevron } from '../../src/components/BackChevron';
 import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { formatWeight, weightUnit, heightUnit, lengthUnit, kgToInput, cmToInput, cmLenToInput, parseWeight, parseHeight, parseLength, UnitSystem } from '../../src/lib/units';
-import { COUNTRIES, getCountry, formatMoneyFromUsd } from '../../src/lib/currency';
+import { COUNTRIES, getCountry } from '../../src/lib/currency';
 import { fmt } from '../../src/lib/format';
 import { requestHealthPermissions, readHealthData, healthPlatformName, isHealthAvailable } from '../../src/lib/healthKit';
 import { useDiaryStore } from '../../src/store/diaryStore';
@@ -829,7 +828,9 @@ export default function ProfileScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.ink, fontWeight: '700', marginBottom: 2 }}>{healthPlatformName()}</Text>
                     <Text style={{ color: healthConnected ? colors.green : colors.ink3, fontSize: fontSize.sm }}>{healthConnected ? 'Connected' : 'Not connected'}</Text>
-                    {healthLastSync ? <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginTop: 2 }}>Last sync {healthLastSync}</Text> : null}
+                    {healthSyncing
+                      ? <Text style={{ color: colors.purple2, fontSize: fontSize.xs, marginTop: 2 }}>Syncing…</Text>
+                      : healthLastSync ? <Text style={{ color: colors.ink3, fontSize: fontSize.xs, marginTop: 2 }}>Last sync {healthLastSync}</Text> : null}
                   </View>
                   {!healthConnected && (
                     <TouchableOpacity onPress={handleHealthConnect} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
@@ -1505,12 +1506,6 @@ const subst = StyleSheet.create({
   secondaryBtn: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
   secondaryBtnTxt: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink2 },
   legal: { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', lineHeight: fontSize.md, marginTop: spacing.xs },
-});
-
-// ── Account Settings modal styles ────────────────────────────────────────────
-const act = StyleSheet.create({
-  fieldLbl: { fontSize: fontSize.sm, color: colors.ink2, width: 90 },
-  fieldInput: { flex: 1, fontSize: fontSize.sm, color: colors.ink, textAlign: 'right' },
 });
 
 // ── Dietary preferences modal styles ──────────────────────────────────────────

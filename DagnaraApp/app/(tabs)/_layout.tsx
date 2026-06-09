@@ -6,14 +6,14 @@ import {
   ScrollView, TextInput, Alert, Pressable, Animated,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
 import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
-import { useAppStore, getXpLevel } from '../../src/store/appStore';
+import { useAppStore } from '../../src/store/appStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
 import { MESSAGES, MSG_COLORS, groupMessages, countUnread } from '../../src/lib/messages';
 

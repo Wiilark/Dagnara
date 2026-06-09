@@ -265,13 +265,13 @@ export async function cancelQdNotifications(): Promise<void> {
  * active day so users on a Mon/Wed/Fri schedule don't get notifications on Tue/Thu.
  */
 export async function schedulePillReminders(
-  meds: Array<{
+  meds: {
     id: string;
     name: string;
     dosage: string;
     times: string[];
     daysOfWeek?: number[] | null;
-  }>,
+  }[],
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 

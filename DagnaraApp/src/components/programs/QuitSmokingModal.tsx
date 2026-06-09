@@ -15,7 +15,7 @@ import { scheduleQsNotifications } from '../../lib/notifications';
 import { formatMoneyFromUsd, currencySymbol, usdToLocal, localToUsd, minorUnits } from '../../lib/currency';
 import { fmt } from '../../lib/format';
 import {
-  CRAVING_COPING, CRAVING_TRIGGERS, Craving, DEFAULT_TIP_PREFS, HeroBadgeArt, MeditationArt, NRT_TYPES, NrtEntry, PatternsArt, ProgramSheetHeader, ProgressSceneArt, QS_ACHIEVEMENTS, QS_MILESTONES, QS_PRODUCT_LABELS, QS_QUITLINES, QsAchBadge, QsAchievement, QsData, QsIllo, QsProduct, QuitlinePhoneArt, TipBulbArt, TipPrefs, achColor, buildAchList, estimateAchHours, formatAchStat, isAchUnlocked, makeKeys, nrtRelTime, pickDailyTip, prevUnlockedRefGlobal, productLabels, unlockedAchAt, m,
+  CRAVING_COPING, CRAVING_TRIGGERS, Craving, DEFAULT_TIP_PREFS, HeroBadgeArt, MeditationArt, NRT_TYPES, NrtEntry, PatternsArt, ProgramSheetHeader, ProgressSceneArt, QS_MILESTONES, QS_PRODUCT_LABELS, QS_QUITLINES, QsAchBadge, QsAchievement, QsData, QsIllo, QsProduct, QuitlinePhoneArt, TipBulbArt, TipPrefs, achColor, buildAchList, estimateAchHours, formatAchStat, isAchUnlocked, makeKeys, nrtRelTime, pickDailyTip, prevUnlockedRefGlobal, productLabels, unlockedAchAt, m,
 } from './shared';
 
 // ── Quit Smoking Modal ────────────────────────────────────────────────────────
@@ -591,10 +591,6 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
       ? `${Math.floor(lifeRegained / 60)}h`
       : `${lifeRegained}m`;
 
-  // Latest unlocked achievement → drives "Health improvements" highlight card
-  const latestUnlocked = data
-    ? [...QS_ACHIEVEMENTS].reverse().find(a => hours >= a.hours) ?? null
-    : null;
 
   // Latest unlocked WHO health milestone (separate from gamified achievements)
   const latestHealthMs = data
@@ -2240,9 +2236,8 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
             const topCoping   = [...copingCountsWon.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
             const maxTrigger  = topTriggers[0]?.[1] ?? 0;
             const maxCoping   = topCoping[0]?.[1] ?? 0;
-            const maxHour     = Math.max(0, ...hourCounts);
             // Bucket the 24 hours into 6 four-hour slots for a readable histogram
-            const slots: Array<{ label: string; count: number }> = [
+            const slots: { label: string; count: number }[] = [
               { label: '12-4a',  count: hourCounts.slice(0, 4).reduce((a, b) => a + b, 0) },
               { label: '4-8a',   count: hourCounts.slice(4, 8).reduce((a, b) => a + b, 0) },
               { label: '8-12p',  count: hourCounts.slice(8, 12).reduce((a, b) => a + b, 0) },

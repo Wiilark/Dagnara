@@ -312,7 +312,7 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
 
 export default function RecipesScreen() {
   const { entries, addFood, loadEntry } = useDiaryStore();
-  const { setMessagesOpen, addXp, calorieGoal, hasUnread, checkAndUpdateStreak, dietaryPreferences } = useAppStore();
+  const { addXp, calorieGoal, hasUnread, checkAndUpdateStreak, dietaryPreferences } = useAppStore();
   const { email, profile } = useAuthStore();
   const [recipeSearch, setRecipeSearch] = useState('');
   const [foodSearch, setFoodSearch] = useState('');

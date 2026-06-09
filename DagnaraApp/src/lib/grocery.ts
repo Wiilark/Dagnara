@@ -23,7 +23,7 @@ export interface GroceryItem {
 export interface RecipeForGrocery {
   id: string;
   name: string;
-  ingredients: Array<{ qty: string; name: string }>;
+  ingredients: { qty: string; name: string }[];
 }
 
 export function groceryKey(email: string | null | undefined): string {
@@ -88,7 +88,7 @@ export function pickFrequentItems(history: GroceryHistory, limit = 8): GroceryHi
 
 // ── Category keywords ─────────────────────────────────────────────────────────
 // Order matters — earlier entries win on first substring match.
-const CATEGORY_KEYWORDS: Array<{ id: string; keywords: string[] }> = [
+const CATEGORY_KEYWORDS: { id: string; keywords: string[] }[] = [
   // Frozen first — "frozen X" should trump produce/protein
   { id: 'frozen',  keywords: ['frozen', 'ice cream'] },
 

@@ -145,7 +145,7 @@ async function processSyncQueue(get: () => DiaryState) {
     } catch (e) {
       // Re-queue on failure
       dates.forEach(d => syncQueue.add(d));
-      // eslint-disable-next-line no-console
+       
       console.error('[diaryStore] batch sync failed, re-queued:', e);
     }
   }
@@ -178,7 +178,7 @@ function pruneEntries(entries: Record<string, DiaryEntry>): Record<string, Diary
 function getEmail(): string | null {
   try {
     // Lazy import to avoid circular dependency at module load time
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     return require('./authStore').useAuthStore.getState().email;
   } catch {
     return null;

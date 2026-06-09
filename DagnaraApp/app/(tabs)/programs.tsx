@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Platform, Animated,
+  View, Text, TouchableOpacity, StyleSheet, Platform, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -48,7 +48,7 @@ function ProgramRow({ icon, name, description, color, isLast = false, onPress }:
 
 // ── Main Programs Screen ──────────────────────────────────────────────────────
 export default function ProgramsScreen() {
-  const { setMessagesOpen, hasUnread } = useAppStore();
+  const { hasUnread } = useAppStore();
   const { email: authEmail, profile } = useAuthStore();
   const [qsVisible, setQsVisible] = useState(false);
   const [qdVisible, setQdVisible] = useState(false);

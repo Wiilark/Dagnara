@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY ?? '';
 // Fail loud in dev, fail quiet (but logged) in production. A misconfigured
 // build will silently lose auth and sync otherwise.
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  // eslint-disable-next-line no-console
+   
   console.error(
     '[supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_KEY. ' +
     'Auth and cloud sync will fail. Check your .env and EAS secrets.',

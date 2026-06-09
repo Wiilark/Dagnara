@@ -75,7 +75,6 @@ export default function LogScreen() {
   const avgKcal = loggedDays > 0
     ? Math.round(dayData.reduce((s, d) => s + d.kcal, 0) / loggedDays)
     : 0;
-  const totalItems = dayData.reduce((s, d) => s + d.foods.length, 0);
   const proteinHitDays = dayData.filter((d) => d.protein > 0 && d.protein >= PROTEIN_GOAL * 0.9).length;
 
   const maxKcal = Math.max(...dayData.map((d) => d.kcal), calorieGoal * 1.1, 1);

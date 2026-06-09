@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Defs, LinearGradient, Stop, G, Line } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { useDiaryStore, FoodItem, StrengthSession, StrengthExercise, CardioSession } from '../../src/store/diaryStore';
 import { STRENGTH_EXERCISES, estimateStrengthKcal } from '../../src/lib/strengthExercises';
@@ -23,8 +23,6 @@ import { analyzeFood, importRecipe, estimateNutrition } from '../../src/lib/api'
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
 import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
-import { ClockPickerModal } from '../../src/components/ClockPickerModal';
-import { BackChevron } from '../../src/components/BackChevron';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { fmt } from '../../src/lib/format';
 
@@ -39,8 +37,6 @@ const MEAL_SUGGESTED: Record<string, string> = { breakfast: '~550 kcal suggested
 
 const WATER_GOAL = 8;
 const VEG_GOAL = 3; const FRUIT_GOAL = 3;
-
-const RING_SW = 12;
 
 function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 function addDays(date: string, days: number) { const [y, m, dd] = date.split('-').map(Number); const d = new Date(y, m - 1, dd); d.setDate(d.getDate() + days); return dateStr(d); }
@@ -189,124 +185,6 @@ const BROWSE_CATEGORIES = [
   { emoji: '🥤', label: 'Beverages',           foodIds: ['b001','b002','b003','b004','b005','b006','b007','b008','b009','b010'] },
 ] as const;
 
-// ── Sleep Logger Modal ────────────────────────────────────────────────────────
-const SLEEP_QUALITY = ['😫', '😕', '😐', '😊', '🌟'];
-
-type SleepSaveData = { bedtime: string; waketime: string; quality: number; duration: string };
-
-/** Format a 24-h "HH:MM" string as "10:30 PM" for display */
-function fmtSleepTime(t: string): string {
-  const parts = t.split(':');
-  const h24 = parseInt(parts[0], 10) || 0;
-  const m   = parseInt(parts[1], 10) || 0;
-  const suffix = h24 < 12 ? 'AM' : 'PM';
-  const h12  = h24 % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
-function SleepModal({ visible, onClose, onSave }: {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (data: SleepSaveData) => void;
-}) {
-  const [bedtime, setBedtime]   = useState('22:30');
-  const [waketime, setWaketime] = useState('06:00');
-  const [quality, setQuality]   = useState(2);
-  const [clockTarget, setClockTarget] = useState<'bed' | 'wake' | null>(null);
-
-  useEffect(() => {
-    if (!visible) { setBedtime('22:30'); setWaketime('06:00'); setQuality(2); setClockTarget(null); }
-  }, [visible]);
-
-  function calcDuration(): string {
-    const [bh, bm] = bedtime.split(':').map(Number);
-    const [wh, wm] = waketime.split(':').map(Number);
-    if ([bh, bm, wh, wm].some(n => isNaN(n))) return '—';
-    let mins = (wh * 60 + wm) - (bh * 60 + bm);
-    if (mins < 0) mins += 24 * 60;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-  }
-
-  function handleClockConfirm(time: string) {
-    if (clockTarget === 'bed') setBedtime(time);
-    else setWaketime(time);
-    setClockTarget(null);
-  }
-
-  return (
-    <>
-      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-        <SafeAreaView style={sl.safe} edges={['bottom']}>
-          <View style={sl.header}>
-            <TouchableOpacity onPress={onClose} style={sl.backBtn}>
-              <BackChevron size={20} />
-            </TouchableOpacity>
-            <Text style={sl.title}>Log Sleep</Text>
-            <View style={{ width: 34 }} />
-          </View>
-          <ScrollView contentContainerStyle={sl.content}>
-            <View style={sl.durationDisplay}>
-              <Text style={sl.durNum}>{calcDuration()}</Text>
-              <Text style={sl.durLbl}>Sleep duration</Text>
-            </View>
-            <Text style={sl.sectionLbl}>BEDTIME & WAKE TIME</Text>
-            <View style={sl.timeRow}>
-              <TouchableOpacity
-                style={[sl.timeCard, { borderColor: colors.purple + '80', backgroundColor: colors.purpleTint }]}
-                onPress={() => setClockTarget('bed')}
-                activeOpacity={0.75}
-              >
-                <Text style={sl.timeCardLbl}>🌙 Bedtime</Text>
-                <Text style={sl.timeVal}>{fmtSleepTime(bedtime)}</Text>
-                <Text style={sl.timeCardHint}>tap to change</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={sl.timeCard}
-                onPress={() => setClockTarget('wake')}
-                activeOpacity={0.75}
-              >
-                <Text style={sl.timeCardLbl}>☀️ Wake time</Text>
-                <Text style={sl.timeVal}>{fmtSleepTime(waketime)}</Text>
-                <Text style={sl.timeCardHint}>tap to change</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={sl.sectionLbl}>SLEEP QUALITY</Text>
-            <View style={sl.qualityRow}>
-              {SLEEP_QUALITY.map((em, i) => (
-                <TouchableOpacity key={i} style={[sl.qBtn, quality === i && sl.qBtnSel]} onPress={() => setQuality(i)}>
-                  <Text style={sl.qEmoji}>{em}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={sl.insight}>
-              <Text style={sl.insightLbl}>✦ Insight</Text>
-              <Text style={sl.insightTxt}>On days following 8h+ sleep, your step count is 34% higher. Your mood also improves on average.</Text>
-            </View>
-            <TouchableOpacity style={sl.saveBtn} activeOpacity={0.85} onPress={() => {
-              const duration = calcDuration();
-              if (duration === '—') { Alert.alert('Invalid time', 'Check your times and try again.'); return; }
-              onSave({ bedtime, waketime, quality, duration });
-              onClose();
-            }}>
-              <ExpoLinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sl.saveGrad}>
-                <Text style={sl.saveTxt}>Save Sleep Log</Text>
-              </ExpoLinearGradient>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Clock picker — rendered outside the pageSheet Modal to avoid z-index issues */}
-      <ClockPickerModal
-        visible={clockTarget !== null}
-        initial={clockTarget === 'bed' ? bedtime : waketime}
-        label={clockTarget === 'bed' ? 'SET BEDTIME' : 'SET WAKE TIME'}
-        onConfirm={handleClockConfirm}
-        onClose={() => setClockTarget(null)}
-      />
-    </>
-  );
-}
 
 // ── Exercise Logger Modal ─────────────────────────────────────────────────────
 const EXERCISES = [
@@ -644,253 +522,6 @@ function ExerciseModal({ visible, onClose, onAddCalories, onAddStrengthSession }
   );
 }
 
-// ── Stress & Breathing Modal ──────────────────────────────────────────────────
-type BreathPhase = { label: string; duration: number };
-type BreathExercise = { name: string; icon: string; color: string; desc: string; totalSecs: number; phases: BreathPhase[] };
-
-const BREATH_EXERCISES: BreathExercise[] = [
-  { name: '4-7-8 Breathing', icon: '🌊', color: colors.purple,
-    desc: 'Inhale 4s · Hold 7s · Exhale 8s · 8 min', totalSecs: 480,
-    phases: [{ label: 'Inhale', duration: 4 }, { label: 'Hold', duration: 7 }, { label: 'Exhale', duration: 8 }] },
-  { name: 'Box Breathing', icon: '🔲', color: colors.sky,
-    desc: 'Inhale 4s · Hold 4s · Exhale 4s · Hold 4s · 4 min', totalSecs: 240,
-    phases: [{ label: 'Inhale', duration: 4 }, { label: 'Hold', duration: 4 }, { label: 'Exhale', duration: 4 }, { label: 'Hold', duration: 4 }] },
-  { name: 'Deep Breathing', icon: '💨', color: colors.green,
-    desc: 'Slow deep breaths · 2 min', totalSecs: 120,
-    phases: [{ label: 'Inhale', duration: 6 }, { label: 'Exhale', duration: 6 }] },
-];
-
-const STRESS_EMOJIS = ['😌', '😊', '😐', '😟', '😩'];
-const STRESS_LABELS = ['Calm', 'OK', 'Neutral', 'Stressed', 'Overwhelmed'];
-const MOOD_EMOJIS   = ['😩', '😕', '😐', '😊', '🤩'];
-const MOOD_LABELS   = ['Awful', 'Bad', 'Ok', 'Good', 'Great'];
-
-function BreathingGuideModal({ exercise, onClose }: { exercise: BreathExercise; onClose: () => void }) {
-  const phaseIdxRef  = useRef(0);
-  const countdownRef = useRef(exercise.phases[0].duration);
-  const totalRef     = useRef(exercise.totalSecs);
-  const [phaseIdx, setPhaseIdx]   = useState(0);
-  const [countdown, setCountdown] = useState(exercise.phases[0].duration);
-  const [totalLeft, setTotalLeft] = useState(exercise.totalSecs);
-  const [running, setRunning]     = useState(true);
-  const [done, setDone]           = useState(false);
-
-  useEffect(() => {
-    if (!running || done) return;
-    const id = setInterval(() => {
-      countdownRef.current -= 1;
-      totalRef.current     -= 1;
-      if (countdownRef.current <= 0) {
-        phaseIdxRef.current = (phaseIdxRef.current + 1) % exercise.phases.length;
-        countdownRef.current = exercise.phases[phaseIdxRef.current].duration;
-        setPhaseIdx(phaseIdxRef.current);
-      }
-      setCountdown(countdownRef.current);
-      setTotalLeft(totalRef.current);
-      if (totalRef.current <= 0) { clearInterval(id); setDone(true); }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [running, done]);
-
-  const phase   = exercise.phases[phaseIdx];
-  const elapsed = phase.duration - countdown;
-  const R = 80; const CIRC = 2 * Math.PI * R;
-  const dash = Math.min(1, elapsed / phase.duration) * CIRC;
-  const mins = Math.floor(totalLeft / 60);
-  const secs = totalLeft % 60;
-
-  return (
-    <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
-          <TouchableOpacity style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
-            <Ionicons name="close" size={28} color={colors.ink3} />
-          </TouchableOpacity>
-        </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink, marginBottom: spacing.xl }}>{exercise.icon} {exercise.name}</Text>
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
-          <Svg width={200} height={200} viewBox="0 0 200 200">
-            <Circle cx={100} cy={100} r={R} fill="none" stroke={exercise.color + '22'} strokeWidth={14} />
-            <G rotation="-90" origin="100, 100">
-              <Circle cx={100} cy={100} r={R} fill="none" stroke={exercise.color} strokeWidth={14}
-                strokeLinecap="round" strokeDasharray={`${dash} ${CIRC}`} />
-            </G>
-          </Svg>
-          <View style={{ position: 'absolute', alignItems: 'center' }}>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: exercise.color }}>{phase.label}</Text>
-            <Text style={{ fontSize: fontSize['2xl'], fontWeight: '900', color: colors.ink }}>{countdown}</Text>
-          </View>
-        </View>
-        {done ? (
-          <View style={{ alignItems: 'center', gap: 16, marginTop: 16 }}>
-            <Text style={{ fontSize: fontSize['2xl'] + 10 }}>✅</Text>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.ink }}>Session complete!</Text>
-            <TouchableOpacity style={{ backgroundColor: exercise.color, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, marginTop: 8 }} onPress={onClose}>
-              <Text style={{ color: colors.white, fontWeight: '700', fontSize: fontSize.sm }}>Done · +20 XP</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <Text style={{ color: colors.ink3, fontSize: fontSize.sm, marginBottom: 32 }}>{mins}:{String(secs).padStart(2, '0')} remaining</Text>
-            <TouchableOpacity onPress={() => setRunning(r => !r)}
-              style={{ backgroundColor: exercise.color + '22', borderWidth: 1, borderColor: exercise.color + '44', borderRadius: radius.pill, width: 64, height: 64, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={running ? 'pause' : 'play'} size={28} color={exercise.color} />
-            </TouchableOpacity>
-          </>
-        )}
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-function StressBreathingModal({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (level: number) => void }) {
-  const [stressLevel, setStressLevel]       = useState<number | null>(null);
-  const [activeExercise, setActiveExercise] = useState<BreathExercise | null>(null);
-
-  useEffect(() => {
-    if (!visible) { setStressLevel(null); setActiveExercise(null); }
-  }, [visible]);
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {activeExercise && <BreathingGuideModal exercise={activeExercise} onClose={() => setActiveExercise(null)} />}
-      <SafeAreaView style={sbst.safe} edges={['bottom']}>
-        <View style={sbst.header}>
-          <TouchableOpacity onPress={onClose} style={sbst.backBtn}><BackChevron size={20} /></TouchableOpacity>
-          <Text style={sbst.title}>Stress & Breathing</Text>
-          <View style={{ width: 34 }} />
-        </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
-          <Text style={sbst.sectionLbl}>HOW STRESSED ARE YOU?</Text>
-          <View style={sbst.emojiRow}>
-            {STRESS_EMOJIS.map((em, i) => (
-              <TouchableOpacity key={i} style={[sbst.emojiBtn, stressLevel === i + 1 && sbst.emojiBtnSel]} onPress={() => setStressLevel(i + 1)}>
-                <Text style={sbst.emoji}>{em}</Text>
-                <Text style={[sbst.emojiLbl, stressLevel === i + 1 && { color: colors.ink }]}>{STRESS_LABELS[i]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {stressLevel !== null && (
-            <TouchableOpacity style={sbst.saveBtn} onPress={() => { onSave(stressLevel); onClose(); }}>
-              <Text style={sbst.saveBtnTxt}>Log Stress Level</Text>
-            </TouchableOpacity>
-          )}
-          <Text style={[sbst.sectionLbl, { marginTop: 8 }]}>BREATHING EXERCISES</Text>
-          {BREATH_EXERCISES.map((ex) => (
-            <TouchableOpacity key={ex.name} style={[sbst.breathCard, { borderColor: ex.color + '25', backgroundColor: ex.color + '0d' }]} onPress={() => setActiveExercise(ex)}>
-              <Text style={{ fontSize: fontSize.xl, flexShrink: 0 }}>{ex.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={sbst.breathName}>{ex.name}</Text>
-                <Text style={sbst.breathDesc}>{ex.desc}</Text>
-              </View>
-              <Text style={{ fontSize: fontSize.md + 1, color: colors.ink3 }}>▶</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-const sbst = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: radius.lg },
-  title:      { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
-  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, color: colors.ink3, textTransform: 'uppercase' },
-  emojiRow:   { flexDirection: 'row', gap: 4 },
-  emojiBtn:   { flex: 1, alignItems: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.layer2 },
-  emojiBtnSel:{ borderColor: colors.teal, backgroundColor: colors.teal + '11' },
-  emoji:      { fontSize: fontSize.lg },
-  emojiLbl:   { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, textAlign: 'center' },
-  saveBtn:    { backgroundColor: colors.teal, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
-  saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
-  breathCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
-  breathName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
-  breathDesc: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
-});
-
-// ── Mood Logger Modal ─────────────────────────────────────────────────────────
-function MoodModal({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (mood: number, notes: string) => void }) {
-  const [mood, setMood]   = useState<number | null>(null);
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    if (!visible) { setMood(null); setNotes(''); }
-  }, [visible]);
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={moodst.safe} edges={['bottom']}>
-        <View style={moodst.header}>
-          <TouchableOpacity onPress={onClose} style={moodst.backBtn}><BackChevron size={20} /></TouchableOpacity>
-          <Text style={moodst.title}>Log Mood</Text>
-          <View style={{ width: 34 }} />
-        </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
-          <Text style={moodst.question}>How are you feeling?</Text>
-          <View style={moodst.emojiRow}>
-            {MOOD_EMOJIS.map((em, i) => (
-              <TouchableOpacity key={i} style={[moodst.emojiBtn, mood === i + 1 && moodst.emojiBtnSel]} onPress={() => setMood(i + 1)}>
-                <Text style={moodst.emoji}>{em}</Text>
-                <Text style={[moodst.emojiLbl, mood === i + 1 && { color: colors.ink }]}>{MOOD_LABELS[i]}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            style={moodst.notesInput}
-            placeholder="What's on your mind? (optional)"
-            placeholderTextColor={colors.ink3}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
-          <TouchableOpacity style={[moodst.saveBtn, mood === null && { opacity: 0.4 }]}
-            onPress={() => { if (mood !== null) { onSave(mood, notes); onClose(); } }} disabled={mood === null}>
-            <Text style={moodst.saveBtnTxt}>Log Mood</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-const moodst = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  backBtn:    { padding: 8, backgroundColor: colors.layer2, borderRadius: radius.lg },
-  title:      { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
-  question:   { fontSize: fontSize.sm, fontWeight: '600', color: colors.ink },
-  emojiRow:   { flexDirection: 'row', gap: 4 },
-  emojiBtn:   { flex: 1, alignItems: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.layer2 },
-  emojiBtnSel:{ borderColor: colors.honey, backgroundColor: colors.honey + '11' },
-  emoji:      { fontSize: fontSize.lg },
-  emojiLbl:   { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, textAlign: 'center' },
-  notesInput: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, color: colors.ink, padding: 14, fontSize: fontSize.sm, minHeight: 90, textAlignVertical: 'top' },
-  saveBtn:    { backgroundColor: colors.honey, borderRadius: radius.md, alignItems: 'center', paddingVertical: spacing.sm },
-  saveBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
-});
-
-// ── Dagnara Logo ──────────────────────────────────────────────────────────────
-function DagnaraLogo({ size = 22, color = colors.lavender }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 28 28">
-      <Line x1="14" y1="2" x2="14" y2="26" stroke={color} strokeWidth="0.8" opacity="0.35" />
-      <Line x1="2" y1="14" x2="26" y2="14" stroke={color} strokeWidth="0.8" opacity="0.35" />
-      <Circle cx="14" cy="14" r="11" stroke={color} strokeWidth="1.4" fill="none" />
-      <Circle cx="14" cy="14" r="2.5" fill={color} />
-      <Line x1="14" y1="2" x2="14" y2="6.5" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Line x1="14" y1="21.5" x2="14" y2="26" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Line x1="2" y1="14" x2="6.5" y2="14" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Line x1="21.5" y1="14" x2="26" y2="14" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </Svg>
-  );
-}
-
 // ── Food row ──────────────────────────────────────────────────────────────────
 function FoodRow({ food, onDelete, onFavorite }: { food: FoodItem; onDelete: () => void; onFavorite: () => void }) {
   const isQuickEntry = food.name === 'Quick entry';
@@ -1110,8 +741,8 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { email, profile } = useAuthStore();
-  const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, addWater, removeWater, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, logSleep, addStrengthSession, addCardioSession } = useDiaryStore();
-  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, setMessagesOpen, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
+  const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, addStrengthSession, addCardioSession } = useDiaryStore();
+  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
   const xpInfo = getXpLevel(xp);
 
@@ -1130,7 +761,7 @@ export default function DiaryScreen() {
   const [programsCardData, setProgramsCardData] = useState<ProgramsCardData>({});
 
   // Pill card state
-  const [pillMeds, setPillMeds] = useState<Array<{ id: string; name: string; color: string; times: string[] }>>([]);
+  const [pillMeds, setPillMeds] = useState<{ id: string; name: string; color: string; times: string[] }[]>([]);
   const [pillTakenToday, setPillTakenToday] = useState(false);
   const [pillStreak, setPillStreak] = useState(0);
   const pillFlashAnim = useRef(new Animated.Value(0)).current;
@@ -1316,7 +947,7 @@ export default function DiaryScreen() {
         }
         setProgramsCardData({ qsDays, qdDays, pillsCount, fastingActive, fastingElapsedHrs, fastingMode });
         if (pilRaw) {
-          const meds: Array<{ id: string; name: string; color: string; times: string[] }> = JSON.parse(pilRaw);
+          const meds: { id: string; name: string; color: string; times: string[] }[] = JSON.parse(pilRaw);
           if (Array.isArray(meds) && meds.length > 0) {
             setPillMeds(meds);
             const today = dateStr(new Date());
@@ -1823,7 +1454,6 @@ export default function DiaryScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
   const headerH = 50 + insets.top + 16;
-  const dateBarH = spacing.xl + spacing.md;
   const totalHeaderH = headerH; // Now only the top bar is fixed
 
   return (
@@ -3121,34 +2751,6 @@ const st = StyleSheet.create({
   emptyStateIcon: { fontSize: fontSize['2xl'] },
   emptyStateTxt: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   emptyStateHint: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center', lineHeight: 20 },
-});
-
-// ── Sleep modal styles ────────────────────────────────────────────────────────
-const sl = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-  backBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
-  content: { padding: spacing.md, gap: spacing.md },
-  durationDisplay: { alignItems: 'center', paddingVertical: spacing.lg },
-  durNum: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink },
-  durLbl: { fontSize: fontSize.sm, color: colors.ink3, marginTop: 4 },
-  sectionLbl: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: colors.ink3 },
-  timeRow: { flexDirection: 'row', gap: spacing.sm },
-  timeCard: { flex: 1, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
-  timeCardLbl: { fontSize: fontSize.xs, color: colors.ink3, marginBottom: spacing.sm },
-  timeVal: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink, textAlign: 'center' },
-  timeCardHint: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 4, opacity: 0.7 },
-  qualityRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  qBtn: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
-  qBtnSel: { backgroundColor: colors.purple + '33', borderWidth: 2, borderColor: colors.purple },
-  qEmoji: { fontSize: fontSize.xl - 2 },
-  insight: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, padding: spacing.md },
-  insightLbl: { fontSize: fontSize.xs, fontWeight: '700', color: colors.purple2, marginBottom: 6 },
-  insightTxt: { fontSize: fontSize.sm, color: colors.ink2, lineHeight: 20 },
-  saveBtn: { borderRadius: radius.md, overflow: 'hidden' },
-  saveGrad: { padding: spacing.md, alignItems: 'center' },
-  saveTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.base },
 });
 
 // ── Exercise modal styles ─────────────────────────────────────────────────────

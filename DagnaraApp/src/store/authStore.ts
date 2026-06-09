@@ -62,11 +62,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           { onConflict: 'email' }
         );
         if (error) {
-          // eslint-disable-next-line no-console
+           
           console.error('[authStore.setProfile] supabase upsert failed:', error.message);
         }
       } catch (e: any) {
-        // eslint-disable-next-line no-console
+         
         console.error('[authStore.setProfile] network error:', e?.message ?? e);
       }
     }
@@ -149,11 +149,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         { onConflict: 'email' }
       );
       if (upErr) {
-        // eslint-disable-next-line no-console
+         
         console.error('[authStore.register] profile upsert failed:', upErr.message);
       }
     } catch (e: any) {
-      // eslint-disable-next-line no-console
+       
       console.error('[authStore.register] profile upsert network error:', e?.message ?? e);
     }
     await cacheProfile(email, profile);

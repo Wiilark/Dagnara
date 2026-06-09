@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, Dimensions, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,13 +9,11 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../src/store/authStore';
 import { useAppStore, calcTDEE, macrosFor } from '../src/store/appStore';
-import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput, type UnitSystem } from '../src/lib/units';
+import { weightUnit, heightUnit, weightPlaceholder, heightPlaceholder, parseWeight, parseHeight, formatWeight, formatHeight, kgToInput, cmToInput } from '../src/lib/units';
 import { scheduleMealReminders, scheduleStreakReminder, scheduleWaterReminder, scheduleDailySummaryReminder } from '../src/lib/notifications';
 import { COUNTRIES, getCountry } from '../src/lib/currency';
 import { fmt } from '../src/lib/format';
 import { colors, spacing, fontSize, radius } from '../src/theme';
-
-const { width } = Dimensions.get('window');
 
 const STEPS = 8;
 

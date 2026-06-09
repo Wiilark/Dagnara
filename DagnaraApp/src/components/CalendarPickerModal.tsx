@@ -98,7 +98,7 @@ export function CalendarPickerModal({
   const cells = useMemo(() => {
     const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
     const daysInMonth     = new Date(viewYear, viewMonth + 1, 0).getDate();
-    const out: Array<{ key: string; day: number; inMonth: boolean; disabled: boolean }> = [];
+    const out: { key: string; day: number; inMonth: boolean; disabled: boolean }[] = [];
 
     // Previous month's trailing days (fillers)
     const prevDaysInMonth = new Date(viewYear, viewMonth, 0).getDate();

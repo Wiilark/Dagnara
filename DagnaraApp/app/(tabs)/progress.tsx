@@ -14,7 +14,6 @@ import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../src/lib/units';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
-import { BackChevron } from '../../src/components/BackChevron';
 import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { fmt } from '../../src/lib/format';
 import { usePremium, PremiumBadge } from '../../src/components/Premium';
@@ -911,7 +910,7 @@ interface ProgressPhoto { uri: string; date: string; }
 
 export default function ProgressScreen() {
   const { entries, selectedDate } = useDiaryStore();
-  const { lifeScore: rawLifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, setMessagesOpen, calorieGoal, weightGoal, hasUnread, addXp, unitSystem, macroPcts } = useAppStore();
+  const { lifeScore: rawLifeScore, lifeScoreDate, streak, weightHistory, addWeightEntry, setLifeScore, calorieGoal, weightGoal, hasUnread, addXp, unitSystem, macroPcts } = useAppStore();
   const { email, profile } = useAuthStore();
   // Life Score resets every Sunday 22:00 — once expired it reads as "not taken"
   // so the card prompts a fresh weekly check-in. The stored number is untouched.
