@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const helmet = require('helmet');
-const { rateLimit } = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 const app = express();
 
@@ -142,7 +142,7 @@ const analyzeLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  keyGenerator: (req) => (req.body?.email ?? ipKeyGenerator(req.ip)),
   message: { error: { message: 'Too many requests — please wait before analysing another photo.' } }
 });
 
@@ -153,7 +153,7 @@ const estimateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  keyGenerator: (req) => (req.body?.email ?? ipKeyGenerator(req.ip)),
   message: { error: { message: 'Too many AI requests — please wait a moment.' } }
 });
 
@@ -397,7 +397,7 @@ const recipeLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  keyGenerator: (req) => (req.body?.email ?? ipKeyGenerator(req.ip)),
   message: { error: { message: 'Too many recipe imports — please wait a moment.' } }
 });
 
@@ -571,7 +571,7 @@ const coachLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? req.ip),
+  keyGenerator: (req) => (req.body?.email ?? ipKeyGenerator(req.ip)),
   message: { error: { message: 'Too many messages — please wait a moment.' } }
 });
 
