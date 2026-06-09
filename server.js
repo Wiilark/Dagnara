@@ -582,6 +582,10 @@ const publicDir = path.join(__dirname, 'public');
 app.get('/premium-success', (req, res) => res.sendFile(path.join(publicDir, 'premium-success.html')));
 app.get('/premium-cancel',  (req, res) => res.sendFile(path.join(publicDir, 'premium-cancel.html')));
 
+// ── Legal pages (required for App Store / Play Store listings) ────────────────
+app.get('/privacy', (req, res) => res.sendFile(path.join(publicDir, 'privacy.html')));
+app.get('/terms',   (req, res) => res.sendFile(path.join(publicDir, 'terms.html')));
+
 // ── Landing page ──────────────────────────────────────────────────────────────
 // Registered AFTER all /api routes so the wildcard does not intercept them.
 const landingIndex = path.join(__dirname, 'index.html');

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, TextInput, Modal, Switch, Image, Platform, Keyboard,
-  Animated,
+  Animated, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -601,8 +601,8 @@ export default function ProfileScreen() {
           {[
             { icon: 'fitness-outline', label: healthPlatformName(), color: colors.green, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('health'); } },
             { icon: 'notifications-outline', label: 'Notification Settings', color: colors.purple, value: '', onPress: () => { setSettingsModal(true); setSettingsPage('notifications'); } },
-            { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Alert.alert('Terms & Conditions', 'Coming soon.') },
-            { icon: 'shield-checkmark-outline', label: 'Data Consents', color: colors.teal, value: '', onPress: () => Alert.alert('Data Consents', 'Coming soon.') },
+            { icon: 'document-text-outline', label: 'Terms & Conditions', color: colors.ink2, value: '', onPress: () => Linking.openURL('https://www.dagnara.com/terms') },
+            { icon: 'shield-checkmark-outline', label: 'Privacy Policy', color: colors.teal, value: '', onPress: () => Linking.openURL('https://www.dagnara.com/privacy') },
           ].map(({ icon, label, color, value, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
               <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
