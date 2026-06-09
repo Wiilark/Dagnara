@@ -10,3 +10,7 @@ node_modules/
 # Local scratch / screenshots — never commit
 Screenshots/
 test_off.json
+
+# Transient session handoff — regenerated each compact, never commit
+HANDOFF.md
+odysseus/
