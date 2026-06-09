@@ -18,6 +18,7 @@ npm start          # Start Expo dev server (port 8081)
 npm run android    # Run on Android
 npm run ios        # Run on iOS
 npm run web        # Run as web
+npm run lint       # ESLint (flat config, eslint-config-expo) — quality gate
 eas build --profile development   # Dev build (points to localhost:3001)
 eas build --profile preview       # Preview APK (points to Railway)
 eas build --profile production    # Production AAB (points to Railway)
@@ -30,7 +31,7 @@ npm run build      # Build web app with Vite
 npm start          # Start Express server (production, port 3000)
 ```
 
-No test suite is configured.
+No test suite is configured. `npm run lint` (ESLint flat config) is the static-analysis gate — an `eslint_check.py` PostToolUse hook lints each edited file automatically and reports errors. Run the full `npm run lint` to see warnings (dead code, exhaustive-deps).
 
 ## Architecture
 
@@ -171,9 +172,9 @@ Any code written by Gemini, Copilot, or another external AI **must be audited be
 | Any bug or unexpected behavior | `/systematic-debugging` |
 | Security change (auth, API keys, RLS) | `/security-review` |
 | AI output feels over-engineered | `/karpathy-guidelines` then re-prompt |
-| Test UI in a real browser | `playwright` MCP |
+| Test UI in a real browser | `playwright` MCP *(disabled — re-enable in settings before use)* |
 | Query/inspect Supabase DB | `Supabase` MCP |
-| Create PRs, read CI | `github` MCP |
+| Create PRs, read CI | `gh` CLI via Bash *(github MCP disabled to save tokens)* |
 | Research competitors / nutrition APIs | `/dagnara-kit:search-first` (exa MCP disabled to save tokens) |
 | Session about to compact | `/dx:handoff` for richer recovery context |
 | Stale rules in CLAUDE.md | `/dx:review-claudemd` |
