@@ -196,31 +196,30 @@ function isPrivateUrl(urlString) {
 // ── Allowed image MIME types ───────────────────────────────────────────────────
 const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
-// ── OpenRouter call helper — enforces a 20s timeout on every API call ─────────
-// Accepts an Anthropic-shaped body ({ model, system, messages, max_tokens,
-// temperature }) and translates it to OpenRouter's OpenAI-compatible chat
-// format. Returns an object with a .json() method that yields an Anthropic-
-// shaped response ({ content: [{ text }] } or { error: { message } }) so call
-// sites and parsing stay unchanged.
+// ── Multi-provider AI helper — Gemini → Groq → OpenRouter, all free tiers ─────
+// Every AI route builds one Anthropic-shaped body ({ model, system, messages,
+// max_tokens, temperature, wantsJson }). callAI() tries each free provider in
+// order until one returns usable text, then hands back an Anthropic-shaped
+// response ({ content:[{text}] } | { error:{message} }) so the routes and
+// parseItems() never change.
 //
-// Anthropic message content is either a string or an array of blocks
-// ({ type:'text'|'image', ... }); OpenAI wants content as a string or an array
-// of { type:'text', text } / { type:'image_url', image_url:{ url } } (base64
-// images are passed as a data: URL). The Anthropic system prompt (string or
-// array of text blocks) becomes a leading { role:'system' } message.
-// Free vision models tried in order. The free tier rate-limits individual
-// models often, so when one returns 429/5xx we fall through to the next. All
-// are vision-capable, so the food-photo path works on any of them.
+// Why three providers: each free tier is small and flaky. Gemini gives the most
+// headroom (~1,500/day) but some accounts are flagged (AQ. keys, 0 quota), so we
+// fall back to Groq (~1,000/day, not tied to Google) and finally OpenRouter
+// (~50/day). Whichever has a working key + remaining quota answers.
+
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// OpenRouter free vision models, tried in order if the first is rate-limited.
 const OPENROUTER_FALLBACKS = [
   'nvidia/nemotron-nano-12b-v2-vl:free',
   'google/gemma-4-26b-a4b-it:free',
   'google/gemma-4-31b-it:free',
 ];
 
-async function callOpenRouter(body) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  // Flatten Anthropic system (string | [{type:'text',text}]) into one string.
+// Flatten an Anthropic-shaped body into the pieces every provider needs:
+// a system string and an OpenAI-style messages array (text + data-URL images).
+function extractParts(body) {
   let systemText = '';
   if (typeof body.system === 'string') {
     systemText = body.system;
@@ -228,90 +227,152 @@ async function callOpenRouter(body) {
     systemText = body.system.map((b) => b?.text ?? '').join('\n');
   }
 
-  // Map Anthropic messages → OpenAI chat messages.
-  const messages = (body.messages ?? []).map((msg) => {
+  const oaMessages = (body.messages ?? []).map((msg) => {
     let content;
     if (typeof msg.content === 'string') {
-      content = msg.content;
+      content = [{ type: 'text', text: msg.content }];
     } else if (Array.isArray(msg.content)) {
       content = msg.content.map((block) => {
         if (block.type === 'image') {
           const { media_type, data } = block.source;
-          return { type: 'image_url', image_url: { url: `data:${media_type};base64,${data}` } };
+          return { type: 'image_url', image_url: { url: `data:${media_type};base64,${data}` }, _media: media_type, _data: data };
         }
         return { type: 'text', text: block.text ?? '' };
       });
     } else {
-      content = '';
+      content = [];
     }
     return { role: msg.role === 'assistant' ? 'assistant' : 'user', content };
   });
-  if (systemText) {
-    messages.unshift({ role: 'system', content: systemText });
-  }
 
-  const basePayload = {
+  return { systemText, oaMessages };
+}
+
+// Shared fetch wrapper with a 20s abort timeout. Returns { text } on success or
+// { retryable, message } so callAI() can decide whether to try the next model.
+async function aiFetch(url, headers, payload, extractText) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const raw = await res.json().catch(() => ({}));
+    if (raw.error || !res.ok) {
+      const code = raw?.error?.code ?? res.status;
+      const retryable = code === 429 || code >= 500;
+      return { retryable, message: raw?.error?.message ?? `HTTP ${res.status}` };
+    }
+    const text = (extractText(raw) ?? '').trim();
+    // Some free models return a 200 with empty content when overloaded — treat
+    // that as retryable so the next provider/model gets a shot.
+    if (!text) return { retryable: true, message: 'empty response' };
+    return { text };
+  } catch (e) {
+    return { retryable: true, message: e?.name === 'AbortError' ? 'timeout' : 'network error' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Provider: Google Gemini (generativelanguage API) ──────────────────────────
+async function callGemini(body) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { retryable: true, message: 'no gemini key' };
+  const { systemText, oaMessages } = extractParts(body);
+
+  // Gemini wants contents:[{role,parts:[{text}|{inline_data}]}], roles user/model.
+  const contents = oaMessages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: m.content.map((b) =>
+      b.type === 'image_url'
+        ? { inline_data: { mime_type: b._media, data: b._data } }
+        : { text: b.text }),
+  }));
+
+  const payload = {
+    contents,
+    generationConfig: {
+      temperature: body.temperature ?? 0,
+      maxOutputTokens: body.max_tokens ?? 600,
+      ...(body.wantsJson === false ? {} : { responseMimeType: 'application/json' }),
+    },
+    ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  return aiFetch(url, {}, payload,
+    (raw) => raw?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join(''));
+}
+
+// ── Provider: Groq (OpenAI-compatible) ────────────────────────────────────────
+async function callGroq(body) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return { retryable: true, message: 'no groq key' };
+  const { systemText, oaMessages } = extractParts(body);
+
+  // Strip the helper fields; Groq uses standard OpenAI image_url blocks.
+  const messages = oaMessages.map((m) => ({
+    role: m.role,
+    content: m.content.map(({ _media, _data, ...keep }) => keep),
+  }));
+  if (systemText) messages.unshift({ role: 'system', content: systemText });
+
+  const payload = {
+    model: GROQ_MODEL,
     messages,
     temperature: body.temperature ?? 0,
     max_tokens: body.max_tokens ?? 600,
-    // Force clean JSON for the structured endpoints (analyze/import/estimate).
-    // The coach endpoint passes wantsJson:false to get plain prose.
     ...(body.wantsJson === false ? {} : { response_format: { type: 'json_object' } }),
   };
+  return aiFetch('https://api.groq.com/openai/v1/chat/completions',
+    { Authorization: `Bearer ${apiKey}` }, payload,
+    (raw) => raw?.choices?.[0]?.message?.content);
+}
 
-  // One HTTP attempt against a single model. Returns { text } on success, or
-  // { retryable, message } so the caller can decide whether to try the next.
-  async function attempt(model) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20_000);
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          // Optional attribution headers recommended by OpenRouter.
-          'HTTP-Referer': 'https://www.dagnara.com',
-          'X-Title': 'Dagnara',
-        },
-        body: JSON.stringify({ model, ...basePayload }),
-        signal: controller.signal,
-      });
-      const raw = await res.json().catch(() => ({}));
-      if (raw.error || !res.ok) {
-        const code = raw?.error?.code ?? res.status;
-        // 429 (rate-limited) and 5xx (provider down) are worth retrying on the
-        // next model; anything else (bad request, etc.) is not.
-        const retryable = code === 429 || code >= 500;
-        return { retryable, message: raw?.error?.message ?? 'OpenRouter API error' };
-      }
-      const text = raw?.choices?.[0]?.message?.content ?? '';
-      // Free models sometimes return a 200 with empty content when overloaded.
-      // Treat that like a 429 so we fall through to the next model.
-      if (!text.trim()) {
-        return { retryable: true, message: 'empty response' };
-      }
-      return { text };
-    } catch (e) {
-      // Network/timeout — try the next model.
-      return { retryable: true, message: e?.name === 'AbortError' ? 'timeout' : 'network error' };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
+// ── Provider: OpenRouter (OpenAI-compatible, multi-model fallback) ─────────────
+async function callOpenRouterModel(model, body) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return { retryable: false, message: 'no openrouter key' };
+  const { systemText, oaMessages } = extractParts(body);
 
-  // Try the requested model first, then the remaining fallbacks (deduped).
-  const order = [body.model, ...OPENROUTER_FALLBACKS].filter(
-    (m, i, arr) => m && arr.indexOf(m) === i,
-  );
-  let lastMessage = 'OpenRouter API error';
-  for (const model of order) {
-    const r = await attempt(model);
+  const messages = oaMessages.map((m) => ({
+    role: m.role,
+    content: m.content.map(({ _media, _data, ...keep }) => keep),
+  }));
+  if (systemText) messages.unshift({ role: 'system', content: systemText });
+
+  const payload = {
+    model,
+    messages,
+    temperature: body.temperature ?? 0,
+    max_tokens: body.max_tokens ?? 600,
+    ...(body.wantsJson === false ? {} : { response_format: { type: 'json_object' } }),
+  };
+  return aiFetch('https://openrouter.ai/api/v1/chat/completions',
+    { Authorization: `Bearer ${apiKey}`, 'HTTP-Referer': 'https://www.dagnara.com', 'X-Title': 'Dagnara' },
+    payload, (raw) => raw?.choices?.[0]?.message?.content);
+}
+
+// ── Orchestrator: try each free provider until one answers ────────────────────
+async function callAI(body) {
+  const attempts = [
+    () => callGemini(body),
+    () => callGroq(body),
+    ...OPENROUTER_FALLBACKS.map((m) => () => callOpenRouterModel(m, body)),
+  ];
+  let lastMessage = 'AI service error';
+  for (const run of attempts) {
+    const r = await run();
     if ('text' in r) {
       return { json: async () => ({ content: [{ text: r.text }] }) };
     }
     lastMessage = r.message;
-    if (!r.retryable) break;
+    // Non-retryable (e.g. bad request) only stops THIS provider; we still try
+    // the next one, since a different provider may accept the same request.
   }
   return { json: async () => ({ error: { message: lastMessage } }) };
 }
@@ -361,7 +422,7 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
   }
 
   try {
-    const response = await callOpenRouter({
+    const response = await callAI({
       model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 500,
       temperature: 0,
@@ -452,7 +513,7 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
         .slice(0, 3000);
     }
 
-    const response = await callOpenRouter({
+    const response = await callAI({
       model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 600,
       temperature: 0,
@@ -542,7 +603,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
   }
 
   try {
-    const response = await callOpenRouter({
+    const response = await callAI({
       model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 400,
       temperature: 0,
@@ -601,7 +662,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   ].filter(Boolean).join('\n');
 
   try {
-    const response = await callOpenRouter({
+    const response = await callAI({
       model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 600,
       wantsJson: false,
