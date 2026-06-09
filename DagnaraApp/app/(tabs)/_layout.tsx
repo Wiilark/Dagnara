@@ -201,19 +201,17 @@ const MOOD_LABELS = ['Awful', 'Bad', 'Okay', 'Good', 'Amazing'];
 
 function MoodLogger({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [selected, setSelected] = useState(2);
-  const [notes, setNotes] = useState('');
   const { addXp } = useAppStore();
   const { logMood } = useDiaryStore();
 
   useEffect(() => {
-    if (!visible) { setNotes(''); setSelected(2); }
+    if (!visible) { setSelected(2); }
   }, [visible]);
 
   async function handleLog() {
     await logMood(TODAY(), selected);
     addXp(10);
     Alert.alert('Mood logged!', `${MOODS[selected]} Feeling ${MOOD_LABELS[selected]} saved. +10 XP`);
-    setNotes('');
     setSelected(2);
     onClose();
   }
@@ -233,15 +231,6 @@ function MoodLogger({ visible, onClose }: { visible: boolean; onClose: () => voi
               </TouchableOpacity>
             ))}
           </View>
-          <TextInput
-            style={ml.notes}
-            placeholder="Add a note... (optional)"
-            placeholderTextColor={colors.ink3}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
           <TouchableOpacity style={ml.logBtn} onPress={handleLog} activeOpacity={0.85}>
             <LinearGradient colors={[colors.purple, colors.purpleGlow]} style={ml.logBtnGrad}>
               <Text style={ml.logBtnTxt}>LOG MOOD +10 XP</Text>
@@ -260,11 +249,10 @@ function SleepLogger({ visible, onClose }: { visible: boolean; onClose: () => vo
   const [bedtime, setBedtime] = useState('22:30');
   const [waketime, setWaketime] = useState('06:00');
   const [quality, setQuality] = useState(2);
-  const [notes, setNotes] = useState('');
   const QUALITIES = ['😫', '😕', '😐', '😊', '🌟'];
 
   useEffect(() => {
-    if (!visible) { setBedtime('22:30'); setWaketime('06:00'); setQuality(2); setNotes(''); }
+    if (!visible) { setBedtime('22:30'); setWaketime('06:00'); setQuality(2); }
   }, [visible]);
 
   function getDuration() {
@@ -280,7 +268,6 @@ function SleepLogger({ visible, onClose }: { visible: boolean; onClose: () => vo
     await logSleep(TODAY(), { bedtime, waketime, quality, duration });
     await addXp(20);
     Alert.alert('Sleep logged!', `${duration} sleep saved. +20 XP`);
-    setNotes('');
     onClose();
   }
 
@@ -325,10 +312,6 @@ function SleepLogger({ visible, onClose }: { visible: boolean; onClose: () => vo
               </TouchableOpacity>
             ))}
           </View>
-          {/* Notes */}
-          <TextInput style={sl.notes} placeholder="How was your sleep? Any dreams?"
-            placeholderTextColor={colors.ink3} value={notes} onChangeText={setNotes}
-            multiline numberOfLines={3} />
           <TouchableOpacity style={sl.saveBtn} onPress={handleSave} activeOpacity={0.85}>
             <LinearGradient colors={[colors.purpleGlow, colors.purple]} style={sl.saveGrad}>
               <Text style={sl.saveTxt}>SAVE SLEEP LOG +20 XP</Text>
@@ -867,17 +850,6 @@ const ml = StyleSheet.create({
   emoji: { fontSize: fontSize.lg + 6 },
   emojiLbl: { fontSize: fontSize.xs - 2, color: colors.ink3, fontWeight: '600' },
   emojiLblActive: { color: colors.lavender },
-  notes: {
-    backgroundColor: colors.layer2,
-    borderWidth: 1,
-    borderColor: colors.line2,
-    borderRadius: radius.md - 2,
-    padding: spacing.sm + 4,
-    color: colors.ink,
-    fontSize: fontSize.sm + 1,
-    minHeight: spacing.xl * 2 + spacing.xs + 2,
-    textAlignVertical: 'top',
-  },
   logBtn: {
     borderRadius: radius.md - 2,
     overflow: 'hidden',
@@ -1094,7 +1066,6 @@ const sl = StyleSheet.create({
   qualityBtn: { width: 52, height: 52, borderRadius: radius.md - 2, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   qualityBtnSel: { borderColor: colors.purple, backgroundColor: colors.purple + '22' },
   qualityEmoji: { fontSize: fontSize.xl - 2 },
-  notes: { marginHorizontal: spacing.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md - 2, padding: spacing.sm + 2, color: colors.ink, fontSize: fontSize.sm + 1, minHeight: spacing.xl * 2 - 2, marginBottom: spacing.sm + 4, textAlignVertical: 'top' },
   saveBtn: { marginHorizontal: spacing.md, borderRadius: radius.md - 2, overflow: 'hidden' },
   saveGrad: { paddingVertical: spacing.md, alignItems: 'center' },
   saveTxt: { fontSize: fontSize.sm + 1, fontWeight: '700', color: colors.ink, letterSpacing: 0.6 },
