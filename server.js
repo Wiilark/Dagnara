@@ -208,6 +208,15 @@ const VALID_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'imag
 // of { type:'text', text } / { type:'image_url', image_url:{ url } } (base64
 // images are passed as a data: URL). The Anthropic system prompt (string or
 // array of text blocks) becomes a leading { role:'system' } message.
+// Free vision models tried in order. The free tier rate-limits individual
+// models often, so when one returns 429/5xx we fall through to the next. All
+// are vision-capable, so the food-photo path works on any of them.
+const OPENROUTER_FALLBACKS = [
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'google/gemma-4-31b-it:free',
+];
+
 async function callOpenRouter(body) {
   const apiKey = process.env.OPENROUTER_API_KEY;
 
@@ -241,8 +250,7 @@ async function callOpenRouter(body) {
     messages.unshift({ role: 'system', content: systemText });
   }
 
-  const payload = {
-    model: body.model,
+  const basePayload = {
     messages,
     temperature: body.temperature ?? 0,
     max_tokens: body.max_tokens ?? 600,
@@ -251,33 +259,73 @@ async function callOpenRouter(body) {
     ...(body.wantsJson === false ? {} : { response_format: { type: 'json_object' } }),
   };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        // Optional attribution headers recommended by OpenRouter.
-        'HTTP-Referer': 'https://www.dagnara.com',
-        'X-Title': 'Dagnara',
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    const raw = await res.json();
-    // Normalize to Anthropic shape so call sites read data.content[0].text.
-    return {
-      json: async () => {
-        if (raw.error) return { error: { message: raw.error.message ?? 'OpenRouter API error' } };
-        const text = raw?.choices?.[0]?.message?.content ?? '';
-        return { content: [{ text }] };
-      },
-    };
-  } finally {
-    clearTimeout(timer);
+  // One HTTP attempt against a single model. Returns { text } on success, or
+  // { retryable, message } so the caller can decide whether to try the next.
+  async function attempt(model) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          // Optional attribution headers recommended by OpenRouter.
+          'HTTP-Referer': 'https://www.dagnara.com',
+          'X-Title': 'Dagnara',
+        },
+        body: JSON.stringify({ model, ...basePayload }),
+        signal: controller.signal,
+      });
+      const raw = await res.json().catch(() => ({}));
+      if (raw.error || !res.ok) {
+        const code = raw?.error?.code ?? res.status;
+        // 429 (rate-limited) and 5xx (provider down) are worth retrying on the
+        // next model; anything else (bad request, etc.) is not.
+        const retryable = code === 429 || code >= 500;
+        return { retryable, message: raw?.error?.message ?? 'OpenRouter API error' };
+      }
+      const text = raw?.choices?.[0]?.message?.content ?? '';
+      // Free models sometimes return a 200 with empty content when overloaded.
+      // Treat that like a 429 so we fall through to the next model.
+      if (!text.trim()) {
+        return { retryable: true, message: 'empty response' };
+      }
+      return { text };
+    } catch (e) {
+      // Network/timeout — try the next model.
+      return { retryable: true, message: e?.name === 'AbortError' ? 'timeout' : 'network error' };
+    } finally {
+      clearTimeout(timer);
+    }
   }
+
+  // Try the requested model first, then the remaining fallbacks (deduped).
+  const order = [body.model, ...OPENROUTER_FALLBACKS].filter(
+    (m, i, arr) => m && arr.indexOf(m) === i,
+  );
+  let lastMessage = 'OpenRouter API error';
+  for (const model of order) {
+    const r = await attempt(model);
+    if ('text' in r) {
+      return { json: async () => ({ content: [{ text: r.text }] }) };
+    }
+    lastMessage = r.message;
+    if (!r.retryable) break;
+  }
+  return { json: async () => ({ error: { message: lastMessage } }) };
+}
+
+// Tolerant parse for the structured food routes. OpenAI json_object mode forces
+// a top-level object, so models return {"items":[...]}, but some still emit a
+// bare [...] array. Accept either and always return an array.
+function parseItems(text) {
+  try {
+    const p = JSON.parse(text);
+    if (Array.isArray(p)) return p;
+    if (p && Array.isArray(p.items)) return p.items;
+  } catch { /* not JSON */ }
+  return [];
 }
 
 // ── Config endpoint ───────────────────────────────────────────────────────────
@@ -314,12 +362,12 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
 
   try {
     const response = await callOpenRouter({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 500,
       temperature: 0,
       system: [{
         type: 'text',
-        text: 'You are a precise nutrition analysis assistant. Return ONLY valid JSON arrays — no prose, no markdown. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]\nRules: (1) Estimate the ACTUAL visible portion weight carefully — a large plate of pasta is ~400g, a burger is ~250g, a salad is ~300g. (2) Use standard USDA/nutritionist values for per100 macros. (3) kcal must equal (carbs*4 + protein*4 + fat*9) * weight_g/100 — verify this before responding. (4) List each distinct food item separately. (5) Return [] if no food is visible.',
+        text: 'You are a precise nutrition analysis assistant. Return ONLY a valid JSON object — no prose, no markdown. Format:\n{"items":[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description","weight_g":estimated_grams_number,"per100":{"kcal":number,"carbs":number,"protein":number,"fat":number}}]}\nRules: (1) Estimate the ACTUAL visible portion weight carefully — a large plate of pasta is ~400g, a burger is ~250g, a salad is ~300g. (2) Use standard USDA/nutritionist values for per100 macros. (3) kcal must equal (carbs*4 + protein*4 + fat*9) * weight_g/100 — verify this before responding. (4) Add one entry to "items" for EACH distinct food item you see — never merge them. (5) Return {"items":[]} if no food is visible.',
       }],
       messages: [{
         role: 'user',
@@ -333,8 +381,7 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
     const data = await response.json();
     if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
     const text = data?.content?.[0]?.text ?? '';
-    let items = [];
-    try { const p = JSON.parse(text); items = Array.isArray(p) ? p : []; } catch { items = []; }
+    const items = parseItems(text);
     res.json({ items });
   } catch (err) {
     console.error('[analyze-food]', err.message);
@@ -406,7 +453,7 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
     }
 
     const response = await callOpenRouter({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 600,
       temperature: 0,
       system: [{
@@ -496,12 +543,12 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
 
   try {
     const response = await callOpenRouter({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 400,
       temperature: 0,
       system: [{
         type: 'text',
-        text: 'You are a nutrition estimation assistant. Return ONLY valid JSON arrays — no prose, no markdown. Given a food description in natural language, return estimated nutrition. Format:\n[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]\nReturn [] if you cannot estimate. Never explain, just return JSON.',
+        text: 'You are a nutrition estimation assistant. Return ONLY a valid JSON object — no prose, no markdown. Given a food description in natural language, return estimated nutrition. Format:\n{"items":[{"icon":"emoji","name":"food name","kcal":number,"carbs":number,"protein":number,"fat":number,"unit":"serving description"}]}\nAdd one entry to "items" for EACH distinct food mentioned — never merge them. Return {"items":[]} if you cannot estimate. Never explain, just return JSON.',
       }],
       messages: [{ role: 'user', content: `Estimate nutrition for: ${description.trim().slice(0, 500)}` }]
     });
@@ -509,8 +556,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
     const data = await response.json();
     if (data.error) return res.status(502).json({ error: { message: data.error.message ?? 'AI service error' } });
     const text = data?.content?.[0]?.text ?? '';
-    let items = [];
-    try { const p = JSON.parse(text); items = Array.isArray(p) ? p : []; } catch { items = []; }
+    const items = parseItems(text);
     res.json({ items });
   } catch (err) {
     console.error('[estimate-nutrition]', err.message);
@@ -556,7 +602,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
 
   try {
     const response = await callOpenRouter({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: 'nvidia/nemotron-nano-12b-v2-vl:free',
       max_tokens: 600,
       wantsJson: false,
       system: [{ type: 'text', text: systemPrompt }],
