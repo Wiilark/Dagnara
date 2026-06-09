@@ -40,12 +40,6 @@ export function formatHeight(cm: number, sys: UnitSystem): string {
   return `${ft}'${inch}"`;
 }
 
-export function formatLength(cm: number, sys: UnitSystem): string {
-  if (!cm || isNaN(cm)) return '—';
-  if (sys === 'Metric') return `${Math.round(cm)} cm`;
-  return `${Math.round(cm / 2.54 * 10) / 10} in`;
-}
-
 // ── Input population (metric → editable string for TextInput) ─────────────────
 
 export function kgToInput(kg: number, sys: UnitSystem): string {
