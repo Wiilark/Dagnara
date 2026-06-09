@@ -70,8 +70,13 @@ ALWAYS_DENY = [
     (r"\brm\s+-[a-z]*rf?\s+\.\.", "rm -rf on parent directory paths is blocked."),
     (r"DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE\s+TABLE", "Destructive SQL blocked. Run manually if intentional."),
     (r"git\s+rebase\s+-i", "Interactive rebase requires user input — run this manually in your terminal."),
+    (r"git\s+checkout\s+--\s+\S+", "git checkout -- discards uncommitted file changes. Confirm with the user first."),
+    (r"git\s+restore\s+(?!--staged)", "git restore overwrites working-tree changes. Confirm with the user first."),
+    (r"git\s+push\s+.*-f\b", "Force push (-f) is blocked. Push normally or ask the user to force push manually."),
     (r"npx\s+.*--dangerously", "Dangerous npx flags blocked."),
+    (r"npm\s+publish", "npm publish ships to the registry. Never auto-run — the user must publish manually."),
     (r"chmod\s+777", "chmod 777 is a security risk. Use more restrictive permissions."),
+    (r"\b(taskkill|kill)\s+.*\b(node|expo|metro)\b", "Killing all node/expo/metro processes would stop the live dev server. Confirm first."),
 ]
 
 
