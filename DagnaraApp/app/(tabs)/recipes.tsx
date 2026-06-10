@@ -33,10 +33,10 @@ const MODAL_PHOTO_HEIGHT = Math.round(MODAL_PHOTO_WIDTH * 0.6);
 const DIET_FILTERS = ['All', 'For your goal', 'Quick', 'Breakfast', 'Lunch', 'Dinner', 'Snack', 'High Protein', 'Low Carb', 'Vegan', 'Keto', 'Vegetarian', 'Mediterranean'];
 
 const MEAL_PICK = [
-  { key: 'breakfast' as const, icon: '🍳', label: 'Breakfast', color: colors.honey },
-  { key: 'lunch'     as const, icon: '🥗', label: 'Lunch',     color: colors.violet },
-  { key: 'dinner'    as const, icon: '🍝', label: 'Dinner',    color: colors.sky },
-  { key: 'snack'     as const, icon: '🍌', label: 'Snack',     color: colors.rose },
+  { key: 'breakfast' as const, icon: '🍳', label: 'Breakfast', color: colors.mealBreakfast },
+  { key: 'lunch'     as const, icon: '🥗', label: 'Lunch',     color: colors.mealLunch },
+  { key: 'dinner'    as const, icon: '🍝', label: 'Dinner',    color: colors.mealDinner },
+  { key: 'snack'     as const, icon: '🍌', label: 'Snack',     color: colors.mealSnack },
 ];
 
 const RECIPES = [
