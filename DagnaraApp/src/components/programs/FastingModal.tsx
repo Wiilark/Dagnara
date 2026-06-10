@@ -4,7 +4,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -229,12 +228,17 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
                   />
                 )}
               </Svg>
-              <View style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: RING_R * 2 - RING_STROKE * 2,
-                height: RING_R * 2 - RING_STROKE * 2,
-              }}>
+              <TouchableOpacity
+                onPress={toggleFast}
+                activeOpacity={0.7}
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: RING_R * 2 - RING_STROKE * 2,
+                  height: RING_R * 2 - RING_STROKE * 2,
+                  borderRadius: RING_R,
+                }}
+              >
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -269,7 +273,19 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
                     {progressPct}% · {inEatingWindow ? `${fmtHM(elapsedHrs - modeInfo.fasting)} eaten` : `${fmtHM(elapsedHrs)} fasted`}
                   </Text>
                 )}
-              </View>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: fontSize.xs,
+                    fontWeight: '700',
+                    color: state.active ? colors.rose : colors.purple,
+                    letterSpacing: 1.1,
+                    marginTop: spacing.sm,
+                  }}
+                >
+                  {state.active ? 'TAP TO END' : 'TAP TO START'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Time stats row */}
@@ -314,19 +330,6 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
               </View>
             )}
           </View>
-
-          {/* Start / Stop button */}
-          <TouchableOpacity onPress={toggleFast} activeOpacity={0.8} style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-            {state.active ? (
-              <View style={{ backgroundColor: colors.rose + '18', borderRadius: radius.md, borderWidth: 1, borderColor: colors.rose + '44', paddingVertical: spacing.md, alignItems: 'center' }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.rose }}>End Fast</Text>
-              </View>
-            ) : (
-              <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.white }}>Start Fast</Text>
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
 
           {/* Weekly stats */}
           {state.history.length > 0 && (
