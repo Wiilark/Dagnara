@@ -1289,11 +1289,19 @@ export default function DiaryScreen() {
     }
   }
 
-  async function processBase64Image(base64: string) {
+  // The server only accepts jpeg/png/gif/webp. ImagePicker may report HEIC/HEIF
+  // (iOS) or omit the type — coerce anything unsupported to jpeg, which the
+  // picker re-encodes to anyway when base64 is requested at quality < 1.
+  function pickerMediaType(mime?: string): string {
+    const supported = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    return mime && supported.includes(mime) ? mime : 'image/jpeg';
+  }
+
+  async function processBase64Image(base64: string, mediaType: string = 'image/jpeg') {
     setSearchVisible(false);
     setAnalyzing(true);
     try {
-      const data = await analyzeFood(base64, 'image/jpeg');
+      const data = await analyzeFood(base64, mediaType);
       const raw: any[] = Array.isArray(data?.items) ? data.items : [];
       if (raw.length === 0) { Alert.alert('No food detected', 'Try a clearer photo.'); return; }
       const meal: Meal = searchMeal;
@@ -1363,7 +1371,7 @@ export default function DiaryScreen() {
     if (result.canceled || !result.assets[0].base64) return;
     const b64 = result.assets[0].base64;
     if (b64.length > 10_000_000) { Alert.alert('Photo too large', 'Please use a lower-resolution photo.'); return; }
-    await processBase64Image(b64);
+    await processBase64Image(b64, pickerMediaType(result.assets[0].mimeType));
   }
 
   async function handleGallery() {
@@ -1376,7 +1384,7 @@ export default function DiaryScreen() {
     if (result.canceled || !result.assets[0].base64) return;
     const b64 = result.assets[0].base64;
     if (b64.length > 10_000_000) { Alert.alert('Photo too large', 'Please use a lower-resolution photo.'); return; }
-    await processBase64Image(b64);
+    await processBase64Image(b64, pickerMediaType(result.assets[0].mimeType));
   }
 
   async function handleGlassTap(i: number) {

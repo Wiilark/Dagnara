@@ -377,16 +377,54 @@ async function callAI(body) {
   return { json: async () => ({ error: { message: lastMessage } }) };
 }
 
+// True if at least one AI provider key is configured. Routes gate on this so the
+// feature works whenever ANY provider is available — not just OpenRouter, which
+// is now only the last-resort fallback behind Gemini and Groq.
+function hasAnyAIKey() {
+  return Boolean(
+    process.env.GEMINI_API_KEY ||
+    process.env.GROQ_API_KEY ||
+    process.env.OPENROUTER_API_KEY
+  );
+}
+
+// Normalize one food item to the app's schema. Free models often ignore the
+// requested field names and emit "calories"/"carbohydrates"/"fats" instead of
+// "kcal"/"carbs"/"fat", which would map to undefined in the app. Coerce known
+// aliases and force numbers so every item the app receives is usable.
+function normalizeItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const num = (...vals) => {
+    for (const v of vals) {
+      const n = typeof v === 'string' ? parseFloat(v) : v;
+      if (typeof n === 'number' && Number.isFinite(n)) return n;
+    }
+    return 0;
+  };
+  return {
+    ...it,
+    icon: it.icon ?? '🍽️',
+    name: it.name ?? it.food ?? 'Food',
+    kcal: num(it.kcal, it.calories, it.cal, it.energy),
+    carbs: num(it.carbs, it.carbohydrates, it.carbohydrate, it.carb),
+    protein: num(it.protein, it.proteins),
+    fat: num(it.fat, it.fats, it.total_fat),
+    unit: it.unit ?? it.serving ?? 'serving',
+  };
+}
+
 // Tolerant parse for the structured food routes. OpenAI json_object mode forces
 // a top-level object, so models return {"items":[...]}, but some still emit a
-// bare [...] array. Accept either and always return an array.
+// bare [...] array. Accept either, normalize each item to the app schema, and
+// always return an array.
 function parseItems(text) {
+  let raw = [];
   try {
     const p = JSON.parse(text);
-    if (Array.isArray(p)) return p;
-    if (p && Array.isArray(p.items)) return p.items;
+    if (Array.isArray(p)) raw = p;
+    else if (p && Array.isArray(p.items)) raw = p.items;
   } catch { /* not JSON */ }
-  return [];
+  return raw.map(normalizeItem).filter(Boolean);
 }
 
 // ── Config endpoint ───────────────────────────────────────────────────────────
@@ -417,7 +455,7 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
     return res.status(400).json({ error: { message: 'Image too large. Please use a smaller photo.' } });
   }
 
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!hasAnyAIKey()) {
     return res.status(503).json({ error: { message: 'Food detection not configured on this server' } });
   }
 
@@ -476,7 +514,7 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
     return res.status(400).json({ error: { message: 'URL not allowed' } });
   }
 
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!hasAnyAIKey()) {
     return res.status(503).json({ error: { message: 'Recipe import not configured on this server' } });
   }
 
@@ -598,7 +636,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
   if (!description || typeof description !== 'string' || description.trim().length < 2) {
     return res.status(400).json({ error: { message: 'description is required' } });
   }
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!hasAnyAIKey()) {
     return res.status(503).json({ error: { message: 'AI estimation not configured on this server' } });
   }
 
@@ -641,7 +679,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: { message: 'messages is required' } });
   }
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!hasAnyAIKey()) {
     return res.status(503).json({ error: { message: 'AI coach not configured on this server' } });
   }
 
