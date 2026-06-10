@@ -50,6 +50,27 @@ export const colors = {
   microIron:      '#9c6fff', // purple2
   microPotassium: '#c4a8ff', // purple3
 
+  // Meal accent colors — one hue per meal, used for the per-meal section accent
+  // and add-food buttons. Single source so meals stay consistent across screens.
+  mealBreakfast: '#f59e0b', // honey
+  mealLunch:     '#a855f7', // violet
+  mealDinner:    '#38bdf8', // sky
+  mealSnack:     '#f43f5e', // rose
+
+  // Life-Score pillar colors — one hue per pillar (Nutrition/Sleep/Activity/
+  // Hydration/Mindset). Used for pillar bars and scores in progress.tsx.
+  pillarNutrition: '#22c55e', // green
+  pillarSleep:     '#a855f7', // violet
+  pillarActivity:  '#f59e0b', // honey
+  pillarHydration: '#38bdf8', // sky
+  pillarMindset:   '#14b8a6', // teal
+
+  // Wellness metric colors. Water = sky (matches CLAUDE.md). Sleep is violet
+  // across its real UI (Life-Score pillar + the SleepLogger sheet); the old
+  // "teal = sleep" note was stale — teal is the activity/exercise accent.
+  metricWater: '#38bdf8', // sky
+  metricSleep: '#a855f7', // violet
+
   // Purple tints (use these instead of inline rgba)
   purpleGlow: '#9c27b0',               // CTA gradient endpoint
   purpleTint: 'rgba(124,77,255,0.08)', // subtle fill for selected/active cards

@@ -85,11 +85,11 @@ function scoreColor(s: number) {
 function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 
 const PILLARS = [
-  { key: 'nutrition', label: 'Nutrition', emoji: '🥗', color: colors.green, max: 40 },
-  { key: 'sleep',     label: 'Sleep',     emoji: '😴', color: colors.violet, max: 30 },
-  { key: 'activity',  label: 'Activity',  emoji: '🏃', color: colors.honey,  max: 30 },
-  { key: 'hydration', label: 'Hydration', emoji: '💧', color: colors.sky,    max: 25 },
-  { key: 'mindset',   label: 'Mindset',   emoji: '🧘', color: colors.teal,   max: 25 },
+  { key: 'nutrition', label: 'Nutrition', emoji: '🥗', color: colors.pillarNutrition, max: 40 },
+  { key: 'sleep',     label: 'Sleep',     emoji: '😴', color: colors.pillarSleep, max: 30 },
+  { key: 'activity',  label: 'Activity',  emoji: '🏃', color: colors.pillarActivity,  max: 30 },
+  { key: 'hydration', label: 'Hydration', emoji: '💧', color: colors.pillarHydration,    max: 25 },
+  { key: 'mindset',   label: 'Mindset',   emoji: '🧘', color: colors.pillarMindset,   max: 25 },
 ];
 
 const STREAK_MILESTONES = [
@@ -1348,7 +1348,7 @@ export default function ProgressScreen() {
         <View style={st.statsGrid}>
           {[
             { label: 'Kcal today', value: totalKcal, unit: 'kcal', color: colors.lavender, tap: openPro(() => setDailyProgressVisible(true)) },
-            { label: 'Water', value: entry?.water ?? 0, unit: 'glasses', color: colors.sky, tap: undefined },
+            { label: 'Water', value: entry?.water ?? 0, unit: 'glasses', color: colors.metricWater, tap: undefined },
             { label: 'Meals logged', value: new Set(foods.map(f => f.meal)).size, unit: 'meals', color: colors.green, tap: undefined },
             { label: 'Food items', value: foods.length, unit: 'items', color: colors.honey, tap: undefined },
           ].map(({ label, value, unit, color, tap }) => (

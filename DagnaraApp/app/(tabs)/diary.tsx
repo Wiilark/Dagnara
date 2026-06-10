@@ -30,7 +30,7 @@ const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 type Meal = typeof MEALS[number];
 
 const MEAL_ICONS: Record<string, string> = { breakfast: '🍳', lunch: '🥗', dinner: '🍝', snack: '🍌' };
-const MEAL_ACCENT: Record<string, string> = { breakfast: colors.honey, lunch: colors.violet, dinner: colors.sky, snack: colors.rose };
+const MEAL_ACCENT: Record<string, string> = { breakfast: colors.mealBreakfast, lunch: colors.mealLunch, dinner: colors.mealDinner, snack: colors.mealSnack };
 const MEAL_LABEL: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
 const MEAL_SUGGESTED: Record<string, string> = { breakfast: '~550 kcal suggested', lunch: '~650 kcal suggested', dinner: '~750 kcal suggested', snack: '~150 kcal suggested' };
 
@@ -1795,7 +1795,7 @@ export default function DiaryScreen() {
           <View style={st.waterCard}>
             <View style={st.waterHeader}>
               <Text style={st.wvfLabel}>💧 WATER</Text>
-              <Text style={[st.waterCount, { color: waterGoalMet ? colors.sky : colors.ink3 }]}>{water}/{WATER_GOAL} glasses</Text>
+              <Text style={[st.waterCount, { color: waterGoalMet ? colors.metricWater : colors.ink3 }]}>{water}/{WATER_GOAL} glasses</Text>
             </View>
             <View style={st.waterGlasses}>
               {Array.from({ length: WATER_GOAL }, (_, i) => (
@@ -1805,7 +1805,7 @@ export default function DiaryScreen() {
                   activeOpacity={0.7}
                   style={[st.waterGlass, i < water && st.waterGlassFull]}
                 >
-                  <Text style={{ fontSize: fontSize.md, color: i < water ? colors.sky : colors.ink3 }}>💧</Text>
+                  <Text style={{ fontSize: fontSize.md, color: i < water ? colors.metricWater : colors.ink3 }}>💧</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -2715,10 +2715,10 @@ const st = StyleSheet.create({
   waterCount: { fontSize: fontSize.xs, fontWeight: '700' },
   waterGlasses: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
   waterGlass: { flex: 1, borderRadius: radius.sm, backgroundColor: colors.line, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm },
-  waterGlassFull: { backgroundColor: colors.sky + '22', borderColor: colors.sky },
+  waterGlassFull: { backgroundColor: colors.metricWater + '22', borderColor: colors.metricWater },
   wvfRow: { flexDirection: 'row', gap: spacing.sm },
   wvfBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, gap: spacing.xs },
-  wvfBtnWater: { backgroundColor: colors.sky + '18', borderColor: colors.sky + '66' },
+  wvfBtnWater: { backgroundColor: colors.metricWater + '18', borderColor: colors.metricWater + '66' },
   wvfBtnVeg:   { backgroundColor: colors.green + '18', borderColor: colors.green + '66' },
   wvfBtnFruit: { backgroundColor: colors.rose + '18', borderColor: colors.rose + '66' },
   wvfEmoji:  { fontSize: fontSize.xl },

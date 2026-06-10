@@ -1055,7 +1055,7 @@ const sl = StyleSheet.create({
   backBtn: { width: 34, height: 34, borderRadius: radius.md + 1, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
   durationCard: { margin: spacing.md, backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md + 2, padding: spacing.lg - 4, alignItems: 'center', gap: 4 },
-  durationNum: { fontSize: fontSize['2xl'] - 6, fontWeight: '800', color: colors.violet },
+  durationNum: { fontSize: fontSize['2xl'] - 6, fontWeight: '800', color: colors.metricSleep },
   durationLbl: { fontSize: fontSize.sm, color: colors.ink3 },
   sectionLbl: { fontSize: fontSize.xs - 1, fontWeight: '700', letterSpacing: 1.2, color: colors.ink3, textTransform: 'uppercase', paddingHorizontal: spacing.md, marginBottom: spacing.xs + 2 },
   timeRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.lg - 4 },
