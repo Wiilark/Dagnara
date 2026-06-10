@@ -214,7 +214,7 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
               <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} style={{ position: 'absolute' }}>
                 <Circle
                   cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_R}
-                  stroke={colors.line} strokeWidth={RING_STROKE} fill="none"
+                  stroke={state.active ? colors.line : colors.purple} strokeWidth={RING_STROKE} fill="none"
                 />
                 {state.active && (
                   <Circle
@@ -253,18 +253,20 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
                 >
                   {countdownDisplay}
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: fontSize.xs,
-                    fontWeight: '700',
-                    color: colors.ink3,
-                    letterSpacing: 1.1,
-                    marginTop: 4,
-                  }}
-                >
-                  {countdownLabel}
-                </Text>
+                {state.active && (
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: fontSize.xs,
+                      fontWeight: '700',
+                      color: colors.ink3,
+                      letterSpacing: 1.1,
+                      marginTop: 4,
+                    }}
+                  >
+                    {countdownLabel}
+                  </Text>
+                )}
                 {state.active && (
                   <Text
                     numberOfLines={1}
@@ -276,10 +278,10 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
                 <Text
                   numberOfLines={1}
                   style={{
-                    fontSize: fontSize.xs,
-                    fontWeight: '700',
+                    fontSize: fontSize.md,
+                    fontWeight: '800',
                     color: state.active ? colors.rose : colors.purple,
-                    letterSpacing: 1.1,
+                    letterSpacing: 1.4,
                     marginTop: spacing.sm,
                   }}
                 >
