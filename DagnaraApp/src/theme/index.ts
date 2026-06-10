@@ -33,6 +33,12 @@ export const colors = {
   sky:    '#38bdf8',
   teal:   '#14b8a6',
 
+  // Macro colors — single source of truth for carbs/protein/fat everywhere
+  // (charts, indicators, donuts, legends). Never reassign these per-screen.
+  macroCarbs:   '#38bdf8', // sky
+  macroProtein: '#f43f5e', // rose
+  macroFat:     '#a855f7', // violet
+
   // Purple tints (use these instead of inline rgba)
   purpleGlow: '#9c27b0',               // CTA gradient endpoint
   purpleTint: 'rgba(124,77,255,0.08)', // subtle fill for selected/active cards

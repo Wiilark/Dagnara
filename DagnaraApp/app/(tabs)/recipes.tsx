@@ -663,9 +663,9 @@ export default function RecipesScreen() {
               <View style={styles.modalMacros}>
                 {[
                   { label: 'Kcal',    value: selectedFood.kcal,              color: colors.lavender },
-                  { label: 'Protein', value: `${selectedFood.protein}g`,     color: colors.rose },
-                  { label: 'Carbs',   value: `${selectedFood.carbs}g`,       color: colors.sky },
-                  { label: 'Fat',     value: `${selectedFood.fat}g`,         color: colors.violet },
+                  { label: 'Protein', value: `${selectedFood.protein}g`,     color: colors.macroProtein },
+                  { label: 'Carbs',   value: `${selectedFood.carbs}g`,       color: colors.macroCarbs },
+                  { label: 'Fat',     value: `${selectedFood.fat}g`,         color: colors.macroFat },
                 ].map(({ label, value, color }) => (
                   <View key={label} style={styles.modalMacroPill}>
                     <Text style={[styles.modalMacroVal, { color }]}>{value}</Text>
@@ -811,9 +811,9 @@ export default function RecipesScreen() {
               <View style={styles.modalMacros}>
                 {[
                   { label: 'Kcal',    value: selected.kcal * servings,            color: colors.lavender },
-                  { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.sky },
-                  { label: 'Protein', value: `${selected.protein * servings}g`,   color: colors.rose },
-                  { label: 'Fat',     value: `${selected.fat * servings}g`,       color: colors.violet },
+                  { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.macroCarbs },
+                  { label: 'Protein', value: `${selected.protein * servings}g`,   color: colors.macroProtein },
+                  { label: 'Fat',     value: `${selected.fat * servings}g`,       color: colors.macroFat },
                 ].map(({ label, value, color }) => (
                   <View key={label} style={styles.modalMacroPill}>
                     <Text style={[styles.modalMacroVal, { color }]}>{value}</Text>

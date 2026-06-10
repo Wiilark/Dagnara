@@ -269,9 +269,9 @@ export default function LogScreen() {
                   {d.kcal > 0 && (d.carbs > 0 || d.protein > 0 || d.fat > 0) && (
                     <View style={st.macroRow}>
                       {[
-                        { val: d.carbs,   goal: CARBS_GOAL,   label: 'C', fill: colors.sky },
-                        { val: d.protein, goal: PROTEIN_GOAL, label: 'P', fill: colors.purple },
-                        { val: d.fat,     goal: FAT_GOAL,     label: 'F', fill: colors.honey },
+                        { val: d.carbs,   goal: CARBS_GOAL,   label: 'C', fill: colors.macroCarbs },
+                        { val: d.protein, goal: PROTEIN_GOAL, label: 'P', fill: colors.macroProtein },
+                        { val: d.fat,     goal: FAT_GOAL,     label: 'F', fill: colors.macroFat },
                       ].map(({ val, goal, label, fill }) => {
                         const dot = macroColor(val, goal);
                         return (

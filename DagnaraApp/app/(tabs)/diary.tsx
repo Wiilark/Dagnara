@@ -708,7 +708,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
                 ))}
               </View>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                {[{ v: item.protein, l: 'P', c: colors.rose }, { v: item.carbs, l: 'C', c: colors.sky }, { v: item.fat, l: 'F', c: colors.violet }].map(({ v, l, c }) => (
+                {[{ v: item.protein, l: 'P', c: colors.macroProtein }, { v: item.carbs, l: 'C', c: colors.macroCarbs }, { v: item.fat, l: 'F', c: colors.macroFat }].map(({ v, l, c }) => (
                   <View key={l} style={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
                     <Text style={{ color: c, fontSize: fontSize.xs, fontWeight: '700' }}>{l}</Text>
                     <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{v}g</Text>
@@ -1585,9 +1585,9 @@ export default function DiaryScreen() {
         {/* ── Macro Strip ── */}
         <View style={st.macroStrip}>
           {[
-            { label: 'Carbs', val: totalCarbs, goal: CARBS_GOAL, color: colors.sky, gc: [colors.sky, colors.sky] as [string,string], sub: totalFiber > 0 ? `Net: ${netCarbs}g` : null },
-            { label: 'Protein', val: totalProtein, goal: PROTEIN_GOAL, color: colors.rose, gc: [colors.rose, colors.rose] as [string,string], sub: null },
-            { label: 'Fat', val: totalFat, goal: FAT_GOAL, color: colors.violet, gc: [colors.violet, colors.violet] as [string,string], sub: null },
+            { label: 'Carbs', val: totalCarbs, goal: CARBS_GOAL, color: colors.macroCarbs, gc: [colors.macroCarbs, colors.macroCarbs] as [string,string], sub: totalFiber > 0 ? `Net: ${netCarbs}g` : null },
+            { label: 'Protein', val: totalProtein, goal: PROTEIN_GOAL, color: colors.macroProtein, gc: [colors.macroProtein, colors.macroProtein] as [string,string], sub: null },
+            { label: 'Fat', val: totalFat, goal: FAT_GOAL, color: colors.macroFat, gc: [colors.macroFat, colors.macroFat] as [string,string], sub: null },
           ].map(({ label, val, goal, color, gc, sub }) => (
             <View key={label} style={st.macroTile}>
               <ExpoLinearGradient colors={gc} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.macroTopBar} />
@@ -2051,9 +2051,9 @@ export default function DiaryScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
                     {[
                       { val: kcal, lbl: 'kcal',    color: colors.purple },
-                      { val: prot, lbl: 'protein',  color: colors.sky },
-                      { val: carb, lbl: 'carbs',    color: colors.honey },
-                      { val: fat,  lbl: 'fat',      color: colors.rose },
+                      { val: prot, lbl: 'protein',  color: colors.macroProtein },
+                      { val: carb, lbl: 'carbs',    color: colors.macroCarbs },
+                      { val: fat,  lbl: 'fat',      color: colors.macroFat },
                     ].map(({ val, lbl, color }) => (
                       <View key={lbl} style={{ alignItems: 'center', gap: 2 }}>
                         <Text style={{ color, fontSize: fontSize.lg, fontWeight: '800' }}>{val}</Text>
@@ -2514,15 +2514,15 @@ export default function DiaryScreen() {
                   {qaKcal > 0 && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-around', backgroundColor: colors.layer2, borderRadius: radius.md, paddingVertical: spacing.sm }}>
                       <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.purple }}>{qaProtein}g</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.macroProtein }}>{qaProtein}g</Text>
                         <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Protein</Text>
                       </View>
                       <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.sky }}>{qaCarbs}g</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.macroCarbs }}>{qaCarbs}g</Text>
                         <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Carbs</Text>
                       </View>
                       <View style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.honey }}>{qaFat}g</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.macroFat }}>{qaFat}g</Text>
                         <Text style={{ fontSize: fontSize.xs, color: colors.ink3 }}>Fat</Text>
                       </View>
                     </View>
@@ -2735,7 +2735,7 @@ const st = StyleSheet.create({
   microChip: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.sm + 2, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs + 2, alignItems: 'center', gap: 2 },
   microVal: { fontSize: fontSize.sm + 1, fontWeight: '700', color: colors.ink },
   microLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  macroNetCarbs: { fontSize: fontSize.xs, color: colors.sky, fontWeight: '600', marginTop: 2 },
+  macroNetCarbs: { fontSize: fontSize.xs, color: colors.macroCarbs, fontWeight: '600', marginTop: 2 },
   microDv:  { fontSize: fontSize.xs, color: colors.purple, fontWeight: '600' },
   // Food grade badge
   gradeBadge: { width: 32, height: 32, borderRadius: spacing.xs + 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },

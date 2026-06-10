@@ -492,6 +492,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
   visible: boolean; onClose: () => void; entries: Record<string, DiaryEntry>;
 }) {
   const { calorieGoal: storeCalGoal, macroPcts } = useAppStore();
+  const scrollY = useRef(new Animated.Value(0)).current;
   const today = new Date().toLocaleDateString('en-CA');
   const todayEntry = entries[today];
   const foods = todayEntry?.foods ?? [];
@@ -518,7 +519,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
     const key = d.toLocaleDateString('en-CA');
     const dayKcal = (entries[key]?.foods ?? []).reduce((s: number, f) => s + f.kcal, 0);
-    const label = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1);
+    const label = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2);
     return { key, kcal: dayKcal, label, isToday: key === today };
   });
   const maxWeekKcal = Math.max(...weekBars.map(b => b.kcal), 500);
@@ -536,15 +537,14 @@ function DailyProgressModal({ visible, onClose, entries }: {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={dp2.safe} edges={['top', 'bottom']}>
-        <View style={dp2.header}>
-          <TouchableOpacity onPress={onClose} style={dp2.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-          <Text style={dp2.title}>Daily progress</Text>
-          <View style={{ width: 36 }} />
-        </View>
+        <FloatingModalHeader scrollY={scrollY} title="Daily progress" staticTitle onBack={onClose} />
 
-        <ScrollView contentContainerStyle={dp2.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          contentContainerStyle={dp2.scroll}
+          showsVerticalScrollIndicator={false}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+          scrollEventThrottle={16}
+        >
           {/* Date */}
           <Text style={dp2.date}>{dateLabel}</Text>
 
@@ -578,9 +578,9 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <Text style={dp2.h2}>Daily intake</Text>
           {[
             { lbl: 'KCAL', val: kcal, goal: KCAL_GOAL, unit: 'kcal', color: colors.green },
-            { lbl: 'CARBS', val: carbs, goal: CARBS_GOAL, unit: 'g', color: colors.honey },
-            { lbl: 'PROTEIN', val: protein, goal: PROT_GOAL, unit: 'g', color: colors.sky },
-            { lbl: 'FAT', val: fat, goal: FAT_GOAL, unit: 'g', color: colors.violet },
+            { lbl: 'CARBS', val: carbs, goal: CARBS_GOAL, unit: 'g', color: colors.macroCarbs },
+            { lbl: 'PROTEIN', val: protein, goal: PROT_GOAL, unit: 'g', color: colors.macroProtein },
+            { lbl: 'FAT', val: fat, goal: FAT_GOAL, unit: 'g', color: colors.macroFat },
           ].map(({ lbl, val, goal, unit, color }) => (
             <View key={lbl} style={dp2.intakeRow}>
               <View style={dp2.intakeMeta}>
@@ -601,9 +601,9 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <View style={dp2.donutCard}>
             <View style={dp2.donutLegend}>
               {[
-                [colors.honey,  `${macroPcts.carbs}%`,   'CARBS'],
-                [colors.sky,    `${macroPcts.protein}%`, 'PROTEIN'],
-                [colors.violet, `${macroPcts.fat}%`,     'FAT'],
+                [colors.macroCarbs,   `${macroPcts.carbs}%`,   'CARBS'],
+                [colors.macroProtein, `${macroPcts.protein}%`, 'PROTEIN'],
+                [colors.macroFat,     `${macroPcts.fat}%`,     'FAT'],
               ].map(([c, p, l]) => (
                 <View key={l} style={dp2.legendItem}>
                   <View style={[dp2.legendDot, { backgroundColor: c }]} />
@@ -613,13 +613,13 @@ function DailyProgressModal({ visible, onClose, entries }: {
             </View>
             <Svg width={72} height={72} viewBox="0 0 72 72">
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.line} strokeWidth={10} />
-              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.honey} strokeWidth={10}
+              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
                 strokeDasharray={`${CIRC * cPct} ${CIRC}`} strokeDashoffset={CIRC * carbsOffset}
                 transform="rotate(-90 36 36)" />
-              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.sky} strokeWidth={10}
+              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroProtein} strokeWidth={10}
                 strokeDasharray={`${CIRC * pPct} ${CIRC}`} strokeDashoffset={CIRC * protOffset}
                 transform="rotate(-90 36 36)" />
-              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.violet} strokeWidth={10}
+              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroFat} strokeWidth={10}
                 strokeDasharray={`${CIRC * fPct} ${CIRC}`} strokeDashoffset={CIRC * fatOffset}
                 transform="rotate(-90 36 36)" />
             </Svg>
@@ -630,9 +630,9 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <View style={dp2.donutCard}>
             <View style={dp2.donutLegend}>
               {[
-                [colors.honey, `${carbsPct}%`, 'CARBS'],
-                [colors.sky, `${protPct}%`, 'PROTEIN'],
-                [colors.violet, `${fatPct}%`, 'FAT'],
+                [colors.macroCarbs, `${carbsPct}%`, 'CARBS'],
+                [colors.macroProtein, `${protPct}%`, 'PROTEIN'],
+                [colors.macroFat, `${fatPct}%`, 'FAT'],
               ].map(([c, p, l]) => (
                 <View key={l} style={dp2.legendItem}>
                   <View style={[dp2.legendDot, { backgroundColor: c as string }]} />
@@ -644,13 +644,13 @@ function DailyProgressModal({ visible, onClose, entries }: {
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.line} strokeWidth={10} />
               {totalMacros > 1 ? (
                 <>
-                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.honey} strokeWidth={10}
+                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
                     strokeDasharray={`${carbsArc} ${CIRC}`} strokeDashoffset={CIRC * 0.25}
                     transform="rotate(-90 36 36)" />
-                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.sky} strokeWidth={10}
+                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroProtein} strokeWidth={10}
                     strokeDasharray={`${protArc} ${CIRC}`} strokeDashoffset={-(carbsArc - CIRC * 0.25)}
                     transform="rotate(-90 36 36)" />
-                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.violet} strokeWidth={10}
+                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroFat} strokeWidth={10}
                     strokeDasharray={`${fatArc} ${CIRC}`} strokeDashoffset={-(carbsArc + protArc - CIRC * 0.25)}
                     transform="rotate(-90 36 36)" />
                 </>
@@ -685,7 +685,7 @@ function DailyProgressModal({ visible, onClose, entries }: {
           </View>
 
           <View style={{ height: 24 }} />
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -1212,7 +1212,7 @@ export default function ProgressScreen() {
         {/* Macros today */}
         <View style={st.card}>
           <Text style={st.cardLabel}>TODAY'S MACROS</Text>
-          {[{ label: 'Carbs', val: totalCarbs, color: colors.sky }, { label: 'Protein', val: totalProtein, color: colors.rose }, { label: 'Fat', val: totalFat, color: colors.violet }].map(({ label, val, color }) => (
+          {[{ label: 'Carbs', val: totalCarbs, color: colors.macroCarbs }, { label: 'Protein', val: totalProtein, color: colors.macroProtein }, { label: 'Fat', val: totalFat, color: colors.macroFat }].map(({ label, val, color }) => (
             <View key={label} style={st.macroRow}>
               <Text style={st.macroLabel}>{label}</Text>
               <View style={st.macroTrack}>
@@ -1631,10 +1631,7 @@ const stat = StyleSheet.create({
 // ── Daily Progress Modal styles ────────────────────────────────────────────────
 const dp2 = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
-  closeBtn: { width: spacing.xl, height: spacing.xl, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
-  scroll: { padding: spacing.md, paddingTop: spacing.md },
+  scroll: { padding: spacing.md, paddingTop: spacing.xl + spacing.xl },
   h1: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, letterSpacing: -0.5, marginBottom: 4 },
   h2: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, letterSpacing: -0.5, marginBottom: spacing.sm, marginTop: spacing.lg },
   date: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1.2, color: colors.ink3, marginBottom: spacing.md, textTransform: 'uppercase' },
