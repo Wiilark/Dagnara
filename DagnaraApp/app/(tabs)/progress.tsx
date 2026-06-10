@@ -509,9 +509,9 @@ function DailyProgressModal({ visible, onClose, entries }: {
   const cPct = macroPcts.carbs / 100;
   const pPct = macroPcts.protein / 100;
   const fPct = macroPcts.fat / 100;
-  const carbsOffset = 0.25;                       // start at top (12 o'clock)
-  const protOffset  = 0.25 - cPct;
-  const fatOffset   = 0.25 - cPct - pPct;
+  const protOffset  = 0.25;                       // start at top (12 o'clock)
+  const carbsOffset = 0.25 - pPct;
+  const fatOffset   = 0.25 - pPct - cPct;
   const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
 
   // 7-day bars
@@ -578,8 +578,8 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <Text style={dp2.h2}>Daily intake</Text>
           {[
             { lbl: 'KCAL', val: kcal, goal: KCAL_GOAL, unit: 'kcal', color: colors.green },
-            { lbl: 'CARBS', val: carbs, goal: CARBS_GOAL, unit: 'g', color: colors.macroCarbs },
             { lbl: 'PROTEIN', val: protein, goal: PROT_GOAL, unit: 'g', color: colors.macroProtein },
+            { lbl: 'CARBS', val: carbs, goal: CARBS_GOAL, unit: 'g', color: colors.macroCarbs },
             { lbl: 'FAT', val: fat, goal: FAT_GOAL, unit: 'g', color: colors.macroFat },
           ].map(({ lbl, val, goal, unit, color }) => (
             <View key={lbl} style={dp2.intakeRow}>
@@ -601,8 +601,8 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <View style={dp2.donutCard}>
             <View style={dp2.donutLegend}>
               {[
-                [colors.macroCarbs,   `${macroPcts.carbs}%`,   'CARBS'],
                 [colors.macroProtein, `${macroPcts.protein}%`, 'PROTEIN'],
+                [colors.macroCarbs,   `${macroPcts.carbs}%`,   'CARBS'],
                 [colors.macroFat,     `${macroPcts.fat}%`,     'FAT'],
               ].map(([c, p, l]) => (
                 <View key={l} style={dp2.legendItem}>
@@ -613,11 +613,11 @@ function DailyProgressModal({ visible, onClose, entries }: {
             </View>
             <Svg width={72} height={72} viewBox="0 0 72 72">
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.line} strokeWidth={10} />
-              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
-                strokeDasharray={`${CIRC * cPct} ${CIRC}`} strokeDashoffset={CIRC * carbsOffset}
-                transform="rotate(-90 36 36)" />
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroProtein} strokeWidth={10}
                 strokeDasharray={`${CIRC * pPct} ${CIRC}`} strokeDashoffset={CIRC * protOffset}
+                transform="rotate(-90 36 36)" />
+              <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
+                strokeDasharray={`${CIRC * cPct} ${CIRC}`} strokeDashoffset={CIRC * carbsOffset}
                 transform="rotate(-90 36 36)" />
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroFat} strokeWidth={10}
                 strokeDasharray={`${CIRC * fPct} ${CIRC}`} strokeDashoffset={CIRC * fatOffset}
@@ -630,8 +630,8 @@ function DailyProgressModal({ visible, onClose, entries }: {
           <View style={dp2.donutCard}>
             <View style={dp2.donutLegend}>
               {[
-                [colors.macroCarbs, `${carbsPct}%`, 'CARBS'],
                 [colors.macroProtein, `${protPct}%`, 'PROTEIN'],
+                [colors.macroCarbs, `${carbsPct}%`, 'CARBS'],
                 [colors.macroFat, `${fatPct}%`, 'FAT'],
               ].map(([c, p, l]) => (
                 <View key={l} style={dp2.legendItem}>
@@ -644,14 +644,14 @@ function DailyProgressModal({ visible, onClose, entries }: {
               <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.line} strokeWidth={10} />
               {totalMacros > 1 ? (
                 <>
-                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
-                    strokeDasharray={`${carbsArc} ${CIRC}`} strokeDashoffset={CIRC * 0.25}
-                    transform="rotate(-90 36 36)" />
                   <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroProtein} strokeWidth={10}
-                    strokeDasharray={`${protArc} ${CIRC}`} strokeDashoffset={-(carbsArc - CIRC * 0.25)}
+                    strokeDasharray={`${protArc} ${CIRC}`} strokeDashoffset={CIRC * 0.25}
+                    transform="rotate(-90 36 36)" />
+                  <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroCarbs} strokeWidth={10}
+                    strokeDasharray={`${carbsArc} ${CIRC}`} strokeDashoffset={-(protArc - CIRC * 0.25)}
                     transform="rotate(-90 36 36)" />
                   <Circle cx="36" cy="36" r="28" fill="none" stroke={colors.macroFat} strokeWidth={10}
-                    strokeDasharray={`${fatArc} ${CIRC}`} strokeDashoffset={-(carbsArc + protArc - CIRC * 0.25)}
+                    strokeDasharray={`${fatArc} ${CIRC}`} strokeDashoffset={-(protArc + carbsArc - CIRC * 0.25)}
                     transform="rotate(-90 36 36)" />
                 </>
               ) : null}
@@ -1212,7 +1212,7 @@ export default function ProgressScreen() {
         {/* Macros today */}
         <View style={st.card}>
           <Text style={st.cardLabel}>TODAY'S MACROS</Text>
-          {[{ label: 'Carbs', val: totalCarbs, color: colors.macroCarbs }, { label: 'Protein', val: totalProtein, color: colors.macroProtein }, { label: 'Fat', val: totalFat, color: colors.macroFat }].map(({ label, val, color }) => (
+          {[{ label: 'Protein', val: totalProtein, color: colors.macroProtein }, { label: 'Carbs', val: totalCarbs, color: colors.macroCarbs }, { label: 'Fat', val: totalFat, color: colors.macroFat }].map(({ label, val, color }) => (
             <View key={label} style={st.macroRow}>
               <Text style={st.macroLabel}>{label}</Text>
               <View style={st.macroTrack}>

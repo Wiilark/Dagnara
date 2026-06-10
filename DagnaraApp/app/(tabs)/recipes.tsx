@@ -811,8 +811,8 @@ export default function RecipesScreen() {
               <View style={styles.modalMacros}>
                 {[
                   { label: 'Kcal',    value: selected.kcal * servings,            color: colors.lavender },
-                  { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.macroCarbs },
                   { label: 'Protein', value: `${selected.protein * servings}g`,   color: colors.macroProtein },
+                  { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.macroCarbs },
                   { label: 'Fat',     value: `${selected.fat * servings}g`,       color: colors.macroFat },
                 ].map(({ label, value, color }) => (
                   <View key={label} style={styles.modalMacroPill}>

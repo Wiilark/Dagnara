@@ -1585,8 +1585,8 @@ export default function DiaryScreen() {
         {/* ── Macro Strip ── */}
         <View style={st.macroStrip}>
           {[
-            { label: 'Carbs', val: totalCarbs, goal: CARBS_GOAL, color: colors.macroCarbs, gc: [colors.macroCarbs, colors.macroCarbs] as [string,string], sub: totalFiber > 0 ? `Net: ${netCarbs}g` : null },
             { label: 'Protein', val: totalProtein, goal: PROTEIN_GOAL, color: colors.macroProtein, gc: [colors.macroProtein, colors.macroProtein] as [string,string], sub: null },
+            { label: 'Carbs', val: totalCarbs, goal: CARBS_GOAL, color: colors.macroCarbs, gc: [colors.macroCarbs, colors.macroCarbs] as [string,string], sub: totalFiber > 0 ? `Net: ${netCarbs}g` : null },
             { label: 'Fat', val: totalFat, goal: FAT_GOAL, color: colors.macroFat, gc: [colors.macroFat, colors.macroFat] as [string,string], sub: null },
           ].map(({ label, val, goal, color, gc, sub }) => (
             <View key={label} style={st.macroTile}>
