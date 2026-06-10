@@ -611,7 +611,7 @@ export function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onCl
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.line2 }}
                 >
-                  <Ionicons name="create-outline" size={22} color={colors.ink} />
+                  <Ionicons name="pencil-sharp" size={20} color={colors.ink} />
                 </TouchableOpacity>
               }
             />
