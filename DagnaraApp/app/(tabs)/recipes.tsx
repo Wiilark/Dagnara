@@ -677,12 +677,12 @@ export default function RecipesScreen() {
               {/* Extra micros */}
               <View style={styles.microRow}>
                 {[
-                  { label: 'Fiber',   value: `${selectedFood.fiber}g` },
-                  { label: 'Sugar',   value: `${selectedFood.sugar}g` },
-                  { label: 'Sodium',  value: `${selectedFood.sodium}mg` },
-                ].map(({ label, value }) => (
+                  { label: 'Fiber',   value: `${selectedFood.fiber}g`,  color: colors.microFiber },
+                  { label: 'Sugar',   value: `${selectedFood.sugar}g`,  color: colors.microSugar },
+                  { label: 'Sodium',  value: `${selectedFood.sodium}mg`, color: colors.microSodium },
+                ].map(({ label, value, color }) => (
                   <View key={label} style={styles.microPill}>
-                    <Text style={styles.microVal}>{value}</Text>
+                    <Text style={[styles.microVal, { color }]}>{value}</Text>
                     <Text style={styles.microLabel}>{label}</Text>
                   </View>
                 ))}

@@ -39,6 +39,17 @@ export const colors = {
   macroProtein: '#f43f5e', // rose
   macroFat:     '#a855f7', // violet
 
+  // Micronutrient colors — one identity hue per micro, none clashing with macros.
+  // Used for the value text in micro chips. Sugar/sodium still flip to `rose`
+  // when over the daily limit (warning state overrides the identity color).
+  microFiber:     '#22c55e', // green
+  microSugar:     '#f59e0b', // honey
+  microSodium:    '#14b8a6', // teal
+  microVitaminC:  '#16a34a', // green2 (deeper green, distinct from fiber)
+  microCalcium:   '#c4b5fd', // lavender
+  microIron:      '#9c6fff', // purple2
+  microPotassium: '#c4a8ff', // purple3
+
   // Purple tints (use these instead of inline rgba)
   purpleGlow: '#9c27b0',               // CTA gradient endpoint
   purpleTint: 'rgba(124,77,255,0.08)', // subtle fill for selected/active cards
