@@ -861,7 +861,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   style={{ width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.line2 }}
                 >
-                  <Ionicons name="pencil" size={20} color={colors.ink2} />
+                  <Ionicons name="create-outline" size={22} color={colors.ink} />
                 </TouchableOpacity>
               }
             />
