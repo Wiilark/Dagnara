@@ -18,7 +18,7 @@ export function BackChevron({ size = 24, color = colors.ink }: Props) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
-        d="M15 5 L8 12 L15 19"
+        d="M15.5 5 L8.5 12 L15.5 19"
         stroke={color}
         strokeWidth={2.8}
         strokeLinecap="round"
