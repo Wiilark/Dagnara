@@ -1062,9 +1062,9 @@ const styles = StyleSheet.create({
   recipeKcal: { color: colors.lavender, fontSize: fontSize.sm, fontWeight: '700' },
   recipeMacroRow: { flexDirection: 'row', gap: spacing.xs },
   recipeMacroTxt: { fontSize: fontSize.xs, fontWeight: '600', borderRadius: spacing.xs / 2, paddingHorizontal: 4, paddingVertical: 1 },
-  recipeMacroP:   { color: colors.sky,   backgroundColor: colors.sky   + '22', borderWidth: 1, borderColor: colors.sky   + '55' },
-  recipeMacroC:   { color: colors.honey, backgroundColor: colors.honey + '22', borderWidth: 1, borderColor: colors.honey + '55' },
-  recipeMacroF:   { color: colors.rose,  backgroundColor: colors.rose  + '22', borderWidth: 1, borderColor: colors.rose  + '55' },
+  recipeMacroP:   { color: colors.macroProtein, backgroundColor: colors.macroProtein + '22', borderWidth: 1, borderColor: colors.macroProtein + '55' },
+  recipeMacroC:   { color: colors.macroCarbs,   backgroundColor: colors.macroCarbs   + '22', borderWidth: 1, borderColor: colors.macroCarbs   + '55' },
+  recipeMacroF:   { color: colors.macroFat,     backgroundColor: colors.macroFat     + '22', borderWidth: 1, borderColor: colors.macroFat     + '55' },
 
   // Modal
   modal: { flex: 1, backgroundColor: colors.bg },
