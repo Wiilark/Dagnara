@@ -81,6 +81,17 @@ export function PillReminderModal({ visible, onClose }: { visible: boolean; onCl
 
   const today = todayKey();
 
+  // Live clock so a slot flips from "upcoming" to "overdue" the moment its time
+  // passes — slotStatus() reads new Date() and without a ticker the status only
+  // re-evaluated on an unrelated re-render (e.g. a tap). 30s granularity is plenty
+  // for minute-precision dose times and is the same cadence the fasting lock uses.
+  const [, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, [visible]);
+
   // Last 7 days (oldest→newest), used for per-med history strips
   const weekKeys = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
