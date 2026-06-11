@@ -18,6 +18,16 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
   supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 }
 
+// ── Structured logging ────────────────────────────────────────────────────────
+// One-line JSON per event so Railway's log search and alerts can filter by
+// `scope` and `level`. Never log tokens, request bodies, or image data.
+function logError(scope, message, extra = {}) {
+  console.error(JSON.stringify({ level: 'error', scope, message, ...extra, t: new Date().toISOString() }));
+}
+function logWarn(scope, message, extra = {}) {
+  console.warn(JSON.stringify({ level: 'warn', scope, message, ...extra, t: new Date().toISOString() }));
+}
+
 // ── Auth Middleware ──────────────────────────────────────────────────────────
 async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -27,7 +37,7 @@ async function authenticate(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   if (!supabaseAdmin) {
-    console.error('[auth] SUPABASE_SERVICE_KEY not configured');
+    logError('auth', 'SUPABASE_SERVICE_KEY not configured');
     return res.status(503).json({ error: { message: 'Auth service unavailable' } });
   }
 
@@ -39,7 +49,7 @@ async function authenticate(req, res, next) {
     req.user = user; // Attach user to request
     next();
   } catch (err) {
-    console.error('[auth] verification error:', err.message);
+    logError('auth', 'verification error', { detail: err.message });
     res.status(401).json({ error: { message: 'Session verification failed' } });
   }
 }
@@ -73,7 +83,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error('[stripe-webhook] signature verify failed:', err.message);
+    logError('stripe-webhook', 'signature verify failed', { detail: err.message });
     return res.status(400).json({ error: 'Webhook signature invalid' });
   }
 
@@ -84,7 +94,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   // skip any event older than the last one we already applied for this profile.
   async function syncSubscription(customerId, status, subscriptionId, periodEnd, eventTs) {
     if (!supabaseAdmin) {
-      console.warn('[stripe-webhook] SUPABASE_SERVICE_KEY not set — skipping DB update');
+      logWarn('stripe-webhook', 'SUPABASE_SERVICE_KEY not set — skipping DB update');
       return;
     }
     try {
@@ -100,7 +110,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
       const lastTs = Number(row?.profile_data?.subscriptionEventTs ?? 0);
       if (eventTs && lastTs && eventTs < lastTs) {
-        console.warn(`[stripe-webhook] skipping stale event (${eventTs} < ${lastTs}) for ${email}`);
+        logWarn('stripe-webhook', 'skipping stale event', { eventTs, lastTs });
         return;
       }
 
@@ -119,7 +129,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           updated_at: new Date().toISOString(),
         }, { onConflict: 'email' });
     } catch (err) {
-      console.error('[stripe-webhook] syncSubscription failed:', err.message);
+      logError('stripe-webhook', 'syncSubscription failed', { detail: err.message });
     }
   }
 
@@ -504,7 +514,7 @@ app.post('/api/analyze-food', authenticate, analyzeLimiter, async (req, res) => 
     const items = parseItems(text);
     res.json({ items });
   } catch (err) {
-    console.error('[analyze-food]', err.message);
+    logError('analyze-food', err.message);
     const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
@@ -593,7 +603,7 @@ app.post('/api/import-recipe', authenticate, recipeLimiter, async (req, res) => 
     try { const p = JSON.parse(responseText); if (p && typeof p === 'object' && !Array.isArray(p)) recipe = p; } catch {}
     res.json(recipe);
   } catch (err) {
-    console.error('[import-recipe]', err.message);
+    logError('import-recipe', err.message);
     res.status(500).json({ error: { message: 'Failed to fetch or parse recipe' } });
   }
 });
@@ -606,6 +616,10 @@ const barcodeLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// NOTE: intentionally unauthenticated — proxies only the public OpenFoodFacts
+// database (no user data, no secrets, no AI cost). Abuse is bounded by the
+// IP-keyed rate limiter; requiring a token here would add latency to every
+// search keystroke for no meaningful security gain.
 app.get('/api/food-search', barcodeLimiter, async (req, res) => {
   const q = (req.query.q ?? '').trim();
   if (!q || q.length < 2) return res.status(400).json({ error: 'Query too short' });
@@ -621,7 +635,7 @@ app.get('/api/food-search', barcodeLimiter, async (req, res) => {
     const json = await off.json();
     res.json(json);
   } catch (err) {
-    console.error('[food-search]', err.message);
+    logError('food-search', err.message);
     res.status(502).json({ error: 'Could not reach food database' });
   }
 });
@@ -645,7 +659,7 @@ app.get('/api/barcode/:code', barcodeLimiter, async (req, res) => {
     const json = await off.json();
     res.json(json);
   } catch (err) {
-    console.error('[barcode]', err.message);
+    logError('barcode', err.message);
     const msg = err.name === 'AbortError' ? 'Lookup timed out' : 'Could not reach food database';
     res.status(502).json({ error: msg });
   }
@@ -679,7 +693,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
     const items = parseItems(text);
     res.json({ items });
   } catch (err) {
-    console.error('[estimate-nutrition]', err.message);
+    logError('estimate-nutrition', err.message);
     const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
@@ -734,7 +748,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
     const reply = data?.content?.[0]?.text ?? 'Sorry, I could not generate a response.';
     res.json({ reply });
   } catch (err) {
-    console.error('[coach]', err.message);
+    logError('coach', err.message);
     const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }
@@ -767,7 +781,7 @@ app.post('/api/stripe/create-checkout-session', stripeLimiter, async (req, res) 
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error('[create-checkout-session]', err.message);
+    logError('create-checkout-session', err.message);
     res.status(500).json({ error: { message: 'Failed to create checkout session' } });
   }
 });
@@ -798,7 +812,7 @@ app.post('/api/stripe/portal-session', stripeLimiter, async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error('[portal-session]', err.message);
+    logError('portal-session', err.message);
     res.status(500).json({ error: { message: 'Failed to create portal session' } });
   }
 });
@@ -812,6 +826,36 @@ app.get('/premium-cancel',  (req, res) => res.sendFile(path.join(publicDir, 'pre
 app.get('/privacy', (req, res) => res.sendFile(path.join(publicDir, 'privacy.html')));
 app.get('/terms',   (req, res) => res.sendFile(path.join(publicDir, 'terms.html')));
 
+// ── Health check ──────────────────────────────────────────────────────────────
+// Returns 200 only if the server is up AND its dependencies are configured +
+// reachable. Use this as the Railway healthcheck path so a half-broken deploy
+// (e.g. missing service key, Supabase down) fails fast instead of serving 500s.
+app.get('/health', async (req, res) => {
+  const checks = {
+    supabaseConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_KEY),
+    aiConfigured: hasAnyAIKey(),
+    stripeConfigured: Boolean(stripe),
+    supabaseReachable: false,
+  };
+  if (supabaseAdmin) {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 4000);
+      const { error } = await supabaseAdmin
+        .from('dagnara_profiles')
+        .select('email', { count: 'exact', head: true })
+        .abortSignal(controller.signal);
+      clearTimeout(t);
+      checks.supabaseReachable = !error;
+    } catch {
+      checks.supabaseReachable = false;
+    }
+  }
+  // Healthy = the things the app cannot work without are present and reachable.
+  const healthy = checks.supabaseConfigured && checks.supabaseReachable;
+  res.status(healthy ? 200 : 503).json({ status: healthy ? 'ok' : 'degraded', checks });
+});
+
 // ── Landing page ──────────────────────────────────────────────────────────────
 // Registered AFTER all /api routes so the wildcard does not intercept them.
 const landingIndex = path.join(__dirname, 'index.html');
@@ -819,7 +863,7 @@ app.get('/', (req, res) => res.sendFile(landingIndex));
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
-  console.error('[server]', err.message);
+  logError('server', err.message);
   res.status(500).json({ error: { message: 'Internal server error' } });
 });
 

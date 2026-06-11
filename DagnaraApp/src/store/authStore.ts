@@ -33,6 +33,14 @@ interface AuthState {
   email: string | null;
   profile: Profile;
   isLoading: boolean;
+  // SECURITY — fix before enabling real billing: isPremium is derived from
+  // profile_data.subscriptionStatus, which lives in dagnara_profiles. The RLS
+  // policy ("Users manage own profile", cmd ALL) lets a user UPDATE their own
+  // row, so a determined user could set subscriptionStatus:'active' and unlock
+  // Pro for free. Harmless today (premium is free for everyone during launch),
+  // but the day billing goes live, gate premium features behind a server-side
+  // entitlement check (e.g. GET /api/entitlement that verifies Stripe via the
+  // service-role client) instead of trusting this client-writable field.
   isPremium: boolean;
   setEmail: (email: string | null) => void;
   setProfile: (profile: Profile) => Promise<void>;
