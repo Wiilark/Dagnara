@@ -133,11 +133,12 @@ const st = StyleSheet.create({
     padding: spacing.md,
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', marginLeft: -spacing.md },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
 
-  // Each tile is a 1/4-width column: tinted icon-square + label beneath
+  // Each tile sizes to its icon; row spreads them edge-to-edge so the first
+  // tile hugs the left and the last (Grocery) hugs the right symmetrically.
   tile:           {
-    width: '25%',
+    width: 64,
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
