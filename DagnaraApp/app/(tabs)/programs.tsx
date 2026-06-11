@@ -16,6 +16,9 @@ import { QuitSmokingModal } from '../../src/components/programs/QuitSmokingModal
 import { QuitDrinkingModal } from '../../src/components/programs/QuitDrinkingModal';
 import { PillReminderModal } from '../../src/components/programs/PillReminderModal';
 import { GroceryModal } from '../../src/components/programs/GroceryModal';
+import { ComingSoonModal } from '../../src/components/programs/ComingSoonModal';
+
+type ComingSoon = { title: string; icon: keyof typeof Ionicons.glyphMap; color: string };
 
 // ── Revolut-style product tile (icon-square + label) ──────────────────────────
 type ProgramTileProps = {
@@ -49,6 +52,7 @@ export default function ProgramsScreen() {
   const [pillVisible, setPillVisible] = useState(false);
   const [fastingVisible, setFastingVisible] = useState(false);
   const [groceryVisible, setGroceryVisible] = useState(false);
+  const [comingSoon, setComingSoon] = useState<ComingSoon | null>(null);
 
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -90,6 +94,8 @@ export default function ProgramsScreen() {
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
             <ProgramTile icon="medkit" name="Pill Reminder"  color={colors.purple2} onPress={() => setPillVisible(true)} />
             <ProgramTile icon="restaurant" name="Recipes"   color={colors.sky}     onPress={() => router.push('/(tabs)/recipes')} />
+            <ProgramTile icon="wine"       name="Wine"      color={colors.rose}    onPress={() => setComingSoon({ title: 'Wine', icon: 'wine', color: colors.rose })} />
+            <ProgramTile icon="shirt"      name="Wardrobe"  color={colors.lavender} onPress={() => setComingSoon({ title: 'Wardrobe', icon: 'shirt', color: colors.lavender })} />
           </View>
         </View>
 
@@ -101,6 +107,13 @@ export default function ProgramsScreen() {
       <PillReminderModal visible={pillVisible}    onClose={() => setPillVisible(false)} />
       <FastingModal      visible={fastingVisible} onClose={() => setFastingVisible(false)} />
       <GroceryModal      visible={groceryVisible} onClose={() => setGroceryVisible(false)} />
+      <ComingSoonModal
+        visible={comingSoon !== null}
+        onClose={() => setComingSoon(null)}
+        title={comingSoon?.title ?? ''}
+        icon={comingSoon?.icon ?? 'sparkles'}
+        color={comingSoon?.color ?? colors.purple}
+      />
     </View>
   );
 }
