@@ -137,7 +137,7 @@ const st = StyleSheet.create({
   // Reminder) always wraps to row 2 and lands under the first (Quit Smoking).
   // Negative side margins widen the columns (more gap between icons) and pull
   // the first tile (Quit Smoking) closer to the card's left edge.
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, marginHorizontal: -spacing.sm },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, marginHorizontal: -spacing.md },
 
   // Each tile is a 1/4-width column: tinted icon-square + label beneath.
   tile:           {
