@@ -65,9 +65,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
            
           console.error('[authStore.setProfile] supabase upsert failed:', error.message);
         }
-      } catch (e: any) {
-         
-        console.error('[authStore.setProfile] network error:', e?.message ?? e);
+      } catch (e) {
+
+        console.error('[authStore.setProfile] network error:', e instanceof Error ? e.message : e);
       }
     }
   },
@@ -152,9 +152,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
          
         console.error('[authStore.register] profile upsert failed:', upErr.message);
       }
-    } catch (e: any) {
-       
-      console.error('[authStore.register] profile upsert network error:', e?.message ?? e);
+    } catch (e) {
+
+      console.error('[authStore.register] profile upsert network error:', e instanceof Error ? e.message : e);
     }
     await cacheProfile(email, profile);
     set({ email, profile });
