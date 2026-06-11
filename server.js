@@ -77,8 +77,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     return res.status(400).json({ error: 'Webhook signature invalid' });
   }
 
-  // Merge subscription fields into profile_data without overwriting user data
-  async function syncSubscription(customerId, status, subscriptionId, periodEnd) {
+  // Merge subscription fields into profile_data without overwriting user data.
+  // `eventTs` (the Stripe event's created time, in seconds) guards against
+  // out-of-order delivery: Stripe sends events at-least-once and not always in
+  // order, so a stale `subscription.updated` can arrive after a `deleted`. We
+  // skip any event older than the last one we already applied for this profile.
+  async function syncSubscription(customerId, status, subscriptionId, periodEnd, eventTs) {
     if (!supabaseAdmin) {
       console.warn('[stripe-webhook] SUPABASE_SERVICE_KEY not set — skipping DB update');
       return;
@@ -94,6 +98,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         .eq('email', email)
         .maybeSingle();
 
+      const lastTs = Number(row?.profile_data?.subscriptionEventTs ?? 0);
+      if (eventTs && lastTs && eventTs < lastTs) {
+        console.warn(`[stripe-webhook] skipping stale event (${eventTs} < ${lastTs}) for ${email}`);
+        return;
+      }
+
       await supabaseAdmin
         .from('dagnara_profiles')
         .upsert({
@@ -104,6 +114,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             subscriptionId,
             subscriptionStatus: status,
             subscriptionPeriodEnd: periodEnd,
+            subscriptionEventTs: eventTs ?? lastTs,
           },
           updated_at: new Date().toISOString(),
         }, { onConflict: 'email' });
@@ -112,19 +123,29 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     }
   }
 
+  // Resolve the current period end across Stripe API versions. Newer versions
+  // moved `current_period_end` from the subscription onto the subscription item,
+  // so check both. Returns an ISO string, or null if absent/invalid — never
+  // throws on an Invalid Date (which would 500 the webhook and trigger retries).
+  function periodEndISO(sub) {
+    const secs = sub?.current_period_end ?? sub?.items?.data?.[0]?.current_period_end;
+    if (typeof secs !== 'number' || !Number.isFinite(secs)) return null;
+    const d = new Date(secs * 1000);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
   const obj = event.data.object;
+  const ts = event.created;
   switch (event.type) {
     case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const end = new Date(obj.current_period_end * 1000).toISOString();
-      await syncSubscription(obj.customer, obj.status, obj.id, end);
+    case 'customer.subscription.updated':
+      await syncSubscription(obj.customer, obj.status, obj.id, periodEndISO(obj), ts);
       break;
-    }
     case 'customer.subscription.deleted':
-      await syncSubscription(obj.customer, 'canceled', obj.id, null);
+      await syncSubscription(obj.customer, 'canceled', obj.id, null, ts);
       break;
     case 'invoice.payment_failed':
-      await syncSubscription(obj.customer, 'past_due', obj.subscription, null);
+      await syncSubscription(obj.customer, 'past_due', obj.subscription, null, ts);
       break;
   }
 
