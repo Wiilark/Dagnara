@@ -17,31 +17,25 @@ import { QuitDrinkingModal } from '../../src/components/programs/QuitDrinkingMod
 import { PillReminderModal } from '../../src/components/programs/PillReminderModal';
 import { GroceryModal } from '../../src/components/programs/GroceryModal';
 
-// ── Apple-style row inside a grouped card ─────────────────────────────────────
-type ProgramRowProps = {
-  icon: string;
+// ── Revolut-style product tile (icon-square + label) ──────────────────────────
+type ProgramTileProps = {
+  icon: keyof typeof Ionicons.glyphMap;
   name: string;
-  description: string;
   color: string;
-  isLast?: boolean;
   onPress: () => void;
 };
 
-function ProgramRow({ icon, name, description, color, isLast = false, onPress }: ProgramRowProps) {
+function ProgramTile({ icon, name, color, onPress }: ProgramTileProps) {
   return (
     <TouchableOpacity
-      style={[st.row, !isLast && st.rowDivider]}
+      style={st.tile}
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
-      activeOpacity={0.55}
+      activeOpacity={0.6}
     >
-      <View style={[st.iconWrap, { backgroundColor: color + '26' }]}>
-        <Text style={st.progIcon}>{icon}</Text>
+      <View style={[st.tileIcon, { backgroundColor: color + '26' }]}>
+        <Ionicons name={icon} size={26} color={colors.ink} />
       </View>
-      <View style={st.rowBody}>
-        <Text style={st.rowTitle}>{name}</Text>
-        <Text style={st.rowSubtitle} numberOfLines={2}>{description}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={17} color={colors.ink3} />
+      <Text style={st.tileLabel} numberOfLines={2}>{name}</Text>
     </TouchableOpacity>
   );
 }
@@ -86,52 +80,16 @@ export default function ProgramsScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={[st.scroll, { paddingTop: scrollPaddingTop }]}
         showsVerticalScrollIndicator={false}>
-        {/* HABITS TO BREAK */}
-        <Text style={st.sectionLabel}>Habits to break</Text>
+        {/* Single Revolut-style "Products" card: 3-wide icon grid, no sections */}
+        <Text style={st.sectionLabel}>Programs</Text>
         <View style={st.group}>
-          <ProgramRow
-            icon="🚭" name="Quit Smoking"
-            description="Track smoke-free days and savings"
-            color={colors.rose}
-            onPress={() => setQsVisible(true)}
-          />
-          <ProgramRow
-            icon="🍺" name="Quit Drinking"
-            description="Track alcohol-free days and benefits"
-            color={colors.honey}
-            isLast
-            onPress={() => setQdVisible(true)}
-          />
-        </View>
-
-        {/* TOOLS */}
-        <Text style={st.sectionLabel}>Tools</Text>
-        <View style={st.group}>
-          <ProgramRow
-            icon="⏱️" name="Intermittent Fasting"
-            description="16:8, 18:6, 20:4, OMAD timer"
-            color={colors.teal}
-            onPress={() => setFastingVisible(true)}
-          />
-          <ProgramRow
-            icon="🛒" name="Grocery Planner"
-            description="Build your weekly shopping list"
-            color={colors.green}
-            isLast
-            onPress={() => setGroceryVisible(true)}
-          />
-        </View>
-
-        {/* REMINDERS */}
-        <Text style={st.sectionLabel}>Reminders</Text>
-        <View style={st.group}>
-          <ProgramRow
-            icon="💊" name="Pill Reminder"
-            description="Daily medication reminders"
-            color={colors.purple2}
-            isLast
-            onPress={() => setPillVisible(true)}
-          />
+          <View style={st.grid}>
+            <ProgramTile icon="ban"    name="Quit Smoking"   color={colors.rose}    onPress={() => setQsVisible(true)} />
+            <ProgramTile icon="wine"   name="Quit Drinking"  color={colors.honey}   onPress={() => setQdVisible(true)} />
+            <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
+            <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
+            <ProgramTile icon="medkit" name="Pill Reminder"  color={colors.purple2} onPress={() => setPillVisible(true)} />
+          </View>
         </View>
 
         <View style={{ height: spacing.xl }} />
@@ -166,29 +124,31 @@ const st = StyleSheet.create({
   // Section labels (iOS Settings style)
   sectionLabel:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: spacing.lg, marginBottom: spacing.sm, marginLeft: spacing.sm },
 
-  // iOS Settings-style grouped card
+  // Revolut-style "Products" container holding the whole grid
   group:          {
     backgroundColor: colors.layer1,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,
-    overflow: 'hidden',
+    padding: spacing.md,
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  row:            { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, minHeight: 64 },
-  rowDivider:     { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap' },
 
-  iconWrap:       {
-    width: 40, height: 40,
-    borderRadius: radius.sm,
+  // Each tile is a 1/3-width column: tinted icon-square + label beneath
+  tile:           {
+    width: '33.333%',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  tileIcon:       {
+    width: 58, height: 58,
+    borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  progIcon:       { fontSize: fontSize.lg },
-
-  rowBody:        { flex: 1 },
-  rowTitle:       { fontSize: fontSize.base, fontWeight: '600', color: colors.ink, letterSpacing: -0.2 },
-  rowSubtitle:    { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2, lineHeight: 16 },
+  tileLabel:      { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink, textAlign: 'center', lineHeight: 15 },
 });
 
 // Modal shared styles
