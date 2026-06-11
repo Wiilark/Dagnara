@@ -60,13 +60,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
   const [cravingCoping, setCravingCoping] = useState<string | null>(null);
   const [cravingGaveIn, setCravingGaveIn] = useState(false);
   // UI: which detail view is showing inside the modal
-  const [qsView, setQsView] = useState<'main' | 'progress' | 'achievements' | 'achievement' | 'health' | 'cravings' | 'tip' | 'quitline' | 'breathing' | 'reasons' | 'nrt' | 'rescue' | 'patterns' | 'goal'>('main');
-  // Money-saved goal — user names what they're saving for + dollar target.
-  // Persisted to QS_GOAL. Stored amount is in user's display currency (NOT USD)
-  // so the editor's number is what the user typed and the bar reads naturally.
-  const [moneyGoal, setMoneyGoal] = useState<{ amount: number; label: string } | null>(null);
-  const [goalDraftAmount, setGoalDraftAmount] = useState('');
-  const [goalDraftLabel,  setGoalDraftLabel ] = useState('');
+  const [qsView, setQsView] = useState<'main' | 'progress' | 'achievements' | 'achievement' | 'health' | 'cravings' | 'tip' | 'quitline' | 'breathing' | 'reasons' | 'nrt' | 'rescue' | 'patterns'>('main');
   // Craving rescue — 3-minute countdown the user runs in the moment a craving
   // hits. Reuses the breathing animation circle for visual rhythm. On completion
   // we auto-log a Craving with gaveIn:false (rode it out).
@@ -229,8 +223,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
       AsyncStorage.getItem(KEYS.QS_NRT),
       AsyncStorage.getItem(KEYS.QS_TIP),
       AsyncStorage.getItem(KEYS.QS_COST_PROMPT),
-      AsyncStorage.getItem(KEYS.QS_GOAL),
-    ]).then(([raw, rawSlips, rawBest, rawCrave, rawReasons, rawNrt, rawTip, rawCostPrompt, rawGoal]) => {
+    ]).then(([raw, rawSlips, rawBest, rawCrave, rawReasons, rawNrt, rawTip, rawCostPrompt]) => {
       if (raw) {
         try {
           const d: QsData = JSON.parse(raw);
@@ -318,20 +311,6 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
         setTipPrefs(safe);
       } catch {
         setTipPrefs(DEFAULT_TIP_PREFS);
-      }
-      try {
-        if (rawGoal) {
-          const g = JSON.parse(rawGoal) as { amount: number; label: string };
-          if (g && typeof g.amount === 'number' && Number.isFinite(g.amount) && g.amount > 0 && typeof g.label === 'string') {
-            setMoneyGoal({ amount: g.amount, label: g.label });
-          } else {
-            setMoneyGoal(null);
-          }
-        } else {
-          setMoneyGoal(null);
-        }
-      } catch {
-        setMoneyGoal(null);
       }
     });
   }, [visible]);
@@ -527,42 +506,6 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
     setRescueRunning(false);
     setRescueSecondsLeft(RESCUE_TOTAL_SEC);
     setRescueDone(false);
-  }
-
-  // Persist the money-saved goal. Stored amount is in display currency (NOT USD)
-  // so what the user typed is what they read back. Label is freeform (under 60 ch).
-  function saveGoal() {
-    const amt = parseFloat(goalDraftAmount);
-    const lbl = goalDraftLabel.trim();
-    if (!Number.isFinite(amt) || amt <= 0) {
-      Alert.alert('Invalid amount', 'Enter a goal amount greater than 0.');
-      return;
-    }
-    if (!lbl) {
-      Alert.alert('What are you saving for?', 'Give your goal a name — e.g. "Weekend in Lisbon" or "New bike".');
-      return;
-    }
-    const g = { amount: amt, label: lbl.slice(0, 60) };
-    AsyncStorage.setItem(KEYS.QS_GOAL, JSON.stringify(g));
-    setMoneyGoal(g);
-    setQsView('progress');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  }
-  function clearGoal() {
-    Alert.alert(
-      'Remove your goal?',
-      'You can set a new one any time.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => {
-          AsyncStorage.removeItem(KEYS.QS_GOAL);
-          setMoneyGoal(null);
-          setGoalDraftAmount('');
-          setGoalDraftLabel('');
-          setQsView('progress');
-        } },
-      ],
-    );
   }
 
   // Cravings in the rolling last 7 days, plus the win-rate (didn't give in) so the
@@ -870,12 +813,10 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
               // Detail-view back navigation:
               //  • 'achievement'              → achievements list
               //  • tip / quitline / breathing → cravings list
-              //  • goal                       → progress
               //  • anything else              → main
               onBack={() => {
                 if (qsView === 'achievement') { setSelectedAch(null); setQsView('achievements'); }
                 else if (qsView === 'tip' || qsView === 'quitline' || qsView === 'breathing' || qsView === 'rescue' || qsView === 'patterns') setQsView('cravings');
-                else if (qsView === 'goal') setQsView('progress');
                 else { setReasonsEditing(false); setQsView('main'); }
               }}
               title={
@@ -889,8 +830,7 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
                 qsView === 'reasons'      ? 'My reasons' :
                 qsView === 'nrt'          ? 'NRT log' :
                 qsView === 'rescue'       ? 'Ride the wave' :
-                qsView === 'patterns'     ? 'Your patterns' :
-                qsView === 'goal'         ? 'Money-saved goal' : ''
+                qsView === 'patterns'     ? 'Your patterns' : ''
               }
               right={
                 qsView === 'health' ? (
@@ -1270,93 +1210,6 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
                 <Text style={m.qsDetailRowLbl}>Per year</Text>
                 <Text style={m.qsDetailRowVal}>{fmtKr(moneyPer.year)}</Text>
               </View>
-
-              {/* Money-saved GOAL — named target with a live progress bar. Empty
-                  state shows a "Set a goal" CTA. moneyGoal.amount is stored in the
-                  user's display currency; moneySaved is USD, so we convert the
-                  USD figure into the same display currency for an apples-to-apples
-                  bar. Reuses the same fmtKr formatter for the readouts. */}
-              <Text style={m.qsDetailSectionTitle}>Money-saved goal</Text>
-              {moneyGoal ? (() => {
-                // moneyPer.day is display-currency per day, so cumulative saved
-                // in display currency = moneyPer.day × full days quit. We already
-                // compute hours; use hours/24 for the day fraction. This compares
-                // like-for-like with the stored goal amount (also display currency).
-                const savedCurr = moneyPer.day * (hours / 24);
-                const pct = Math.max(0, Math.min(1, savedCurr / moneyGoal.amount));
-                const remaining = Math.max(0, moneyGoal.amount - savedCurr);
-                const done = pct >= 1;
-                return (
-                  <View style={m.qsGoalCard}>
-                    <View style={m.qsGoalHead}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={m.qsGoalLabel} numberOfLines={2}>{moneyGoal.label}</Text>
-                        <Text style={m.qsGoalSub}>
-                          {fmtKr(savedCurr)} of {fmtKr(moneyGoal.amount)} · {Math.round(pct * 100)}%
-                        </Text>
-                      </View>
-                      <View style={[m.qsGoalBadge, done && { backgroundColor: colors.green + '22', borderColor: colors.green + '55' }]}>
-                        <Ionicons
-                          name={done ? 'trophy' : 'flag'}
-                          size={14}
-                          color={done ? colors.green : colors.honey}
-                        />
-                      </View>
-                    </View>
-                    <View style={m.qsGoalBarTrack}>
-                      <View
-                        style={[
-                          m.qsGoalBarFill,
-                          {
-                            width: `${Math.max(2, pct * 100)}%`,
-                            backgroundColor: done ? colors.green : colors.honey,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={[m.qsGoalFootnote, done && { color: colors.green }]}>
-                      {done
-                        ? "You hit it. Time to spend it on what you're saving for."
-                        : `${fmtKr(remaining)} to go — keep going.`}
-                    </Text>
-                    <View style={m.qsGoalActionsRow}>
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                          setGoalDraftAmount(String(moneyGoal.amount));
-                          setGoalDraftLabel(moneyGoal.label);
-                          setQsView('goal');
-                        }}
-                        style={m.qsGoalActionBtn}
-                      >
-                        <Ionicons name="pencil" size={14} color={colors.ink2} />
-                        <Text style={m.qsGoalActionTxt}>Edit goal</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })() : (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    setGoalDraftAmount('');
-                    setGoalDraftLabel('');
-                    setQsView('goal');
-                  }}
-                  style={m.qsGoalEmpty}
-                >
-                  <View style={m.qsGoalEmptyIcon}>
-                    <Ionicons name="trophy" size={20} color={colors.honey} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={m.qsGoalEmptyTitle}>Set a savings goal</Text>
-                    <Text style={m.qsGoalEmptySub}>Name what you're saving for and watch your bar fill as you stay quit.</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
-                </TouchableOpacity>
-              )}
 
               {/* Time won back */}
               <Text style={m.qsDetailSectionTitle}>Time won back</Text>
@@ -2351,60 +2204,6 @@ export function QuitSmokingModal({ visible, onClose }: { visible: boolean; onClo
               </>
             );
           })()}
-
-          {/* ════════════════════════════════════════════════════════════════
-              MONEY-SAVED GOAL — name a thing you're saving for, watch the bar.
-          ════════════════════════════════════════════════════════════════ */}
-          {qsView === 'goal' && (
-            <>
-              <View style={m.qsReasonsIntro}>
-                <Ionicons name="trophy" size={18} color={colors.honey} />
-                <Text style={m.qsReasonsIntroTxt}>
-                  Name what you're saving for — a trip, gear, a treat — and we'll track your money-saved progress against it. The bigger the prize, the better the motivation.
-                </Text>
-              </View>
-
-              <Text style={m.qsDetailSectionTitle}>What are you saving for?</Text>
-              <TextInput
-                style={m.qsTextInput}
-                value={goalDraftLabel}
-                onChangeText={setGoalDraftLabel}
-                placeholder="e.g. Weekend in Lisbon"
-                placeholderTextColor={colors.ink3}
-                maxLength={60}
-                returnKeyType="next"
-              />
-
-              <Text style={m.qsDetailSectionTitle}>How much do you need?</Text>
-              <TextInput
-                style={m.qsTextInput}
-                value={goalDraftAmount}
-                onChangeText={setGoalDraftAmount}
-                placeholder="500"
-                placeholderTextColor={colors.ink3}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                onSubmitEditing={saveGoal}
-              />
-
-              <TouchableOpacity activeOpacity={0.85} onPress={saveGoal} style={m.qsCravingSaveBtnWrap}>
-                <LinearGradient
-                  colors={[colors.purple, colors.purpleGlow]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={m.qsCravingSaveBtn}
-                >
-                  <Text style={m.qsCravingSaveBtnTxt}>{moneyGoal ? 'Update goal' : 'Save goal'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {moneyGoal && (
-                <TouchableOpacity activeOpacity={0.85} onPress={clearGoal} style={m.qsRescueAgainBtn}>
-                  <Text style={[m.qsRescueAgainBtnTxt, { color: colors.rose }]}>Remove this goal</Text>
-                </TouchableOpacity>
-              )}
-              <View style={{ height: 24 }} />
-            </>
-          )}
 
           {/* ════════════════════════════════════════════════════════════════
               MY REASONS — strongest evidence-based craving anchor.

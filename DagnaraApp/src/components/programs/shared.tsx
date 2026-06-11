@@ -20,7 +20,6 @@ export function makeKeys(email: string) {
     QS_TIP:   `dagnara_quit_smoking_tip_${email}`,        // tip prefs (liked/skipped IDs)
     QS_NRT:   `dagnara_quit_smoking_nrt_${email}`,        // NRT log
     QS_COST_PROMPT: `dagnara_quit_smoking_cost_prompt_${email}`, // last cost-update prompt date
-    QS_GOAL:  `dagnara_quit_smoking_goal_${email}`,       // money-saved goal ({amount,label})
     QD:       `dagnara_quit_drinking_${email}`,
     QD_SLIPS: `dagnara_quit_drinking_slips_${email}`,
     QD_BEST:  `dagnara_quit_drinking_best_${email}`,
@@ -3628,118 +3627,6 @@ export const m = StyleSheet.create({
     marginTop: spacing.sm,
     fontStyle: 'italic',
     textAlign: 'center',
-  },
-
-  // ── Money-saved goal card (progress detail) ───────────────────────────────
-  qsGoalCard: {
-    backgroundColor: colors.layer1,
-    borderWidth: 1, borderColor: colors.line2,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  qsGoalHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  qsGoalLabel: {
-    fontSize: fontSize.md,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: -0.1,
-    lineHeight: fontSize.md + 4,
-  },
-  qsGoalSub: {
-    fontSize: fontSize.xs,
-    color: colors.ink3,
-    fontWeight: '700',
-    marginTop: 2,
-    letterSpacing: 0.3,
-  },
-  qsGoalBadge: {
-    width: 32, height: 32,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.layer2,
-    borderWidth: 1,
-    borderColor: colors.line2,
-  },
-  qsGoalBarTrack: {
-    height: 12,
-    backgroundColor: colors.layer2,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    marginTop: 4,
-  },
-  qsGoalBarFill: {
-    height: '100%',
-    borderRadius: radius.pill,
-  },
-  qsGoalFootnote: {
-    fontSize: fontSize.sm,
-    color: colors.ink2,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  qsGoalActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  qsGoalActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.layer2,
-    borderWidth: 1, borderColor: colors.line2,
-    borderRadius: radius.pill,
-  },
-  qsGoalActionTxt: {
-    fontSize: fontSize.xs,
-    color: colors.ink2,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-
-  // ── Goal · empty (no goal set yet) entry card ─────────────────────────────
-  qsGoalEmpty: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm2,
-    backgroundColor: colors.layer1,
-    borderWidth: 1, borderColor: colors.line2,
-    borderStyle: 'dashed',
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginTop: spacing.xs,
-  },
-  qsGoalEmptyIcon: {
-    width: 38, height: 38,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.layer2,
-    borderWidth: 1,
-    borderColor: colors.line2,
-  },
-  qsGoalEmptyTitle: {
-    fontSize: fontSize.base,
-    fontWeight: '800',
-    color: colors.white,
-    letterSpacing: -0.1,
-    lineHeight: fontSize.base + 4,
-  },
-  qsGoalEmptySub: {
-    fontSize: fontSize.xs,
-    color: colors.ink3,
-    fontWeight: '600',
-    marginTop: 2,
-    lineHeight: fontSize.xs + 4,
   },
 
   // ── Resilience strip (main view · slips + personal best) ──────────────────
