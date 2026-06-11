@@ -1,12 +1,9 @@
-/* eslint-disable */
 // Shared building blocks for the Programs modals: storage keys, the sheet
 // header, all program types/constants, helper + art components, and the `m`
 // stylesheet used by every modal. Extracted mechanically from programs.tsx —
 // call sites stay byte-identical (`m.foo`, helper names unchanged).
 import { type ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Ellipse, G, Line, Rect, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import { colors, spacing, fontSize, radius } from '../../theme';
 import { BackChevron } from '../BackChevron';
@@ -179,7 +176,7 @@ export interface Craving {
 
 // Trigger and coping options for the craving logger — keep them short so the
 // chip row stays one line on small phones.
-export const CRAVING_TRIGGERS: Array<{ key: string; label: string; icon: string }> = [
+export const CRAVING_TRIGGERS: { key: string; label: string; icon: string }[] = [
   { key: 'stress',  label: 'Stress',  icon: '😣' },
   { key: 'social',  label: 'Social',  icon: '👥' },
   { key: 'meal',    label: 'Meal',    icon: '🍽' },
@@ -187,7 +184,7 @@ export const CRAVING_TRIGGERS: Array<{ key: string; label: string; icon: string 
   { key: 'alcohol', label: 'Drinks',  icon: '🥂' },
   { key: 'other',   label: 'Other',   icon: '•' },
 ];
-export const CRAVING_COPING: Array<{ key: string; label: string; icon: string }> = [
+export const CRAVING_COPING: { key: string; label: string; icon: string }[] = [
   { key: 'breath',   label: 'Breathe',  icon: '🫁' },
   { key: 'walk',     label: 'Walk',     icon: '🚶' },
   { key: 'water',    label: 'Water',    icon: '💧' },
@@ -456,7 +453,7 @@ export const QD_QUITLINES: { code: string; region: string; flag: string; number:
 // Trigger and coping options tuned for alcohol cravings — distinct from the
 // smoking lists (no 'meal' pairing since wine-with-dinner is a *trigger*, and
 // 'celebration' replaces 'social' as the biggest alcohol-specific cue).
-export const QD_CRAVING_TRIGGERS: Array<{ key: string; label: string; icon: string }> = [
+export const QD_CRAVING_TRIGGERS: { key: string; label: string; icon: string }[] = [
   { key: 'stress',      label: 'Stress',      icon: '😣' },
   { key: 'social',      label: 'Social',      icon: '👥' },
   { key: 'celebration', label: 'Celebration', icon: '🎉' },
@@ -465,7 +462,7 @@ export const QD_CRAVING_TRIGGERS: Array<{ key: string; label: string; icon: stri
   { key: 'habit',       label: 'Habit',       icon: '🕰' },
   { key: 'other',       label: 'Other',       icon: '•' },
 ];
-export const QD_CRAVING_COPING: Array<{ key: string; label: string; icon: string }> = [
+export const QD_CRAVING_COPING: { key: string; label: string; icon: string }[] = [
   { key: 'breath',   label: 'Breathe',  icon: '🫁' },
   { key: 'walk',     label: 'Walk',     icon: '🚶' },
   { key: 'water',    label: 'Water',    icon: '💧' },
@@ -1182,7 +1179,7 @@ export function ProgressSceneArt({ width = 260 }: { width?: number }) {
 export function illoVariant(id: string): { tint: string; accent: string; pop: string; spin: number } {
   let h = 5381;
   for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
-  const palettes: Array<[string, string, string]> = [
+  const palettes: [string, string, string][] = [
     [colors.honey,    colors.rose,     colors.sky],
     [colors.rose,     colors.honey,    colors.purple3],
     [colors.sky,      colors.purple3,  colors.honey],

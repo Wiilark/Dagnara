@@ -16,6 +16,41 @@ const DEFAULT_TIMEOUT_MS = 35_000;
 // but catching early saves bandwidth and gives a clearer error.
 const MAX_IMAGE_BASE64 = 12_000_000; // ~9 MB binary
 
+// ---- AI response shapes (must mirror the server.js JSON schemas) ----
+
+/** Per-100g macro block the AI attaches so the serving editor can rescale. */
+export interface NutritionPer100 {
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/** One food the AI extracted from a photo, description, or recipe URL. */
+export interface AiFoodItem {
+  icon: string;
+  name: string;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  unit: string;
+  weight_g?: number;
+  per100?: NutritionPer100;
+}
+
+/** /api/analyze-food and /api/estimate-nutrition return a list of foods. */
+export interface NutritionResponse {
+  items: AiFoodItem[];
+}
+
+/** /api/import-recipe returns a named recipe with its component foods. */
+export interface RecipeResponse {
+  name: string;
+  servings: number;
+  items: AiFoodItem[];
+}
+
 /**
  * fetch with AbortController timeout + safe JSON parsing.
  * Always throws a short, user-friendly Error code:
@@ -49,9 +84,9 @@ async function postJson<T>(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-  } catch (e: any) {
+  } catch (e) {
     clearTimeout(timer);
-    if (e?.name === 'AbortError') throw new Error('TIMEOUT');
+    if (e instanceof Error && e.name === 'AbortError') throw new Error('TIMEOUT');
     throw new Error('NETWORK_ERROR');
   }
   clearTimeout(timer);
@@ -68,18 +103,18 @@ async function postJson<T>(
   }
 }
 
-export async function importRecipe(url: string): Promise<any> {
-  return postJson('/api/import-recipe', { url });
+export async function importRecipe(url: string): Promise<RecipeResponse> {
+  return postJson<RecipeResponse>('/api/import-recipe', { url });
 }
 
-export async function analyzeFood(imageData: string, mediaType: string): Promise<any> {
+export async function analyzeFood(imageData: string, mediaType: string): Promise<NutritionResponse> {
   if (imageData.length > MAX_IMAGE_BASE64) {
     throw new Error('IMAGE_TOO_LARGE');
   }
-  return postJson('/api/analyze-food', { imageData, mediaType }, 45_000);
+  return postJson<NutritionResponse>('/api/analyze-food', { imageData, mediaType }, 45_000);
 }
 
-export async function estimateNutrition(description: string): Promise<any> {
+export async function estimateNutrition(description: string): Promise<NutritionResponse | null> {
   const clean = description.trim().toLowerCase();
   if (clean.length < 2) return null;
 
@@ -92,8 +127,8 @@ export async function estimateNutrition(description: string): Promise<any> {
     }
   } catch { /* cache miss */ }
 
-  const data = await postJson('/api/estimate-nutrition', { description });
-  
+  const data = await postJson<NutritionResponse>('/api/estimate-nutrition', { description });
+
   if (data) {
     try {
       // Cache results for 7 days
@@ -103,14 +138,4 @@ export async function estimateNutrition(description: string): Promise<any> {
   }
   
   return data;
-}
-
-export async function getBarcodeProduct(code: string): Promise<any> {
-  if (!API_BASE) throw new Error('SETUP_REQUIRED');
-  const res = await fetch(`${API_BASE}/api/barcode/${code}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'SERVER_ERROR');
-  }
-  return res.json();
 }
