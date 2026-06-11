@@ -54,10 +54,7 @@ export default function ProgramsScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
   const headerH = 50 + insets.top + 16;
-  // Pull content up so the first program card tucks under the avatar row — the
-  // floating header is transparent until scrolled, so the card showing through
-  // beside/under the profile icon matches Revolut's high-sitting Products grid.
-  const scrollPaddingTop = insets.top + spacing.xs + (spacing.xl + spacing.sm) / 2;
+  const scrollPaddingTop = 60 + insets.top;
 
   return (
     <View style={st.safe}>
@@ -125,7 +122,7 @@ const st = StyleSheet.create({
   scroll:    { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, paddingTop: spacing.sm },
 
   // Section labels (iOS Settings style)
-  sectionLabel:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 0, marginBottom: spacing.sm, marginLeft: spacing.sm },
+  sectionLabel:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: spacing.lg, marginBottom: spacing.sm, marginLeft: spacing.sm },
 
   // Revolut-style "Products" container holding the whole grid
   group:          {
