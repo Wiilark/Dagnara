@@ -1,11 +1,20 @@
 .env
 node_modules/
 
+# Store / signing credentials — never commit
+google-play-service-account.json
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+
 # Claude Code local state — never commit
 .claude/backups/
 .claude/recovery/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
 
 # Local scratch / screenshots — never commit
 Screenshots/
