@@ -54,7 +54,10 @@ export default function ProgramsScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
   const headerH = 50 + insets.top + 16;
-  const scrollPaddingTop = 60 + insets.top;
+  // Pull content up so the first program card tucks under the avatar row — the
+  // floating header is transparent until scrolled, so the card showing through
+  // beside/under the profile icon matches Revolut's high-sitting Products grid.
+  const scrollPaddingTop = insets.top + spacing.xs + (spacing.xl + spacing.sm) / 2;
 
   return (
     <View style={st.safe}>
@@ -70,7 +73,6 @@ export default function ProgramsScreen() {
             </View>
             {hasUnread && <View style={st.avatarDot} />}
           </TouchableOpacity>
-          <View style={st.appTitleWrap} pointerEvents="none"><Text style={st.appTitle}>Programs</Text></View>
           <View style={st.headerRight} />
         </View>
       </View>
@@ -109,8 +111,6 @@ const st = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.bg },
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.lg, flex: 1 },
-  appTitleWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
-  appTitle:  { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
@@ -122,7 +122,7 @@ const st = StyleSheet.create({
   scroll:    { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, paddingTop: spacing.sm },
 
   // Section labels (iOS Settings style)
-  sectionLabel:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: spacing.lg, marginBottom: spacing.sm, marginLeft: spacing.sm },
+  sectionLabel:   { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink3, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 0, marginBottom: spacing.sm, marginLeft: spacing.sm },
 
   // Revolut-style "Products" container holding the whole grid
   group:          {
