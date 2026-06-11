@@ -30,7 +30,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, setCoachOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
   const isPremium = usePremium();
 
   const [editing, setEditing] = useState(false);
@@ -592,6 +592,7 @@ export default function ProfileScreen() {
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
+            { icon: 'chatbubble-outline', label: 'AI Coach', color: colors.lavender, value: 'Nutrition · Macros', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCoachOpen(true); } },
             { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
           ].map(({ icon, label, color, value, badge, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>

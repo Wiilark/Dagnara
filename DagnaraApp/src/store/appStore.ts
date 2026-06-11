@@ -72,10 +72,12 @@ interface PersistedData {
 interface AppState extends PersistedData {
   userEmail: string | null;
   messagesOpen: boolean;
+  coachOpen: boolean;
   hasUnread: boolean;
   unreadCount: number;
   setUserEmail: (email: string | null) => void;
   setMessagesOpen: (v: boolean) => void;
+  setCoachOpen: (v: boolean) => void;
   setHasUnread: (v: boolean) => void;
   markMessageRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -178,6 +180,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   premium: true,   // free during launch — everyone gets Pro for now
   userEmail: null,
   messagesOpen: false,
+  coachOpen: false,
   hasUnread: countUnread([]) > 0,
   unreadCount: countUnread([]),
 
@@ -186,6 +189,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setUserEmail: (email) => set({ userEmail: email }),
   setMessagesOpen: (v) => set({ messagesOpen: v }),
+  setCoachOpen: (v) => set({ coachOpen: v }),
   setHasUnread: (v) => set({ hasUnread: v }),
 
   markMessageRead: async (id) => {
@@ -371,7 +375,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () => set({
     lifeScore: null, lifeScoreDate: null, streak: 0, lastLoggedDate: null,
     programs: { nutrition: true, hydration: true, movement: false, sleep: false, stress: false, quit_smoking: false, quit_drinking: false, pill_reminder: false },
-    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, readMessageIds: [], premium: true, unreadCount: countUnread([]), hasUnread: countUnread([]) > 0, userEmail: null, messagesOpen: false,
+    weightHistory: [], xp: 0, activityLevel: 'moderate', weightGoal: 'maintain', calorieGoal: 2000, unitSystem: 'Metric', macroPcts: { carbs: 45, protein: 30, fat: 25 }, savedRecipes: [], country: 'US', fastingWindow: null, dietaryPreferences: null, pillDefaultTime: null, readMessageIds: [], premium: true, unreadCount: countUnread([]), hasUnread: countUnread([]) > 0, userEmail: null, messagesOpen: false, coachOpen: false,
   }),
 }));
 

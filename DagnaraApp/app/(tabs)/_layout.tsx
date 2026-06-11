@@ -14,7 +14,9 @@ import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { formatWeight } from '../../src/lib/units';
 import { fmt } from '../../src/lib/format';
 import { useAppStore } from '../../src/store/appStore';
+import { useAuthStore } from '../../src/store/authStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
+import { sendCoachMessage, type CoachMessage } from '../../src/lib/api';
 import { MESSAGES, MSG_COLORS, groupMessages, countUnread } from '../../src/lib/messages';
 
 const TODAY = () => new Date().toLocaleDateString('en-CA');
@@ -32,6 +34,147 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 }
 
 
+
+// ── AI Nutrition Coach Modal ──────────────────────────────────────────────────
+function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { profile } = useAuthStore();
+  const { weightGoal, activityLevel, calorieGoal } = useAppStore();
+  const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!visible) { setMessages([]); setInput(''); setLoading(false); }
+  }, [visible]);
+
+  useEffect(() => {
+    if (messages.length > 0) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  }, [messages]);
+
+  const context = [
+    profile.name ? `Name: ${profile.name}` : null,
+    profile.age ? `Age: ${profile.age}` : null,
+    profile.weight ? `Weight: ${profile.weight}kg` : null,
+    `Goal: ${weightGoal}`,
+    `Activity: ${activityLevel}`,
+    `Calorie target: ${calorieGoal} kcal`,
+    profile.sex ? `Sex: ${profile.sex}` : null,
+  ].filter(Boolean).join(', ');
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || loading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next: CoachMessage[] = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    setLoading(true);
+    try {
+      const reply = await sendCoachMessage(next, context);
+      setMessages(m => [...m, { role: 'assistant', content: reply }]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      setMessages(m => [...m, { role: 'assistant', content: `Sorry, I couldn't respond right now. (${msg})` }]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={coach.safe} edges={['top', 'bottom']}>
+        <LinearGradient
+          colors={['rgba(124,77,255,0.18)', 'transparent']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }}
+          pointerEvents="none"
+        />
+        <View style={coach.header}>
+          <TouchableOpacity onPress={onClose} style={coach.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={22} color={colors.ink2} />
+          </TouchableOpacity>
+          <View style={coach.headerCenter}>
+            <Text style={coach.headerTitle}>AI Coach</Text>
+            <Text style={coach.headerSub}>Nutrition · Macros · Habits</Text>
+          </View>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={coach.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {messages.length === 0 && (
+            <View style={coach.emptyWrap}>
+              <Text style={coach.emptyIcon}>🥗</Text>
+              <Text style={coach.emptyTitle}>Your nutrition coach</Text>
+              <Text style={coach.emptySub}>Ask me anything about nutrition, macros, meal ideas, or healthy habits.</Text>
+              <View style={coach.suggestionRow}>
+                {[
+                  'What should I eat before a workout?',
+                  'How much protein do I need?',
+                  'Help me plan a high-protein day',
+                ].map(s => (
+                  <TouchableOpacity key={s} style={coach.suggestion} onPress={() => setInput(s)} activeOpacity={0.75}>
+                    <Text style={coach.suggestionTxt}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+          {messages.map((m, i) => (
+            <View key={i} style={[coach.bubble, m.role === 'user' ? coach.bubbleUser : coach.bubbleAssistant]}>
+              {m.role === 'assistant' && (
+                <View style={coach.avatarDot}>
+                  <Text style={coach.avatarEmoji}>🥗</Text>
+                </View>
+              )}
+              <View style={[coach.bubbleInner, m.role === 'user' ? coach.bubbleInnerUser : coach.bubbleInnerAssistant]}>
+                <Text style={[coach.bubbleTxt, m.role === 'user' && coach.bubbleTxtUser]}>{m.content}</Text>
+              </View>
+            </View>
+          ))}
+          {loading && (
+            <View style={[coach.bubble, coach.bubbleAssistant]}>
+              <View style={coach.avatarDot}><Text style={coach.avatarEmoji}>🥗</Text></View>
+              <View style={[coach.bubbleInner, coach.bubbleInnerAssistant]}>
+                <Text style={coach.typingDots}>· · ·</Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={coach.inputRow}>
+          <TextInput
+            style={coach.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask your coach…"
+            placeholderTextColor={colors.ink3}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={handleSend}
+          />
+          <TouchableOpacity
+            style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
+            onPress={handleSend}
+            activeOpacity={0.8}
+            disabled={!input.trim() || loading}
+          >
+            <Ionicons name="arrow-up" size={18} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
 
 // ── Messages Modal ────────────────────────────────────────────────────────────
 function MessagesModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -576,6 +719,8 @@ export default function TabLayout() {
   const loadApp = useAppStore((s) => s.loadApp);
   const messagesOpen = useAppStore((s) => s.messagesOpen);
   const setMessagesOpen = useAppStore((s) => s.setMessagesOpen);
+  const coachOpen = useAppStore((s) => s.coachOpen);
+  const setCoachOpen = useAppStore((s) => s.setCoachOpen);
   const [fabOpen, setFabOpen] = useState(false);
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const [weightOpen, setWeightOpen] = useState(false);
@@ -675,6 +820,7 @@ export default function TabLayout() {
       <SleepLogger visible={sleepOpen} onClose={() => setSleepOpen(false)} />
       <ActivityLogger visible={activityOpen} onClose={() => setActivityOpen(false)} />
       <MessagesModal visible={messagesOpen} onClose={() => setMessagesOpen(false)} />
+      <CoachModal visible={coachOpen} onClose={() => setCoachOpen(false)} />
     </>
   );
 }
@@ -1098,5 +1244,38 @@ const el = StyleSheet.create({
   durUnit: { fontSize: fontSize.sm + 1, color: colors.ink2 },
   logBtn: { flex: 1, backgroundColor: colors.purple, borderRadius: radius.sm + 2, paddingVertical: spacing.sm + 2, alignItems: 'center' },
   logBtnTxt: { fontSize: fontSize.sm + 1, fontWeight: '700', color: colors.ink },
+});
+
+// ── AI Coach styles ───────────────────────────────────────────────────────────
+const coach = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
+  closeBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  headerCenter: { alignItems: 'center' },
+  headerTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
+  headerSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
+  scroll: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm },
+  emptyWrap: { alignItems: 'center', paddingTop: spacing.xl, paddingHorizontal: spacing.md, gap: spacing.md },
+  emptyIcon: { fontSize: fontSize['2xl'] },
+  emptyTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  emptySub: { fontSize: fontSize.base, color: colors.ink2, textAlign: 'center', lineHeight: 22 },
+  suggestionRow: { width: '100%', gap: spacing.xs + 2, marginTop: spacing.xs },
+  suggestion: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
+  suggestionTxt: { fontSize: fontSize.sm, color: colors.lavender, fontWeight: '500' },
+  bubble: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  bubbleUser: { flexDirection: 'row-reverse' },
+  bubbleAssistant: {},
+  avatarDot: { width: 30, height: 30, borderRadius: radius.pill, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 },
+  avatarEmoji: { fontSize: fontSize.sm },
+  bubbleInner: { maxWidth: '80%', borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
+  bubbleInnerUser: { backgroundColor: colors.purple, borderBottomRightRadius: spacing.xs },
+  bubbleInnerAssistant: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderBottomLeftRadius: spacing.xs },
+  bubbleTxt: { fontSize: fontSize.base, color: colors.ink, lineHeight: 22 },
+  bubbleTxtUser: { color: colors.white },
+  typingDots: { fontSize: fontSize.md, color: colors.ink3, letterSpacing: 4 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderTopWidth: 1, borderTopColor: colors.line2, backgroundColor: colors.bg },
+  input: { flex: 1, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.base, maxHeight: 100 },
+  sendBtn: { width: 38, height: 38, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  sendBtnDisabled: { backgroundColor: colors.layer3, shadowOpacity: 0 },
 });
 
