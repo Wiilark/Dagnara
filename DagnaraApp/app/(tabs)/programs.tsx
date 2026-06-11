@@ -133,13 +133,15 @@ const st = StyleSheet.create({
     padding: spacing.md,
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', marginLeft: -spacing.md },
+  // space-between pins Quit Smoking to the left and Grocery to the right,
+  // spreading the gap evenly across the four. The lone wrapped 5th tile
+  // (Pill Reminder) stays left-aligned, landing directly under Quit Smoking.
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
 
-  // Each tile is a 1/4-width column: tinted icon-square + label beneath
+  // Each tile sizes to its icon so the row can spread edge-to-edge, 4 per row.
   tile:           {
-    width: '25%',
+    width: 60,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
     gap: spacing.sm,
   },
   tileIcon:       {
