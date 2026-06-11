@@ -82,8 +82,8 @@ export default function RegisterScreen() {
         weight: values.weight,
         height: values.height,
       });
-    } catch (e: any) {
-      Alert.alert('Registration failed', e.message);
+    } catch (e) {
+      Alert.alert('Registration failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setLoading(false);
     }

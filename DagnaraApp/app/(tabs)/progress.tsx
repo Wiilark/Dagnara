@@ -121,7 +121,8 @@ function LoggingCalendar({ entries }: { entries: Record<string, DiaryEntry> }) {
   const firstDayOfMonth = new Date(year, month, 1);
   const startPadding = (firstDayOfMonth.getDay() + 6) % 7;
 
-  const days: any[] = [];
+  type DayCell = { day: number; date: string; kcal: number; weight?: number; status: 'future' | 'logged' | 'partial' | 'none' };
+  const days: DayCell[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const key = date.toLocaleDateString('en-CA');

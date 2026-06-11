@@ -117,8 +117,9 @@ export default function OnboardingScreen() {
         await scheduleDailySummaryReminder(true);
       } catch {}
       doNavigate();
-    } catch (e: any) {
-      Alert.alert('Setup error', e?.message ?? 'Something went wrong. Please try again.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      Alert.alert('Setup error', msg);
     } finally {
       clearTimeout(timer);
       setSaving(false);

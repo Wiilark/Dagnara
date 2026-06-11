@@ -19,7 +19,7 @@ import { useDiaryStore, FoodItem, StrengthSession, StrengthExercise, CardioSessi
 import { STRENGTH_EXERCISES, estimateStrengthKcal } from '../../src/lib/strengthExercises';
 import { useAuthStore } from '../../src/store/authStore';
 import { useAppStore, getXpLevel } from '../../src/store/appStore';
-import { analyzeFood, importRecipe, estimateNutrition } from '../../src/lib/api';
+import { analyzeFood, importRecipe, estimateNutrition, type AiFoodItem } from '../../src/lib/api';
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
 import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { skipMealReminderToday } from '../../src/lib/notifications';
@@ -1241,7 +1241,7 @@ export default function DiaryScreen() {
     try {
       const data = await importRecipe(recipeUrl.trim());
       // api.ts already returns the parsed object — not a raw Anthropic response
-      const items: any[] = data?.items ?? [];
+      const items: AiFoodItem[] = data?.items ?? [];
       if (items.length === 0) { Alert.alert('Nothing found', 'Could not extract recipe items. Try a direct recipe page URL.'); return; }
       for (const item of items) {
         const food: FoodItem = {
@@ -1263,10 +1263,10 @@ export default function DiaryScreen() {
         id: `r_${Date.now()}`,
         name: (data?.name as string | undefined) ?? 'Imported Recipe',
         icon: '📖',
-        kcal: Math.round(items.reduce((s: number, i: any) => s + (i.kcal ?? 0), 0) / servings),
-        protein: Math.round(items.reduce((s: number, i: any) => s + (i.protein ?? 0), 0) / servings * 10) / 10,
-        carbs: Math.round(items.reduce((s: number, i: any) => s + (i.carbs ?? 0), 0) / servings * 10) / 10,
-        fat: Math.round(items.reduce((s: number, i: any) => s + (i.fat ?? 0), 0) / servings * 10) / 10,
+        kcal: Math.round(items.reduce((s: number, i: AiFoodItem) => s + (i.kcal ?? 0), 0) / servings),
+        protein: Math.round(items.reduce((s: number, i: AiFoodItem) => s + (i.protein ?? 0), 0) / servings * 10) / 10,
+        carbs: Math.round(items.reduce((s: number, i: AiFoodItem) => s + (i.carbs ?? 0), 0) / servings * 10) / 10,
+        fat: Math.round(items.reduce((s: number, i: AiFoodItem) => s + (i.fat ?? 0), 0) / servings * 10) / 10,
         fiber: 0,
         sugar: 0,
         sodium: 0,
@@ -1278,11 +1278,12 @@ export default function DiaryScreen() {
       setRecipeUrl('');
       setSearchVisible(false);
       Alert.alert('Recipe imported!', `Added ${items.length} item${items.length !== 1 ? 's' : ''} from the recipe.`);
-    } catch (err: any) {
-      if (err?.message === 'SETUP_REQUIRED') {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : undefined;
+      if (msg === 'SETUP_REQUIRED') {
         Alert.alert('Not set up', 'Recipe import requires a deployed server. Set EXPO_PUBLIC_API_URL in your .env.');
       } else {
-        Alert.alert('Import failed', err?.message ?? 'Could not import recipe. Try a different URL.');
+        Alert.alert('Import failed', msg ?? 'Could not import recipe. Try a different URL.');
       }
     } finally {
       setImportingRecipe(false);
@@ -1302,7 +1303,7 @@ export default function DiaryScreen() {
     setAnalyzing(true);
     try {
       const data = await analyzeFood(base64, mediaType);
-      const raw: any[] = Array.isArray(data?.items) ? data.items : [];
+      const raw: AiFoodItem[] = Array.isArray(data?.items) ? data.items : [];
       if (raw.length === 0) { Alert.alert('No food detected', 'Try a clearer photo.'); return; }
       const meal: Meal = searchMeal;
       const aiItems: AiItem[] = raw.map(item => ({
@@ -1313,10 +1314,11 @@ export default function DiaryScreen() {
       setPendingAiItems(aiItems);
       setAiConfirmMeal(meal);
       setAiConfirmVisible(true);
-    } catch (err: any) {
-      if (err?.message === 'SETUP_REQUIRED') {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : undefined;
+      if (msg === 'SETUP_REQUIRED') {
         Alert.alert('Not set up', 'Food photo analysis requires a deployed server.\nSee EXPO_PUBLIC_API_URL in your .env file.');
-      } else if (err?.message === 'NETWORK_ERROR') {
+      } else if (msg === 'NETWORK_ERROR') {
         Alert.alert('Connection failed', 'Could not reach the analysis server. Check your internet connection.');
       } else {
         Alert.alert('Could not analyse photo', 'Try a clearer photo or add food manually.');
@@ -1341,7 +1343,7 @@ export default function DiaryScreen() {
     setAiEstimating(true);
     try {
       const data = await estimateNutrition(q);
-      const items: any[] = Array.isArray(data?.items) ? data.items : [];
+      const items: AiFoodItem[] = Array.isArray(data?.items) ? data.items : [];
       if (items.length === 0) { Alert.alert('No estimate', 'Could not estimate nutrition for that description.'); return; }
       for (const item of items) {
         const food: FoodItem = { id: `${Date.now()}_${Math.random()}`, icon: item.icon ?? '🍽️', name: item.name ?? q, kcal: item.kcal ?? 0, carbs: item.carbs ?? 0, protein: item.protein ?? 0, fat: item.fat ?? 0, unit: item.unit ?? 'serving', meal: searchMeal };
@@ -1352,11 +1354,12 @@ export default function DiaryScreen() {
       await addXp(items.length * 10);
       setAiEstimateQuery('');
       setSearchVisible(false);
-    } catch (err: any) {
-      if (err?.message === 'SETUP_REQUIRED') {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : undefined;
+      if (msg === 'SETUP_REQUIRED') {
         Alert.alert('Not set up', 'AI estimation requires a deployed server.');
       } else {
-        Alert.alert('Estimate failed', err?.message ?? 'Could not estimate nutrition.');
+        Alert.alert('Estimate failed', msg ?? 'Could not estimate nutrition.');
       }
     } finally { setAiEstimating(false); }
   }

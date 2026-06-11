@@ -37,8 +37,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
-    } catch (e: any) {
-      Alert.alert('Login failed', e.message);
+    } catch (e) {
+      Alert.alert('Login failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setLoading(false);
     }
@@ -49,8 +49,8 @@ export default function LoginScreen() {
     try {
       await sendPasswordReset(email.trim().toLowerCase());
       Alert.alert('Check your email', 'A password reset link has been sent.');
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not send reset link.');
     }
   }
 
