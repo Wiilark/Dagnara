@@ -135,15 +135,15 @@ const st = StyleSheet.create({
   },
   grid:           { flexDirection: 'row', flexWrap: 'wrap' },
 
-  // Each tile is a 1/3-width column: tinted icon-square + label beneath
+  // Each tile is a 1/4-width column: tinted icon-square + label beneath
   tile:           {
-    width: '33.333%',
+    width: '25%',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
   },
   tileIcon:       {
-    width: 58, height: 58,
+    width: 60, height: 60,
     borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
