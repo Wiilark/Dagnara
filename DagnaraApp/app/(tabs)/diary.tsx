@@ -108,8 +108,13 @@ interface ProgramsCardData {
   qsDays?: number;
   qdDays?: number;
   pillsCount?: number;
+  // A fast session is running (user hasn't tapped "end"). Spans both the
+  // fasting phase and the eating window — use `fastingLockActive()` (derived
+  // live from fastStartMs/fastingTargetHrs) to decide whether food logging is
+  // actually blocked.
   fastingActive?: boolean;
-  fastingElapsedHrs?: number;
+  fastStartMs?: number;       // when the fast began, for live elapsed calc
+  fastingTargetHrs?: number;  // fasting hours for the chosen mode (e.g. 16)
   fastingMode?: string;
 }
 
@@ -759,6 +764,14 @@ export default function DiaryScreen() {
 
   // Programs card data
   const [programsCardData, setProgramsCardData] = useState<ProgramsCardData>({});
+  // Live clock so the fasting lock lifts on its own when the fasting hours pass,
+  // without the user having to leave and reopen the screen. 30s is plenty for
+  // an hours-long window and cheap on battery.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   // Pill card state
   const [pillMeds, setPillMeds] = useState<{ id: string; name: string; color: string; times: string[] }[]>([]);
@@ -923,7 +936,8 @@ export default function DiaryScreen() {
         let qdDays: number | undefined;
         let pillsCount: number | undefined;
         let fastingActive: boolean | undefined;
-        let fastingElapsedHrs: number | undefined;
+        let fastStartMs: number | undefined;
+        let fastingTargetHrs: number | undefined;
         let fastingMode: string | undefined;
         if (qsRaw) {
           const d = JSON.parse(qsRaw);
@@ -941,11 +955,14 @@ export default function DiaryScreen() {
           const f = JSON.parse(fastRaw);
           if (f?.active && f?.startTime) {
             fastingActive = true;
-            fastingElapsedHrs = (now - new Date(f.startTime).getTime()) / 3600000;
-            fastingMode = f.mode ?? '16:8';
+            fastStartMs = new Date(f.startTime).getTime();
+            const mode: string = typeof f.mode === 'string' ? f.mode : '16:8';
+            fastingMode = mode;
+            // Mode id is "<fastingHrs>:<eatingHrs>" (e.g. "16:8"); OMAD is "23:1".
+            fastingTargetHrs = parseInt(mode.split(':')[0], 10) || 16;
           }
         }
-        setProgramsCardData({ qsDays, qdDays, pillsCount, fastingActive, fastingElapsedHrs, fastingMode });
+        setProgramsCardData({ qsDays, qdDays, pillsCount, fastingActive, fastStartMs, fastingTargetHrs, fastingMode });
         if (pilRaw) {
           const meds: { id: string; name: string; color: string; times: string[] }[] = JSON.parse(pilRaw);
           if (Array.isArray(meds) && meds.length > 0) {
@@ -1119,12 +1136,25 @@ export default function DiaryScreen() {
     setSearching(false);
   }
 
+  // True only while the chosen fasting window is still running. Computed fresh
+  // (not from the 30s `now` state) so a tap right as the window closes isn't
+  // blocked by a stale clock. Once the fasting hours elapse the eating window
+  // is open, so food logging is allowed even though the session is still active.
+  function fastingLockActive() {
+    if (!programsCardData.fastingActive || programsCardData.fastStartMs == null || programsCardData.fastingTargetHrs == null) {
+      return false;
+    }
+    const elapsedHrs = (Date.now() - programsCardData.fastStartMs) / 3600000;
+    return elapsedHrs < programsCardData.fastingTargetHrs;
+  }
+
   function openFoodSearch(meal: Meal) {
-    if (programsCardData.fastingActive) {
+    if (fastingLockActive()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const remaining = programsCardData.fastingTargetHrs! - (Date.now() - programsCardData.fastStartMs!) / 3600000;
       Alert.alert(
         '⏱️ Fast in progress',
-        `You started a ${programsCardData.fastingMode ?? '16:8'} fast. End your fast in Programs before logging food.`,
+        `Your ${programsCardData.fastingMode ?? '16:8'} eating window opens in ${remaining.toFixed(1)} hrs. Hang tight — food logging unlocks automatically then.`,
         [{ text: 'OK' }]
       );
       return;
@@ -1217,11 +1247,12 @@ export default function DiaryScreen() {
   }
 
   async function handleBarcodePress() {
-    if (programsCardData.fastingActive) {
+    if (fastingLockActive()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const remaining = programsCardData.fastingTargetHrs! - (Date.now() - programsCardData.fastStartMs!) / 3600000;
       Alert.alert(
         '⏱️ Fast in progress',
-        `You started a ${programsCardData.fastingMode ?? '16:8'} fast. End your fast in Programs before logging food.`,
+        `Your ${programsCardData.fastingMode ?? '16:8'} eating window opens in ${remaining.toFixed(1)} hrs. Hang tight — food logging unlocks automatically then.`,
         [{ text: 'OK' }]
       );
       return;
@@ -1660,18 +1691,25 @@ export default function DiaryScreen() {
           </View>
         )}
 
-        {/* ── Fasting lock banner ── */}
-        {programsCardData.fastingActive && (
-          <View style={st.fastingBanner}>
-            <Text style={st.fastingBannerIcon}>⏱️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={st.fastingBannerTitle}>Fast in progress</Text>
-              <Text style={st.fastingBannerSub}>
-                {programsCardData.fastingMode ?? '16:8'} · {programsCardData.fastingElapsedHrs?.toFixed(1) ?? '0.0'} hrs elapsed · food logging locked
-              </Text>
+        {/* ── Fasting banner: locked while fasting, "open" once the window passes ── */}
+        {programsCardData.fastingActive && programsCardData.fastStartMs != null && programsCardData.fastingTargetHrs != null && (() => {
+          const elapsedHrs = (now - programsCardData.fastStartMs) / 3600000;
+          const locked = elapsedHrs < programsCardData.fastingTargetHrs;
+          const remaining = programsCardData.fastingTargetHrs - elapsedHrs;
+          return (
+            <View style={[st.fastingBanner, !locked && st.fastingBannerOpen]}>
+              <Text style={st.fastingBannerIcon}>{locked ? '⏱️' : '🍽️'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.fastingBannerTitle, !locked && { color: colors.green }]}>{locked ? 'Fast in progress' : 'Eating window open'}</Text>
+                <Text style={st.fastingBannerSub}>
+                  {locked
+                    ? `${programsCardData.fastingMode ?? '16:8'} · ${elapsedHrs.toFixed(1)} hrs elapsed · opens in ${remaining.toFixed(1)} hrs`
+                    : `${programsCardData.fastingMode ?? '16:8'} · go ahead and log your food`}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* ── Today's meals ── */}
         <Text style={st.sectionHdr}>{isToday ? "Today's meals" : 'Meals'}</Text>
@@ -1927,15 +1965,19 @@ export default function DiaryScreen() {
                   <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>med{programsCardData.pillsCount !== 1 ? 's' : ''} tracked</Text>
                 </View>
               )}
-              {programsCardData.fastingActive && programsCardData.fastingElapsedHrs != null && (
-                <View style={{ flex: 1, backgroundColor: colors.purpleTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line3, padding: spacing.sm, alignItems: 'center', gap: 2 }}>
-                  <Text style={{ fontSize: fontSize.lg }}>⏱️</Text>
-                  <Text style={{ color: colors.honey, fontSize: fontSize.md, fontWeight: '800' }}>
-                    {Math.floor(programsCardData.fastingElapsedHrs)}h {Math.floor((programsCardData.fastingElapsedHrs % 1) * 60)}m
-                  </Text>
-                  <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{programsCardData.fastingMode ?? '16:8'} fast</Text>
-                </View>
-              )}
+              {programsCardData.fastingActive && programsCardData.fastStartMs != null && (() => {
+                const elapsedHrs = (now - programsCardData.fastStartMs) / 3600000;
+                const eating = programsCardData.fastingTargetHrs != null && elapsedHrs >= programsCardData.fastingTargetHrs;
+                return (
+                  <View style={{ flex: 1, backgroundColor: colors.purpleTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line3, padding: spacing.sm, alignItems: 'center', gap: 2 }}>
+                    <Text style={{ fontSize: fontSize.lg }}>{eating ? '🍽️' : '⏱️'}</Text>
+                    <Text style={{ color: eating ? colors.green : colors.honey, fontSize: fontSize.md, fontWeight: '800' }}>
+                      {Math.floor(elapsedHrs)}h {Math.floor((elapsedHrs % 1) * 60)}m
+                    </Text>
+                    <Text style={{ color: colors.ink3, fontSize: fontSize.xs }}>{eating ? 'eating window' : `${programsCardData.fastingMode ?? '16:8'} fast`}</Text>
+                  </View>
+                );
+              })()}
             </View>
           </TouchableOpacity>
         )}
@@ -2639,6 +2681,7 @@ const st = StyleSheet.create({
 
   // Fasting lock banner
   fastingBanner: { marginHorizontal: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.honey + '18', borderWidth: 1, borderColor: colors.honey + '44', borderRadius: radius.md, padding: spacing.md },
+  fastingBannerOpen: { backgroundColor: colors.green + '18', borderColor: colors.green + '44' },
   fastingBannerIcon: { fontSize: fontSize.lg },
   fastingBannerTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.honey },
   fastingBannerSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
