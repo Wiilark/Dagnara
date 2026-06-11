@@ -26,9 +26,11 @@ type ProgramTileProps = {
   name: string;
   color: string;
   onPress: () => void;
+  /** Overlay a circle-slash "ban" on top of the base glyph (e.g. no-beer). */
+  banOverlay?: boolean;
 };
 
-function ProgramTile({ icon, name, color, onPress }: ProgramTileProps) {
+function ProgramTile({ icon, name, color, onPress, banOverlay }: ProgramTileProps) {
   return (
     <TouchableOpacity
       style={st.tile}
@@ -36,7 +38,14 @@ function ProgramTile({ icon, name, color, onPress }: ProgramTileProps) {
       activeOpacity={0.6}
     >
       <View style={[st.tileIcon, { backgroundColor: color + '26' }]}>
-        <Ionicons name={icon} size={37} color={colors.ink} />
+        {banOverlay ? (
+          <>
+            <Ionicons name={icon} size={24} color={colors.ink} />
+            <Ionicons name="ban" size={40} color={colors.ink} style={st.banOverlay} />
+          </>
+        ) : (
+          <Ionicons name={icon} size={37} color={colors.ink} />
+        )}
       </View>
       <Text style={st.tileLabel} numberOfLines={2}>{name}</Text>
     </TouchableOpacity>
@@ -89,7 +98,7 @@ export default function ProgramsScreen() {
         <View style={st.group}>
           <View style={st.grid}>
             <ProgramTile icon="logo-no-smoking" name="Quit Smoking" color={colors.rose} onPress={() => setQsVisible(true)} />
-            <ProgramTile icon="wine"   name="Quit Drinking"  color={colors.honey}   onPress={() => setQdVisible(true)} />
+            <ProgramTile icon="beer"   name="Quit Drinking"  color={colors.honey}   onPress={() => setQdVisible(true)} banOverlay />
             <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
             <ProgramTile icon="medkit" name="Pill Reminder"  color={colors.purple2} onPress={() => setPillVisible(true)} />
@@ -165,6 +174,8 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
+  // Circle-slash sits centered over the base glyph (e.g. beer) for a "no-X" mark.
+  banOverlay:     { position: 'absolute', width: 68, height: 68, textAlign: 'center', textAlignVertical: 'center', lineHeight: 68 },
   tileLabel:      { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink, textAlign: 'center', lineHeight: 15 },
 });
 
