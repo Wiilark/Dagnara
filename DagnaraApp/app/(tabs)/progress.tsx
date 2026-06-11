@@ -16,7 +16,7 @@ import { formatWeight, parseWeight, weightUnit, type UnitSystem } from '../../sr
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { FloatingModalHeader } from '../../src/components/FloatingModalHeader';
 import { fmt } from '../../src/lib/format';
-import { usePremium, PremiumBadge } from '../../src/components/Premium';
+import { usePremium, PremiumBadge, PremiumLock } from '../../src/components/Premium';
 
 // ── Life Score Questions ──────────────────────────────────────────────────────
 const LS_QUESTIONS = [
@@ -1161,36 +1161,47 @@ export default function ProgressScreen() {
             </View>
           </View>
 
-          {/* Pillars breakdown */}
+          {/* Pillars breakdown — premium (Lifestyle Breakdown) */}
           {lifeScore !== null && (
-            <View style={st.pillarsWrap}>
-              {pillarScores.map((p) => (
-                <View key={p.key} style={st.pillarRow}>
-                  <Text style={{ fontSize: fontSize.base + 1 }}>{p.emoji}</Text>
-                  <Text style={st.pillarLabel}>{p.label}</Text>
-                  <View style={st.pillarTrack}>
-                    <View style={[st.pillarBar, { width: `${(p.score / p.max) * 100}%`, backgroundColor: p.color }]} />
+            <PremiumLock unlocked={isPremium} onLockedPress={openPro(() => {})} label="Unlock breakdown with Premium">
+              <View style={st.pillarsWrap}>
+                {pillarScores.map((p) => (
+                  <View key={p.key} style={st.pillarRow}>
+                    <Text style={{ fontSize: fontSize.base + 1 }}>{p.emoji}</Text>
+                    <Text style={st.pillarLabel}>{p.label}</Text>
+                    <View style={st.pillarTrack}>
+                      <View style={[st.pillarBar, { width: `${(p.score / p.max) * 100}%`, backgroundColor: p.color }]} />
+                    </View>
+                    <Text style={[st.pillarScore, { color: p.color }]}>{p.score}/{p.max}</Text>
                   </View>
-                  <Text style={[st.pillarScore, { color: p.color }]}>{p.score}/{p.max}</Text>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            </PremiumLock>
           )}
 
           <TouchableOpacity style={st.lsBtn} onPress={startQuiz}>
             <Text style={st.lsBtnTxt}>✨ Weekly Check-In</Text>
           </TouchableOpacity>
 
-          {/* Locked insights */}
+          {/* AI Insights — premium */}
           {lifeScore !== null && (
-            <TouchableOpacity style={st.insightLocked} activeOpacity={0.8}
-              onPress={openPro(() => setInsightDetailVisible(true))}>
-              <View style={st.insightBlur}>
-                <Text style={st.insightBlurText}>Your weekly insight is ready</Text>
-                <Text style={st.insightBlurSub}>{isPremium ? "Tap to read today's insight" : 'Tap to unlock with Premium'}</Text>
-              </View>
-              <PremiumBadge />
-            </TouchableOpacity>
+            isPremium ? (
+              <TouchableOpacity style={st.insightLocked} activeOpacity={0.8}
+                onPress={openPro(() => setInsightDetailVisible(true))}>
+                <View>
+                  <Text style={st.insightBlurText}>Your weekly insight is ready</Text>
+                  <Text style={st.insightBlurSub}>Tap to read today&apos;s insight</Text>
+                </View>
+                <PremiumBadge />
+              </TouchableOpacity>
+            ) : (
+              <PremiumLock unlocked={false} onLockedPress={openPro(() => setInsightDetailVisible(true))} label="Unlock insight with Premium">
+                <View style={st.insightLocked}>
+                  <Text style={st.insightBlurText}>Your weekly insight is ready</Text>
+                  <Text style={st.insightBlurSub}>Personalised guidance from your own data</Text>
+                </View>
+              </PremiumLock>
+            )
           )}
         </View>
 
@@ -1492,7 +1503,6 @@ const st = StyleSheet.create({
   insightTitle: { fontSize: fontSize.sm, fontWeight: '700' },
   insightBody: { fontSize: fontSize.xs, color: colors.ink2, lineHeight: fontSize.xs * 1.55 },
   insightLocked: { marginTop: spacing.sm, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md, overflow: 'hidden', position: 'relative' },
-  insightBlur: { opacity: 0.4 },
   insightBlurText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
   insightBlurSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 3 },
   insightLockBadge: { position: 'absolute', top: spacing.md, right: spacing.md },

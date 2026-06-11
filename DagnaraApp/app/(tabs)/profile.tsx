@@ -592,12 +592,17 @@ export default function ProfileScreen() {
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },
             { icon: 'flame-outline', label: 'Calorie & Activity Goals', color: colors.honey, value: `${fmt(calorieGoal)} kcal`, onPress: () => setTdeeModal(true) },
             { icon: 'leaf-outline', label: 'Dietary Preferences', color: colors.teal, value: (() => { const pref = selectedFoodPref === 'none' ? 'No food preferences' : selectedFoodPref; const allerg = selectedAllergies.length === 0 ? 'No allergies' : selectedAllergies.join(', '); return `${pref} · ${allerg}`; })(), onPress: () => setDietaryModal(true) },
-            { icon: 'chatbubble-outline', label: 'AI Coach', color: colors.lavender, value: 'Nutrition · Macros', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCoachOpen(true); } },
+            { icon: 'chatbubble-outline', label: 'AI Coach', color: colors.lavender, value: 'Nutrition · Macros', premium: true, onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isPremium) { setCoachOpen(true); } else { setSettingsPage('subscription'); setSettingsModal(true); } } },
             { icon: 'mail-outline', label: 'Inbox', color: colors.purple, value: '', badge: unreadCount, onPress: () => setMessagesOpen(true) },
-          ].map(({ icon, label, color, value, badge, onPress }) => (
+          ].map(({ icon, label, color, value, badge, premium, onPress }) => (
             <TouchableOpacity key={label} style={styles.menuRow} onPress={onPress}>
               <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color={color} style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.menuLabel}>{label}</Text>
+              {premium && !isPremium && (
+                <View style={styles.menuDiamond}>
+                  <Ionicons name="diamond" size={fontSize.sm} color={colors.lavender} />
+                </View>
+              )}
               {!!badge && badge > 0 && (
                 <View style={styles.inboxBadge}>
                   <Text style={styles.inboxBadgeText}>{badge}</Text>
@@ -1479,6 +1484,7 @@ const styles = StyleSheet.create({
 
   footer: { textAlign: 'center', color: colors.ink3, fontSize: 12, marginTop: 4, opacity: 0.4 },
 
+  menuDiamond: { width: 26, height: 26, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line3 },
   inboxBadge: { backgroundColor: colors.rose, borderRadius: radius.pill, minWidth: 20, height: 20, paddingHorizontal: spacing.xs, alignItems: 'center', justifyContent: 'center' },
   inboxBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '800' },
   dietOption: { backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
