@@ -88,7 +88,7 @@ export default function ProgramsScreen() {
         <Text style={st.sectionLabel}>Programs</Text>
         <View style={st.group}>
           <View style={st.grid}>
-            <ProgramTile icon="ban"    name="Quit Smoking"   color={colors.rose}    onPress={() => setQsVisible(true)} />
+            <ProgramTile icon="logo-no-smoking" name="Quit Smoking" color={colors.rose} onPress={() => setQsVisible(true)} />
             <ProgramTile icon="wine"   name="Quit Drinking"  color={colors.honey}   onPress={() => setQdVisible(true)} />
             <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
