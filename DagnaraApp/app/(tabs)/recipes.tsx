@@ -17,6 +17,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { FOOD_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
 import { addRecipesToGrocery } from '../../src/lib/grocery';
 import { fmt } from '../../src/lib/format';
+import { BackChevron } from '../../src/components/BackChevron';
 
 // Map of recipe id → bundled hero photo. Recipes without an entry fall back
 // to the emoji icon. Add more ids here to give any other recipe a photo.
@@ -39,8 +40,37 @@ const MEAL_PICK = [
   { key: 'snack'     as const, icon: '🍌', label: 'Snack',     color: colors.mealSnack },
 ];
 
-const RECIPES = [
-  { id: '1',  icon: '🥗',  name: 'Greek Salad',          diet: 'Vegan',       meal: 'Lunch',     kcal: 220, carbs: 18, protein: 6,  fat: 14, time: '10 min', goal: 'weight_loss',   ingredients: [{ qty: '200g', name: 'Cucumber' }, { qty: '250g', name: 'Tomato' }, { qty: '50g', name: 'Kalamata olives' }, { qty: '80g', name: 'Feta cheese' }, { qty: '60g', name: 'Red onion' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }], steps: ['Chop all vegetables.', 'Combine in a bowl.', 'Add feta and olives.', 'Drizzle with olive oil and season.'] },
+// Maps a recipe's `goal` to a friendly badge label.
+const GOAL_LABEL: Record<string, string> = {
+  weight_loss: 'Weight loss',
+  muscle_gain: 'Muscle gain',
+  balanced: 'Balanced',
+};
+
+// Per-bowl micronutrients (optional — only a few hero recipes carry them).
+interface RecipeMicros {
+  fiber?: number; sugar?: number; sodium?: number;
+  vitaminC?: number; calcium?: number; iron?: number; potassium?: number;
+}
+interface Recipe {
+  id: string; icon: string; name: string; diet: string; meal: string;
+  kcal: number; carbs: number; protein: number; fat: number; time: string; goal: string;
+  ingredients: { qty: string; name: string }[];
+  steps: string[];
+  serves?: string;      // human yield/portion description
+  micros?: RecipeMicros;
+}
+
+const RECIPES: Recipe[] = [
+  { id: '1',  icon: '🥗',  name: 'Greek Salad',          diet: 'Vegetarian',  meal: 'Lunch',     kcal: 220, carbs: 18, protein: 6,  fat: 14, time: '10 min', goal: 'weight_loss',
+    micros: { fiber: 4, sugar: 9, sodium: 580, vitaminC: 28, calcium: 180, iron: 1.4, potassium: 520 },
+    ingredients: [{ qty: '200g', name: 'Cucumber' }, { qty: '250g', name: 'Tomato' }, { qty: '50g', name: 'Kalamata olives' }, { qty: '80g', name: 'Feta cheese' }, { qty: '60g', name: 'Red onion' }, { qty: '2 tbsp (30ml)', name: 'Olive oil' }],
+    steps: [
+      'Cut tomatoes into thick wedges and cucumber into chunky half-moons — keep pieces big, not diced.',
+      'Slice red onion thinly, then soak in cold water 5 min to mellow the raw bite. Drain.',
+      'Combine tomatoes, cucumber, onion, and olives in a wide bowl. Break feta into big chunks over the top by hand.',
+      'Drizzle with olive oil, add a pinch of salt, pepper, and oregano. Toss gently and rest 2 min before serving.',
+    ] },
   { id: '2',  icon: '🍗',  name: 'Grilled Chicken',       diet: 'High Protein', meal: 'Dinner',   kcal: 320, carbs: 2,  protein: 52, fat: 10, time: '25 min', goal: 'muscle_gain',   ingredients: [{ qty: '200g', name: 'Chicken breast' }, { qty: '1 tbsp (15ml)', name: 'Olive oil' }, { qty: '2 cloves', name: 'Garlic' }, { qty: '½ piece', name: 'Lemon' }, { qty: '2 sprigs', name: 'Rosemary' }], steps: ['Place chicken breast in a zip-lock bag and pound to 1.5cm thickness with a rolling pin or heavy pan — grocery store breasts are thick and uneven, so pounding is what makes it cook through without drying out.', 'Coat chicken with olive oil, minced garlic, and lemon juice. Cover and refrigerate at least 30 min (up to 2 hours) — the longer the better.', 'Take chicken out of the fridge 10 min before cooking to take the chill off.', 'Grill over medium-high heat 6–7 min each side until 75°C internal.', 'Rest 5 min before serving.'] },
   { id: '3',  icon: '🥑',  name: 'Avocado Toast',         diet: 'Vegetarian',  meal: 'Breakfast', kcal: 290, carbs: 28, protein: 8,  fat: 17, time: '8 min',  goal: 'balanced',      ingredients: [{ qty: '2 slices (80g)', name: 'Sourdough bread' }, { qty: '1 medium (150g)', name: 'Avocado' }, { qty: '1 tsp (5ml)', name: 'Lemon juice' }, { qty: '¼ tsp', name: 'Red pepper flakes' }, { qty: '¼ tsp', name: 'Salt' }], steps: ['Toast bread until golden.', 'Mash avocado with lemon juice and salt.', 'Spread on toast, top with pepper flakes.'] },
   { id: '4',  icon: '🐟',  name: 'Salmon Bowl',           diet: 'High Protein', meal: 'Lunch',    kcal: 450, carbs: 32, protein: 44, fat: 16, time: '20 min', goal: 'muscle_gain',   ingredients: [{ qty: '150g', name: 'Salmon fillet' }, { qty: '100g (dry)', name: 'Brown rice' }, { qty: '80g', name: 'Edamame' }, { qty: '2 tbsp (30ml)', name: 'Soy sauce' }, { qty: '1 tsp', name: 'Sesame seeds' }, { qty: '60g', name: 'Cucumber' }], steps: ['Rinse rice until water runs clear, then cook per package (about 18 min covered for white, 35 min for brown). Start this first — it takes the longest.', 'Pan-sear salmon over medium-high heat 4 min each side until just opaque in center.', 'Assemble bowl with all ingredients.', 'Drizzle soy sauce and sprinkle sesame seeds.'] },
@@ -326,6 +356,22 @@ export default function RecipesScreen() {
   // cycle 1→2→…→10→1; macros, ingredients, diary log, and grocery add all
   // scale by this number.
   const [servings, setServings] = useState(1);
+  // Which panel the detail-modal selector is showing.
+  const [detailTab, setDetailTab] = useState<'ingredients' | 'instructions'>('ingredients');
+  // In-modal toast — on-brand replacement for jarring OS Alert popups. Holds the
+  // message + accent colour; auto-dismisses. `null` = hidden.
+  const [toast, setToast] = useState<{ msg: string; tint: string } | null>(null);
+  const toastY = useRef(new Animated.Value(60)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, tint: string = colors.green) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, tint });
+    toastY.setValue(60);
+    Animated.spring(toastY, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastY, { toValue: 80, duration: 220, useNativeDriver: true }).start(() => setToast(null));
+    }, 2600);
+  };
 
   // Auto-close the bottom meal-picker sheet whenever the recipe modal closes
   // so it doesn't reappear stale on the next recipe tap. Also reset servings
@@ -334,6 +380,9 @@ export default function RecipesScreen() {
     if (!selected) {
       setMealPickerOpen(false);
       setServings(1);
+      setDetailTab('ingredients');
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      setToast(null);
     }
   }, [selected]);
   const [foodFilter, setFoodFilter] = useState('All');
@@ -384,10 +433,8 @@ export default function RecipesScreen() {
     }));
     const result = await addRecipesToGrocery(email, [{ id: recipe.id, name: recipe.name, ingredients: scaled }]);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Added to grocery list ✓',
-      `${result.added} added · ${result.merged} merged into existing items`,
-    );
+    const mergedPart = result.merged > 0 ? ` · ${result.merged} merged` : '';
+    showToast(`🛒 ${result.added} item${result.added !== 1 ? 's' : ''} added to grocery list${mergedPart}`, colors.sky);
   };
 
   // Ensure today's entry is loaded into the store
@@ -415,6 +462,12 @@ export default function RecipesScreen() {
 
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  // Recipe-detail modal: drives the floating header (blur + title fade in as the
+  // big in-body recipe title scrolls out of view — matches the Profile header).
+  const detailScrollY = useRef(new Animated.Value(0)).current;
+  const detailBlurOpacity = detailScrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
+  const detailTitleOpacity = detailScrollY.interpolate({ inputRange: [80, 130], outputRange: [0, 1], extrapolate: 'clamp' });
+  const detailTitleTranslateY = detailScrollY.interpolate({ inputRange: [80, 130], outputRange: [12, 0], extrapolate: 'clamp' });
   const headerBlurOpacity = scrollY.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: 'clamp' });
   const headerH = 50 + insets.top + 16;
   const scrollPaddingTop = 60 + insets.top;
@@ -433,7 +486,7 @@ export default function RecipesScreen() {
             </View>
             {hasUnread && <View style={styles.avatarDot} />}
           </TouchableOpacity>
-          <View style={styles.headingWrap} pointerEvents="none"><Text style={styles.heading}>Recipes</Text></View>
+          <View style={styles.appTitleWrap} pointerEvents="none"><Text style={styles.appTitle}>Recipes</Text></View>
           <View style={styles.headerRight}>
             {viewMode === 'recipes' && (
               <TouchableOpacity
@@ -722,70 +775,64 @@ export default function RecipesScreen() {
       <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
         {selected && (
           <SafeAreaView style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setSelected(null)} style={styles.closeBtn}>
-                <Ionicons name="close-sharp" size={24} color={colors.ink} />
-              </TouchableOpacity>
-              <View style={styles.headerActions}>
-                <View style={styles.servingStepper}>
+            <View style={styles.detailHeader}>
+              <Animated.View style={[StyleSheet.absoluteFill, { opacity: detailBlurOpacity }]}>
+                <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
+                <LinearGradient
+                  colors={['transparent', colors.bg]}
+                  style={styles.detailHeaderFade}
+                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none"
+                />
+              </Animated.View>
+              <View style={styles.detailHeaderRow}>
+                <TouchableOpacity
+                  onPress={() => setSelected(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.backBtn}
+                >
+                  <BackChevron size={22} color={colors.ink} />
+                </TouchableOpacity>
+                <Animated.Text
+                  style={[styles.detailHeaderTitle, { opacity: detailTitleOpacity, transform: [{ translateY: detailTitleTranslateY }] }]}
+                  numberOfLines={1}
+                  pointerEvents="none"
+                >
+                  {selected.name}
+                </Animated.Text>
+                <View style={styles.headerActions}>
                   <TouchableOpacity
-                    style={styles.servingStepBtn}
-                    activeOpacity={0.6}
-                    disabled={servings <= 1}
+                    style={styles.addDiaryHeaderBtn}
+                    activeOpacity={0.78}
                     onPress={() => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setServings((n) => Math.max(1, n - 1));
+                      setMealPickerOpen(true);
                     }}
                   >
-                    <Ionicons
-                      name="remove"
-                      size={16}
-                      color={servings <= 1 ? colors.ink3 : colors.lavender}
-                    />
+                    <Ionicons name="calendar" size={22} color={colors.ink} />
                   </TouchableOpacity>
-                  <Text style={styles.servingStepTxt}>Serving: {servings}</Text>
                   <TouchableOpacity
-                    style={styles.servingStepBtn}
-                    activeOpacity={0.6}
-                    disabled={servings >= 100}
-                    onPress={() => {
+                    style={styles.addGroceryHeaderBtn}
+                    activeOpacity={0.78}
+                    onPress={async () => {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setServings((n) => Math.min(100, n + 1));
+                      await addOneToGrocery(selected, servings);
+                      // Stay in the modal so the user can also log it to their diary
+                      // in the same visit — the toast confirms the cart add.
                     }}
                   >
-                    <Ionicons
-                      name="add"
-                      size={16}
-                      color={servings >= 100 ? colors.ink3 : colors.lavender}
-                    />
+                    <Ionicons name="cart" size={22} color={colors.ink} />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.addDiaryHeaderBtn}
-                  activeOpacity={0.78}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setMealPickerOpen(true);
-                  }}
-                >
-                  <Ionicons name="add" size={16} color={colors.lavender} />
-                  <Ionicons name="journal" size={18} color={colors.lavender} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.addGroceryHeaderBtn}
-                  activeOpacity={0.78}
-                  onPress={async () => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    await addOneToGrocery(selected, servings);
-                    setSelected(null);
-                  }}
-                >
-                  <Ionicons name="add" size={16} color={colors.lavender} />
-                  <Ionicons name="cart" size={18} color={colors.lavender} />
-                </TouchableOpacity>
               </View>
             </View>
-            <ScrollView contentContainerStyle={styles.modalScroll}>
+            <Animated.ScrollView
+              contentContainerStyle={styles.modalScroll}
+              scrollEventThrottle={16}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { y: detailScrollY } } }],
+                { useNativeDriver: true },
+              )}
+            >
               {(() => {
                 const photo = RECIPE_PHOTOS[selected.id];
                 return photo ? (
@@ -804,72 +851,154 @@ export default function RecipesScreen() {
                 );
               })()}
               <Text style={styles.modalTitle}>{selected.name}</Text>
-              <Text style={styles.modalTime}>⏱ {selected.time}</Text>
 
-              {/* Macro pills — scale with the serving multiplier so users see
-                  the actual numbers they're about to log. */}
+              {/* Quick-glance badges — diet · time · goal. Sells the recipe at a
+                  glance using data the card already carries. */}
+              <View style={styles.badgeRow}>
+                <View style={styles.metaBadge}>
+                  <Ionicons name="leaf-outline" size={12} color={colors.green} />
+                  <Text style={[styles.metaBadgeTxt, { color: colors.green }]}>{selected.diet}</Text>
+                </View>
+                <View style={styles.metaBadge}>
+                  <Ionicons name="time-outline" size={12} color={colors.lavender} />
+                  <Text style={[styles.metaBadgeTxt, { color: colors.lavender }]}>{selected.time}</Text>
+                </View>
+                {GOAL_LABEL[selected.goal] && (
+                  <View style={styles.metaBadge}>
+                    <Ionicons name="flag-outline" size={12} color={colors.honey} />
+                    <Text style={[styles.metaBadgeTxt, { color: colors.honey }]}>{GOAL_LABEL[selected.goal]}</Text>
+                  </View>
+                )}
+              </View>
+
+              {selected.serves && <Text style={styles.servesTxt}>{selected.serves}</Text>}
+
+              {/* Serving stepper — circular − / + buttons flank the count.
+                  Drives the multiplier for macros, ingredient amounts, diary
+                  logging, and grocery adds. Placed directly above the macro
+                  card so taps visibly rescale the numbers below. */}
+              <View style={styles.servingRow}>
+                <TouchableOpacity
+                  style={styles.servingBtn}
+                  activeOpacity={0.7}
+                  disabled={servings <= 1}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setServings((n) => Math.max(1, n - 1));
+                  }}
+                >
+                  <Ionicons name="remove" size={22} color={servings <= 1 ? colors.ink3 : colors.ink} />
+                </TouchableOpacity>
+                <View style={styles.servingCount}>
+                  <Text style={styles.servingNum}>{servings}</Text>
+                  <Text style={styles.servingLabel}>{servings === 1 ? 'SERVING' : 'SERVINGS'}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.servingBtn}
+                  activeOpacity={0.7}
+                  disabled={servings >= 100}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setServings((n) => Math.min(100, n + 1));
+                  }}
+                >
+                  <Ionicons name="add" size={22} color={servings >= 100 ? colors.ink3 : colors.ink} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Macro + micro card — both scale with the serving multiplier so
+                  users see the exact numbers they're about to log. */}
               <View style={styles.modalMacros}>
-                {[
-                  { label: 'Kcal',    value: selected.kcal * servings,            color: colors.lavender },
-                  { label: 'Protein', value: `${selected.protein * servings}g`,   color: colors.macroProtein },
-                  { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.macroCarbs },
-                  { label: 'Fat',     value: `${selected.fat * servings}g`,       color: colors.macroFat },
-                ].map(({ label, value, color }) => (
-                  <View key={label} style={styles.modalMacroPill}>
-                    <Text style={[styles.modalMacroVal, { color }]}>{value}</Text>
-                    <Text style={styles.modalMacroLabel}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Fits budget indicator — compares the scaled total (what will
-                  actually be logged) against the remaining budget. */}
-              {selected.kcal * servings <= remaining && remaining > 0 && (
-                <View style={styles.fitsBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.green} />
-                  <Text style={styles.fitsTxt}>Fits your {remaining} kcal remaining budget</Text>
-                </View>
-              )}
-
-              <View style={styles.ingredientsTable}>
-                <View style={styles.ingredientHeaderRow}>
-                  <Text style={styles.ingredientHeaderQty}>Amount</Text>
-                  <View style={styles.ingredientColSep} />
-                  <Text style={styles.ingredientHeaderName}>Ingredient</Text>
-                </View>
-                {selected.ingredients.map((ing, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.ingredientRow,
-                      i < selected.ingredients.length - 1 && styles.ingredientRowDivided,
-                    ]}
-                  >
-                    <Text style={styles.ingredientQty}>{multiplyQty(ing.qty, servings)}</Text>
-                    <View style={styles.ingredientColSep} />
-                    <Text style={styles.ingredientTxt}>{ing.name}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <Text style={styles.modalSection}>Instructions</Text>
-              <View style={styles.stepsCard}>
-                {selected.steps.map((step, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.stepRow,
-                      i < selected.steps.length - 1 && styles.stepRowDivided,
-                    ]}
-                  >
-                    <View style={styles.stepNum}>
-                      <Text style={styles.stepNumTxt}>{i + 1}</Text>
+                <View style={styles.modalMacroRow}>
+                  {[
+                    { label: 'Kcal',    value: selected.kcal * servings,            color: colors.lavender },
+                    { label: 'Protein', value: `${selected.protein * servings}g`,   color: colors.macroProtein },
+                    { label: 'Carbs',   value: `${selected.carbs * servings}g`,     color: colors.macroCarbs },
+                    { label: 'Fat',     value: `${selected.fat * servings}g`,       color: colors.macroFat },
+                  ].map(({ label, value, color }) => (
+                    <View key={label} style={styles.modalMacroPill}>
+                      <Text style={[styles.modalMacroVal, { color }]}>{value}</Text>
+                      <Text style={styles.modalMacroLabel}>{label}</Text>
                     </View>
-                    <Text style={styles.stepTxt}>{step}</Text>
+                  ))}
+                </View>
+                {selected.micros && (
+                  <View style={styles.recipeMicroRow}>
+                    {([
+                      ['Fiber',     selected.micros.fiber,     'g'],
+                      ['Sugar',     selected.micros.sugar,     'g'],
+                      ['Sodium',    selected.micros.sodium,    'mg'],
+                      ['Vit C',     selected.micros.vitaminC,  'mg'],
+                      ['Calcium',   selected.micros.calcium,   'mg'],
+                      ['Iron',      selected.micros.iron,      'mg'],
+                      ['Potassium', selected.micros.potassium, 'mg'],
+                    ] as const)
+                      .filter(([, v]) => v != null)
+                      .map(([label, v, unit]) => (
+                        <View key={label} style={styles.recipeMicroChip}>
+                          <Text style={styles.recipeMicroVal}>
+                            {Math.round((v as number) * servings * 10) / 10}{unit}
+                          </Text>
+                          <Text style={styles.recipeMicroLabel}>{label}</Text>
+                        </View>
+                      ))}
                   </View>
+                )}
+              </View>
+
+              {/* Segmented selector — Ingredients / Instructions, styled like the
+                  progress-screen period tabs (Standard/Premium look). The active
+                  tab's panel renders below, connected to the selector. */}
+              <View style={styles.detailTabs}>
+                {(['ingredients', 'instructions'] as const).map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.detailTab, detailTab === tab && styles.detailTabActive]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setDetailTab(tab);
+                    }}
+                  >
+                    <Text style={[styles.detailTabTxt, detailTab === tab && styles.detailTabTxtActive]}>
+                      {tab === 'ingredients' ? 'Ingredients' : 'Instructions'}
+                    </Text>
+                  </TouchableOpacity>
                 ))}
               </View>
-            </ScrollView>
+
+              <View style={styles.panelCard}>
+                {detailTab === 'ingredients'
+                  ? selected.ingredients.map((ing, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.ingItem,
+                          i < selected.ingredients.length - 1 && styles.panelItemDivided,
+                        ]}
+                      >
+                        <Text style={styles.ingItemQty}>{multiplyQty(ing.qty, servings)}</Text>
+                        <Text style={styles.ingItemName}>{ing.name}</Text>
+                      </View>
+                    ))
+                  : selected.steps.map((step, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.stepItem,
+                          i < selected.steps.length - 1 && styles.panelItemDivided,
+                        ]}
+                      >
+                        <View style={styles.stepNum}>
+                          <Text style={styles.stepNumTxt}>{i + 1}</Text>
+                        </View>
+                        <Text style={styles.stepItemTxt}>{step}</Text>
+                      </View>
+                    ))}
+              </View>
+            </Animated.ScrollView>
 
             {/* Bottom-sheet meal picker — opened by the "+ diary" header button. */}
             {mealPickerOpen && (
@@ -891,6 +1020,10 @@ export default function RecipesScreen() {
                         onPress={async () => {
                           await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           const logName = servings > 1 ? `${selected.name} (×${servings})` : selected.name;
+                          const m = selected.micros;
+                          // Scale any present micros by the serving multiplier so the
+                          // diary entry carries fibre/sodium/etc., not just macros.
+                          const scaleMicro = (v?: number) => (v == null ? undefined : Math.round(v * servings * 10) / 10);
                           await addFood(today, {
                             id: `${Date.now()}`,
                             icon: selected.icon,
@@ -899,15 +1032,21 @@ export default function RecipesScreen() {
                             carbs: selected.carbs * servings,
                             protein: selected.protein * servings,
                             fat: selected.fat * servings,
+                            fiber: scaleMicro(m?.fiber),
+                            sugar: scaleMicro(m?.sugar),
+                            sodium: scaleMicro(m?.sodium),
+                            vitaminC: scaleMicro(m?.vitaminC),
+                            calcium: scaleMicro(m?.calcium),
+                            iron: scaleMicro(m?.iron),
+                            potassium: scaleMicro(m?.potassium),
                             unit: servings > 1 ? `${servings} servings` : 'serving',
                             meal: key,
                           });
                           await checkAndUpdateStreak(today);
                           await addXp(10);
                           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                          Alert.alert('Logged ✓', `${logName} added to ${label}. +10 XP`);
                           setMealPickerOpen(false);
-                          setSelected(null);
+                          showToast(`✓ Logged to ${label} · +10 XP`, color);
                         }}
                       >
                         <Text style={styles.mealPickIcon}>{icon}</Text>
@@ -917,6 +1056,18 @@ export default function RecipesScreen() {
                   </View>
                 </View>
               </View>
+            )}
+
+            {/* In-modal toast — confirms cart-add / diary-log without a popup,
+                so the user can keep acting in the same visit. */}
+            {toast && (
+              <Animated.View
+                style={[styles.toast, { borderColor: toast.tint, transform: [{ translateY: toastY }] }]}
+                pointerEvents="none"
+              >
+                <View style={[styles.toastAccent, { backgroundColor: toast.tint }]} />
+                <Text style={styles.toastTxt}>{toast.msg}</Text>
+              </Animated.View>
             )}
           </SafeAreaView>
         )}
@@ -965,8 +1116,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.rose },
   avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
-  headingWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
-  heading: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  appTitleWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
+  appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   headerRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: spacing.xl + spacing.sm, zIndex: 1 },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
@@ -1070,11 +1221,22 @@ const styles = StyleSheet.create({
   modal: { flex: 1, backgroundColor: colors.bg },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
   closeBtn: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center' },
+  // Profile-style back-chevron pill — matches ProgramSheetHeader back button.
+  backBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1.5, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  // Floating detail-modal header — blur + centered title fade in on scroll,
+  // matching the Profile / FloatingModalHeader pattern. Sits above the scroll
+  // body (absolute) so the hero photo slides under it as you scroll.
+  detailHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
+  detailHeaderFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 },
+  detailHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  // Left-aligned beside the back chevron (not centered) so the title reads as
+  // a continuation of the back button.
+  detailHeaderTitle: { position: 'absolute', left: spacing.xl + spacing.xl + spacing.xs, right: spacing.xl + spacing.xl, color: colors.ink, fontSize: fontSize.md, fontWeight: '800' },
   modalMeal: { fontSize: fontSize.xs, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.ink3 },
   addBtn: { borderRadius: radius.md, overflow: 'hidden' },
   addBtnGrad: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   addBtnTxt: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
-  modalScroll: { padding: spacing.lg, gap: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.lg },
+  modalScroll: { padding: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl + spacing.xl, paddingBottom: spacing.lg },
   modalIcon: { fontSize: fontSize['2xl'] + 26, textAlign: 'center', marginBottom: spacing.sm },
   // Responsive hero — 300×180 on iPhone 13/14 (77% of width, 0.6 aspect).
   // Wrapper holds the sizing, rounded-corner clip, and background; the bottom-
@@ -1096,96 +1258,84 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   modalTime: { fontSize: fontSize.sm, color: colors.ink3, textAlign: 'center' },
-  modalMacros: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md },
+  // Meta badge row — diet · time · goal, each a tinted pill under the title.
+  badgeRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  metaBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  metaBadgeTxt: { fontSize: fontSize.xs, fontWeight: '700' },
+  servesTxt: { fontSize: fontSize.sm, color: colors.ink2, textAlign: 'center', lineHeight: 19, marginTop: spacing.xs, paddingHorizontal: spacing.md },
+  modalMacros: { marginTop: spacing.md, marginBottom: 0, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.sm },
+  modalMacroRow: { flexDirection: 'row', justifyContent: 'space-around' },
   modalMacroPill: { alignItems: 'center', gap: 4 },
   modalMacroVal: { fontSize: fontSize.md, fontWeight: '700' },
   modalMacroLabel: { color: colors.ink3, fontSize: fontSize.xs },
-  fitsBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.green + '11', borderWidth: 1, borderColor: colors.green + '44', borderRadius: radius.md, padding: spacing.sm },
-  fitsTxt: { fontSize: fontSize.sm, color: colors.green, fontWeight: '500' },
-  modalSection: {
-    color: colors.ink,
-    fontSize: fontSize.base,
-    fontWeight: '700',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    textAlign: 'center',
+  // Micronutrient strip — small chips under the macros, only shown when the
+  // recipe carries micro data. Values scale with the serving multiplier.
+  recipeMicroRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: spacing.sm },
+  recipeMicroChip: { flexDirection: 'row', alignItems: 'baseline', gap: 3, backgroundColor: colors.layer2, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  recipeMicroVal: { fontSize: fontSize.xs, fontWeight: '700', color: colors.ink2 },
+  recipeMicroLabel: { fontSize: fontSize.xs, color: colors.ink3 },
+  // Ingredients / Instructions segmented selector — layer2 track with a filled
+  // purple active pill, matching the progress-screen period tabs.
+  detailTabs: {
+    flexDirection: 'row',
+    backgroundColor: colors.layer2,
+    borderRadius: radius.sm + 2,
+    padding: 3,
+    gap: 2,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
   },
-  // Two-column ingredients table — Amount | Ingredient with vertical divider.
-  ingredientsTable: {
-    marginTop: spacing.md,
+  detailTab: { flex: 1, paddingVertical: spacing.xs + 2, borderRadius: radius.sm, alignItems: 'center' },
+  detailTabActive: { backgroundColor: colors.purple },
+  detailTabTxt: { fontSize: fontSize.sm, fontWeight: '700', color: colors.ink },
+  detailTabTxtActive: { color: colors.ink },
+  // Active panel — single full-width card under the selector.
+  panelCard: {
     borderWidth: 1,
     borderColor: colors.line2,
     borderRadius: radius.md,
     backgroundColor: colors.layer1,
     overflow: 'hidden',
   },
-  ingredientHeaderRow: {
+  panelItemDivided: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  // Ingredient row — scaled amount on the left, name on the right.
+  ingItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.layer2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line2,
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
   },
-  ingredientHeaderQty: {
-    width: 110,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    fontSize: fontSize.base,
-    fontWeight: '700',
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  ingredientHeaderName: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    fontSize: fontSize.base,
-    fontWeight: '700',
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  ingredientRow: { flexDirection: 'row', alignItems: 'center' },
-  ingredientRowDivided: { borderBottomWidth: 1, borderBottomColor: colors.line },
-  ingredientColSep: { width: 1, alignSelf: 'stretch', backgroundColor: colors.line },
-  ingredientQty: {
-    width: 110,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+  ingItemQty: {
+    minWidth: 96,
     fontSize: fontSize.sm,
     fontWeight: '700',
     color: colors.lavender,
-    textAlign: 'center',
   },
-  ingredientTxt: {
+  ingItemName: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.sm + 1,
     color: colors.ink2,
-    fontSize: fontSize.sm,
-    textAlign: 'center',
+    lineHeight: 20,
   },
-  // Instructions — card matching the ingredients table, with bolder numbered chips.
-  stepsCard: {
-    marginTop: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.line2,
-    borderRadius: radius.md,
-    backgroundColor: colors.layer1,
-    overflow: 'hidden',
-  },
-  stepRow: {
+  // Instruction row — numbered chip beside the step text.
+  stepItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm + 2,
     paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
   },
-  stepRowDivided: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  stepItemTxt: {
+    flex: 1,
+    color: colors.ink2,
+    fontSize: fontSize.sm + 1,
+    lineHeight: 21,
+    marginTop: 2,
+  },
   stepNum: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: radius.pill,
     backgroundColor: colors.purple,
     alignItems: 'center',
@@ -1198,13 +1348,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   stepNumTxt: { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink2 },
-  stepTxt: {
-    flex: 1,
-    color: colors.ink2,
-    fontSize: fontSize.sm + 1,
-    lineHeight: 22,
-    marginTop: 3,
-  },
   mealPickerRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md, flexWrap: 'wrap' },
   mealChip: { flex: 1, alignItems: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.line, borderWidth: 1, borderColor: colors.line2 },
   mealChipSel: { backgroundColor: colors.purpleTint, borderColor: colors.line3 },
@@ -1219,6 +1362,29 @@ const styles = StyleSheet.create({
   mealPickBtn: { width: '47%', borderWidth: 1, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', gap: spacing.xs },
   mealPickIcon: { fontSize: fontSize.xl },
   mealPickLabel: { fontSize: fontSize.sm, fontWeight: '700' },
+
+  // In-modal toast — sits above the bottom edge, slides up on action.
+  toast: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.layer3,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    shadowColor: colors.purple,
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  toastAccent: { width: 4, alignSelf: 'stretch', borderRadius: radius.pill },
+  toastTxt: { flex: 1, color: colors.ink, fontSize: fontSize.sm, fontWeight: '600' },
 
   // Tab switcher
   tabSwitcher: { flexDirection: 'row', backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: 3, gap: 3 },
@@ -1360,59 +1526,69 @@ const styles = StyleSheet.create({
   },
   planConfirmTxt: { color: colors.white, fontSize: fontSize.sm, fontWeight: '800' },
 
-  // Compact action pills in recipe detail modal header — opposite the X.
-  // The Serving stepper has − and + buttons either side of the count display
-  // (range 1–100); macros, ingredient qty, diary log, and grocery add all
-  // scale by the count. The "+ diary" pill opens the meal-picker sheet;
-  // the "+ cart" pill adds ingredients to the grocery list.
-  headerActions: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginLeft: spacing.sm },
-  servingStepper: {
-    flex: 1,
+  // Action pills in recipe detail modal header — opposite the back chevron.
+  // The "+ diary" pill opens the meal-picker sheet; the "+ cart" pill adds
+  // ingredients to the grocery list. Both share the back-button pill style.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginLeft: spacing.sm },
+
+  // Body serving stepper — circular − / + buttons (range 1–100) flank a large
+  // count. The multiplier scales macros, ingredient amounts, diary log, and
+  // grocery add. Sits directly above the macro card so taps rescale it live.
+  servingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 36,
-    borderRadius: radius.pill,
-    backgroundColor: colors.purpleTint,
-    borderWidth: 1,
-    borderColor: colors.line3,
-    overflow: 'hidden',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
-  servingStepBtn: {
-    width: 30,
-    height: 36,
+  servingBtn: {
+    width: spacing.xl + spacing.sm,
+    height: spacing.xl + spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.layer2,
+    borderWidth: 1.5,
+    borderColor: colors.line2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  servingStepTxt: {
-    color: colors.lavender,
-    fontSize: fontSize.xs,
-    fontWeight: '800',
-    paddingHorizontal: 4,
-    minWidth: 70,
-    textAlign: 'center',
-  },
-  addDiaryHeaderBtn: {
-    flexDirection: 'row',
+  servingCount: {
     alignItems: 'center',
-    gap: 2,
-    height: 36,
-    paddingHorizontal: spacing.sm + 2,
+    minWidth: 72,
+  },
+  servingNum: {
+    fontSize: fontSize['2xl'],
+    fontWeight: '800',
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  servingLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    color: colors.ink3,
+    marginTop: 2,
+  },
+  // Single-icon circular header actions — match the back-chevron pill.
+  addDiaryHeaderBtn: {
+    width: spacing.xl + spacing.sm,
+    height: spacing.xl + spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.purpleTint,
-    borderWidth: 1,
-    borderColor: colors.line3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.layer2,
+    borderWidth: 1.5,
+    borderColor: colors.line2,
   },
   addGroceryHeaderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
+    width: spacing.xl + spacing.sm,
     height: spacing.xl + spacing.sm,
-    paddingHorizontal: spacing.sm + 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.purpleTint,
-    borderWidth: 1,
-    borderColor: colors.line3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.layer2,
+    borderWidth: 1.5,
+    borderColor: colors.line2,
   },
 
   // Bottom-sheet meal picker overlay — slides up from the bottom of the recipe
