@@ -89,6 +89,7 @@ export default function ProgramsScreen() {
             <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
             <ProgramTile icon="medkit" name="Pill Reminder"  color={colors.purple2} onPress={() => setPillVisible(true)} />
+            <ProgramTile icon="restaurant" name="Recipes"   color={colors.sky}     onPress={() => router.push('/(tabs)/recipes')} />
           </View>
         </View>
 
