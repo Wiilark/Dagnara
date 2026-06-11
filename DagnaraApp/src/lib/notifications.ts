@@ -60,9 +60,9 @@ export async function scheduleMealReminders(enabled: boolean) {
   }
   const granted = await requestNotificationPermission();
   if (!granted) return;
-  await scheduleDailyAt('meal_breakfast', '🥞 Log breakfast', "Don't forget to log your breakfast!", 8, 0);
-  await scheduleDailyAt('meal_lunch',     '🥗 Log lunch',     "Time to log your lunch.",              12, 30);
-  await scheduleDailyAt('meal_dinner',    '🍽 Log dinner',    "Have you logged dinner yet?",           19, 0);
+  await scheduleDailyAt('meal_breakfast', '🥞 Rise & dine', "Morning, sunshine — what's fuelling the day?", 8, 0);
+  await scheduleDailyAt('meal_lunch',     '🥗 Midday munch', "Pause, refuel, and jot down lunch. ✨",        12, 30);
+  await scheduleDailyAt('meal_dinner',    '🍽 Supper time', "Wind down and tuck dinner into your diary.",  19, 0);
 }
 
 export async function scheduleWaterReminder(enabled: boolean) {
@@ -70,14 +70,14 @@ export async function scheduleWaterReminder(enabled: boolean) {
   const granted = await requestNotificationPermission();
   if (!granted) return;
   // Every day at 14:00 as a midday nudge
-  await scheduleDailyAt('water_reminder', '💧 Drink water', 'Halfway through the day — stay hydrated!', 14, 0);
+  await scheduleDailyAt('water_reminder', '💧 Sip sip hooray', 'Your cells are thirsty — give them a splash. 🌊', 14, 0);
 }
 
 export async function scheduleStreakReminder(enabled: boolean) {
   if (!enabled) { await cancelByTag('streak_reminder'); return; }
   const granted = await requestNotificationPermission();
   if (!granted) return;
-  await scheduleDailyAt('streak_reminder', '🔥 Keep your streak!', "Log something today to keep your streak alive.", 20, 0);
+  await scheduleDailyAt('streak_reminder', '🔥 Don\'t break the chain!', "One little log keeps your streak blazing. You've got this!", 20, 0);
 }
 
 export async function scheduleWeightReminder(enabled: boolean) {
@@ -87,7 +87,7 @@ export async function scheduleWeightReminder(enabled: boolean) {
   // Monday mornings at 8:30
   await cancelByTag('weight_reminder');
   await Notifications.scheduleNotificationAsync({
-    content: { title: '⚖️ Weekly weigh-in', body: 'Log your weight to track your progress!', data: { tag: 'weight_reminder' } },
+    content: { title: '⚖️ Hop on the scale', body: 'A fresh week, a fresh number. Let\'s see how you\'re trending! 📈', data: { tag: 'weight_reminder' } },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
       weekday: 2, // Monday (1=Sunday, 2=Monday)
@@ -106,9 +106,9 @@ export async function skipMealReminderToday(meal: 'breakfast' | 'lunch' | 'dinne
   if (!exists) return;
 
   const config: Record<string, [string, string, number, number]> = {
-    breakfast: ['🥞 Log breakfast', "Don't forget to log your breakfast!", 8, 0],
-    lunch:     ['🥗 Log lunch',     'Time to log your lunch.',              12, 30],
-    dinner:    ['🍽 Log dinner',    'Have you logged dinner yet?',           19, 0],
+    breakfast: ['🥞 Rise & dine',  "Morning, sunshine — what's fuelling the day?", 8, 0],
+    lunch:     ['🥗 Midday munch', 'Pause, refuel, and jot down lunch. ✨',         12, 30],
+    dinner:    ['🍽 Supper time',  'Wind down and tuck dinner into your diary.',   19, 0],
   };
   const [title, body, hour, minute] = config[meal];
   const now = new Date();
@@ -145,8 +145,8 @@ export async function scheduleDailySummaryReminder(enabled: boolean) {
   if (!granted) return;
   await scheduleDailyAt(
     'daily_summary',
-    '📊 Daily summary ready',
-    'Tap to review today\'s nutrition and close out your diary.',
+    '📊 That\'s a wrap!',
+    'Peek at today\'s numbers and tuck your diary in for the night. 🌙',
     21, 0,
   );
 }
@@ -301,8 +301,8 @@ export async function schedulePillReminders(
       if (everyDay) {
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: `💊 ${med.name}`,
-            body:  `Time to take ${med.dosage}`,
+            title: `💊 Pill o'clock: ${med.name}`,
+            body:  `A little nudge to take ${med.dosage}. ✨`,
             data:  { tag: `pill_${med.id}_${t}` },
           },
           trigger: {
@@ -315,8 +315,8 @@ export async function schedulePillReminders(
         for (const appleDay of med.daysOfWeek!) {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: `💊 ${med.name}`,
-              body:  `Time to take ${med.dosage}`,
+              title: `💊 Pill o'clock: ${med.name}`,
+              body:  `A little nudge to take ${med.dosage}. ✨`,
               data:  { tag: `pill_${med.id}_${t}_${appleDay}` },
             },
             trigger: {
