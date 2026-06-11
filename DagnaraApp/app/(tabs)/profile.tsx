@@ -39,6 +39,11 @@ export default function ProfileScreen() {
   const [measureModal, setMeasureModal] = useState(false);
   const [settingsModal, setSettingsModal] = useState(false);
   const [settingsPage, setSettingsPage] = useState<'' | 'account' | 'unitSystem' | 'language' | 'country' | 'notifications' | 'subscription' | 'health' | 'about'>('');
+  // Plans page: which tier the user is *previewing*. Tapping a header tab only
+  // changes this preview — it does NOT switch the active plan. The button below
+  // is the only thing that commits a switch. Initialised to the current plan
+  // each time the Plans page opens (see effect below).
+  const [previewTier, setPreviewTier] = useState<boolean>(false);
 
   async function handleDeleteAccount() {
     Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [
@@ -68,6 +73,12 @@ export default function ProfileScreen() {
       router.setParams({ plans: undefined });
     }
   }, [params.plans]);
+
+  // Land the Plans preview on whatever the user is actually subscribed to each
+  // time the page opens, so the header tab reflects their real current plan.
+  useEffect(() => {
+    if (settingsPage === 'subscription') setPreviewTier(isPremium);
+  }, [settingsPage, isPremium]);
 
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName,  setEditLastName]  = useState('');
@@ -904,16 +915,18 @@ export default function ProfileScreen() {
 
             {settingsPage === 'subscription' && (
               <View style={{ padding: spacing.md, gap: spacing.md }}>
-                {/* Standard / Premium selector */}
+                {/* Standard / Premium preview selector — tapping a tab only
+                    changes which plan is *previewed* below; it does NOT switch
+                    the active plan. The button at the bottom commits a switch. */}
                 <View style={subst.selector}>
                   {([
                     { key: false, label: 'Standard' },
                     { key: true, label: 'Premium' },
                   ] as const).map((opt) => {
-                    const active = isPremium === opt.key;
+                    const active = previewTier === opt.key;
                     return (
                       <TouchableOpacity key={opt.label} activeOpacity={0.85} style={subst.selectorBtn}
-                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(opt.key); }}>
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPreviewTier(opt.key); }}>
                         {active && <LinearGradient colors={[colors.purple, colors.purpleGlow]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFillObject} />}
                         <Text style={[subst.selectorTxt, active && subst.selectorTxtActive]}>{opt.label}</Text>
                       </TouchableOpacity>
@@ -921,27 +934,32 @@ export default function ProfileScreen() {
                   })}
                 </View>
 
-                {/* Current plan hero */}
+                {/* Previewed plan hero — reflects the selected tab, with a chip
+                    marking whichever tier is the user's current active plan. */}
                 <View style={subst.proHero}>
                   <LinearGradient colors={['rgba(124,77,255,0.22)', 'transparent']} style={StyleSheet.absoluteFillObject} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" />
                   <View style={subst.proBadge}>
-                    <Ionicons name={isPremium ? 'diamond' : 'person'} size={28} color={isPremium ? colors.lavender : colors.ink2} />
+                    <Ionicons name={previewTier ? 'diamond' : 'person'} size={28} color={previewTier ? colors.lavender : colors.ink2} />
                   </View>
-                  <Text style={subst.proTitle}>{isPremium ? 'Premium' : 'Standard'}</Text>
-                  {isPremium && (
+                  <Text style={subst.proTitle}>{previewTier ? 'Premium' : 'Standard'}</Text>
+                  {previewTier === isPremium ? (
+                    <View style={subst.proFreePill}>
+                      <Text style={subst.proFreePillTxt}>{isPremium ? 'YOUR PLAN · FREE DURING LAUNCH 🎉' : 'YOUR CURRENT PLAN'}</Text>
+                    </View>
+                  ) : previewTier ? (
                     <View style={subst.proFreePill}>
                       <Text style={subst.proFreePillTxt}>FREE DURING LAUNCH 🎉</Text>
                     </View>
-                  )}
+                  ) : null}
                   <Text style={subst.proSub}>
-                    {isPremium
+                    {previewTier
                       ? 'Full access to every insight — on the house while we launch.'
                       : 'Everything you need to track daily. Switch to Premium for deeper analytics.'}
                   </Text>
                 </View>
 
-                {/* What Premium adds */}
-                <View style={[subst.planCard, isPremium && subst.planCardActive]}>
+                {/* What Premium adds — checkmarks lit when previewing Premium */}
+                <View style={[subst.planCard, previewTier && subst.planCardActive]}>
                   <Text style={subst.featHeading}>What Premium unlocks</Text>
                   {[
                     { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
@@ -951,25 +969,26 @@ export default function ProfileScreen() {
                   ].map((f) => (
                     <View key={f.t} style={subst.featCard}>
                       <View style={subst.featIcon}>
-                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={isPremium ? colors.lavender : colors.ink3} />
+                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={previewTier ? colors.lavender : colors.ink3} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={subst.featTitle}>{f.t}</Text>
                         <Text style={subst.featDesc}>{f.d}</Text>
                       </View>
-                      <Ionicons name={isPremium ? 'checkmark-circle' : 'lock-closed'} size={20} color={isPremium ? colors.green : colors.ink3} />
+                      <Ionicons name={previewTier ? 'checkmark-circle' : 'lock-closed'} size={20} color={previewTier ? colors.green : colors.ink3} />
                     </View>
                   ))}
                 </View>
 
-                {/* Action */}
-                {isPremium ? (
-                  <TouchableOpacity
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(false); }}
-                    style={subst.secondaryBtn}>
-                    <Text style={subst.secondaryBtnTxt}>Switch to Standard</Text>
-                  </TouchableOpacity>
-                ) : (
+                {/* Action — the ONLY control that actually switches plans. When
+                    the previewed tier is already the active plan, it's a disabled
+                    "Current plan" marker instead. */}
+                {previewTier === isPremium ? (
+                  <View style={[subst.secondaryBtn, subst.currentPlanBtn]}>
+                    <Ionicons name="checkmark-circle" size={18} color={colors.green} />
+                    <Text style={subst.currentPlanTxt}>Your current plan</Text>
+                  </View>
+                ) : previewTier ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setPremium(true); }}
@@ -978,6 +997,12 @@ export default function ProfileScreen() {
                       <Ionicons name="diamond" size={18} color={colors.white} />
                       <Text style={subst.primaryBtnTxt}>Upgrade to Premium — Free</Text>
                     </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPremium(false); }}
+                    style={subst.secondaryBtn}>
+                    <Text style={subst.secondaryBtnTxt}>Switch to Standard</Text>
                   </TouchableOpacity>
                 )}
                 <Text style={subst.legal}>Premium is free for everyone during launch. Paid plans may arrive later — you’ll always be told before anything changes.</Text>
@@ -1505,6 +1530,8 @@ const subst = StyleSheet.create({
   primaryBtnTxt: { fontSize: fontSize.base, fontWeight: '800', color: colors.white },
   secondaryBtn: { backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
   secondaryBtnTxt: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink2 },
+  currentPlanBtn: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xs },
+  currentPlanTxt: { fontSize: fontSize.base, fontWeight: '700', color: colors.ink },
   legal: { fontSize: fontSize.xs, color: colors.ink3, textAlign: 'center', lineHeight: fontSize.md, marginTop: spacing.xs },
 });
 
