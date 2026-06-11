@@ -73,6 +73,7 @@ export default function ProgramsScreen() {
             </View>
             {hasUnread && <View style={st.avatarDot} />}
           </TouchableOpacity>
+          <View style={st.appTitleWrap} pointerEvents="none"><Text style={st.appTitle}>Programs</Text></View>
           <View style={st.headerRight} />
         </View>
       </View>
@@ -111,6 +112,8 @@ const st = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: colors.bg },
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, overflow: 'hidden' },
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.lg, flex: 1 },
+  appTitleWrap: { position: 'absolute', left: 0, right: 0, top: spacing.xs, bottom: spacing.lg, alignItems: 'center', justifyContent: 'center', zIndex: 0 },
+  appTitle:  { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
