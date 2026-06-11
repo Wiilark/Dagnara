@@ -958,24 +958,35 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
-                {/* What Premium adds — checkmarks lit when previewing Premium */}
+                {/* Feature list — shows what the *previewed* tier gives, not a
+                    fixed Premium upsell. Standard lists its own included
+                    features; Premium lists what it unlocks on top. Both shown
+                    as checkmarks since they describe what that plan provides. */}
                 <View style={[subst.planCard, previewTier && subst.planCardActive]}>
-                  <Text style={subst.featHeading}>What Premium unlocks</Text>
-                  {[
-                    { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
-                    { icon: 'calendar-outline', t: 'Full progress history', d: 'See every day, not just the last 7' },
-                    { icon: 'bulb-outline', t: 'AI Insights', d: 'Personalised guidance from your own data' },
-                    { icon: 'stats-chart-outline', t: 'Advanced Stats', d: 'Trends, averages and deeper charts' },
-                  ].map((f) => (
+                  <Text style={subst.featHeading}>{previewTier ? 'What Premium unlocks' : 'What Standard gives you'}</Text>
+                  {(previewTier
+                    ? [
+                        { icon: 'analytics-outline', t: 'Lifestyle Breakdown', d: 'Per-pillar scores for nutrition, sleep, activity & hydration' },
+                        { icon: 'calendar-outline', t: 'Full progress history', d: 'See every day, not just the last 7' },
+                        { icon: 'bulb-outline', t: 'AI Insights', d: 'Personalised guidance from your own data' },
+                        { icon: 'stats-chart-outline', t: 'Advanced Stats', d: 'Trends, averages and deeper charts' },
+                      ]
+                    : [
+                        { icon: 'restaurant-outline', t: 'Food & calorie diary', d: 'Log meals, macros and water every day' },
+                        { icon: 'camera-outline', t: 'AI food photo scan', d: 'Snap a meal to estimate its nutrition' },
+                        { icon: 'flame-outline', t: 'Goals & streaks', d: 'Calorie targets, weight tracking and daily streaks' },
+                        { icon: 'bar-chart-outline', t: 'Last 7 days', d: 'Recent calorie and progress charts' },
+                      ]
+                  ).map((f) => (
                     <View key={f.t} style={subst.featCard}>
                       <View style={subst.featIcon}>
-                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={previewTier ? colors.lavender : colors.ink3} />
+                        <Ionicons name={f.icon as keyof typeof Ionicons.glyphMap} size={20} color={previewTier ? colors.lavender : colors.ink2} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={subst.featTitle}>{f.t}</Text>
                         <Text style={subst.featDesc}>{f.d}</Text>
                       </View>
-                      <Ionicons name={previewTier ? 'checkmark-circle' : 'lock-closed'} size={20} color={previewTier ? colors.green : colors.ink3} />
+                      <Ionicons name="checkmark-circle" size={20} color={previewTier ? colors.lavender : colors.green} />
                     </View>
                   ))}
                 </View>
