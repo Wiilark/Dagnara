@@ -138,9 +138,9 @@ const st = StyleSheet.create({
   // four. rowGap keeps the wrapped 5th tile (Pill Reminder) spaced below.
   grid:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
 
-  // Each tile sizes to its icon so the row can spread edge-to-edge, 4 per row.
+  // Each tile sizes to its icon so the row can spread edge-to-edge.
   tile:           {
-    width: 60,
+    width: 64,
     alignItems: 'center',
     gap: spacing.sm,
   },
