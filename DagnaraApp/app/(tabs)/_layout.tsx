@@ -341,7 +341,7 @@ const EXERCISE_CATS = [
 
 function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { addXp } = useAppStore();
-  const { entries, updateCaloriesBurned } = useDiaryStore();
+  const { addCaloriesBurned } = useDiaryStore();
   const [search, setSearch] = useState('');
   const [exTab, setExTab] = useState<'list' | 'calories'>('list');
   const [duration, setDuration] = useState('30');
@@ -360,8 +360,7 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
     const mins = parseInt(duration, 10) || 30;
     const kcal = ex.kcalPerMin * mins;
     const todayKey = TODAY();
-    const current = entries[todayKey]?.calories_burned ?? 0;
-    await updateCaloriesBurned(todayKey, current + kcal);
+    await addCaloriesBurned(todayKey, kcal);
     addXp(Math.round(kcal / 10));
     Alert.alert('Exercise logged!', `${ex.icon} ${ex.name} – ${kcal} kcal burned in ${mins} min. +${Math.round(kcal / 10)} XP`);
     setSearch('');
@@ -373,8 +372,7 @@ function ExerciseLogger({ visible, onClose }: { visible: boolean; onClose: () =>
     const k = parseInt(manualKcal, 10);
     if (!k || k <= 0) { Alert.alert('Enter a valid calorie amount'); return; }
     const todayKey = TODAY();
-    const current = entries[todayKey]?.calories_burned ?? 0;
-    await updateCaloriesBurned(todayKey, current + k);
+    await addCaloriesBurned(todayKey, k);
     addXp(Math.round(k / 10));
     Alert.alert('Calories logged!', `${k} kcal burned. +${Math.round(k / 10)} XP`);
     setManualKcal('');

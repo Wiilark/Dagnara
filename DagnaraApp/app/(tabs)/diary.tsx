@@ -741,7 +741,7 @@ function AiConfirmModal({ visible, items, meal, onConfirm, onClose }: {
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { email, profile } = useAuthStore();
-  const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, updateCaloriesBurned, addStrengthSession, addCardioSession } = useDiaryStore();
+  const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, addCaloriesBurned, addStrengthSession, addCardioSession } = useDiaryStore();
   const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
   const xpInfo = getXpLevel(xp);
@@ -1429,8 +1429,7 @@ export default function DiaryScreen() {
 
 
   async function handleAddCalories(kcal: number, name: string, emoji?: string, minutes?: number) {
-    const current = entries[selectedDate]?.calories_burned ?? 0;
-    await updateCaloriesBurned(selectedDate, current + kcal);
+    await addCaloriesBurned(selectedDate, kcal);
     const session: CardioSession = {
       id: Date.now().toString(),
       name,

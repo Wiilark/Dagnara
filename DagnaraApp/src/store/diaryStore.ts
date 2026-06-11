@@ -98,6 +98,7 @@ interface DiaryState {
   setFruits: (date: string, n: number) => Promise<void>;
   setSkippedMeals: (date: string, meals: Record<string, boolean>) => Promise<void>;
   updateCaloriesBurned: (date: string, kcal: number) => Promise<void>;
+  addCaloriesBurned: (date: string, delta: number) => Promise<void>;
   logSleep: (date: string, sleep: SleepLog) => Promise<void>;
   logMood: (date: string, mood: number) => Promise<void>;
   logSteps: (date: string, steps: number) => Promise<void>;
@@ -174,6 +175,23 @@ function pruneEntries(entries: Record<string, DiaryEntry>): Record<string, Diary
   return Object.fromEntries(keys.slice(-60).map(k => [k, entries[k]]));
 }
 
+// Apply an update to one date's entry using the *freshest* state. Computing the
+// new entry inside the functional set (rather than from a get() snapshot taken
+// before the set) prevents lost updates when two mutations on the same date are
+// dispatched in the same tick. Returns the computed entry so callers can persist it.
+function mutate(
+  set: (fn: (s: DiaryState) => Partial<DiaryState>) => void,
+  date: string,
+  fn: (entry: DiaryEntry) => DiaryEntry,
+): DiaryEntry {
+  let result!: DiaryEntry;
+  set((s) => {
+    result = fn(s.entries[date] ?? emptyEntry(date));
+    return { entries: { ...s.entries, [date]: result } };
+  });
+  return result;
+}
+
 // Get the current user's email from authStore (no circular dep — zustand stores are singletons)
 function getEmail(): string | null {
   try {
@@ -230,153 +248,113 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
   },
 
   addFood: async (date, item) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, foods: [...entry.foods, item] };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, foods: [...e.foods, item] }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   removeFood: async (date, id) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, foods: entry.foods.filter((f) => f.id !== id) };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, foods: e.foods.filter((f) => f.id !== id) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   addWater: async (date) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, water: entry.water + 1 };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, water: e.water + 1 }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   removeWater: async (date) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    if (entry.water === 0) return;
-    const updated = { ...entry, water: entry.water - 1 };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    if ((get().entries[date]?.water ?? 0) === 0) return;
+    const updated = mutate(set, date, (e) => ({ ...e, water: Math.max(0, e.water - 1) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   setWater: async (date, n) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, water: Math.max(0, n) };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, water: Math.max(0, n) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   setVeggies: async (date, n) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, veggies: Math.max(0, n) };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, veggies: Math.max(0, n) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   setFruits: async (date, n) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, fruits: Math.max(0, n) };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, fruits: Math.max(0, n) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   setSkippedMeals: async (date, meals) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, skippedMeals: meals };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, skippedMeals: meals }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   updateCaloriesBurned: async (date, kcal) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, calories_burned: kcal };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, calories_burned: kcal }));
+    await saveEntry(date, updated, getEmail(), get);
+  },
+
+  // Additive — reads the freshest value inside the set, so rapid back-to-back
+  // logs (two exercises tapped quickly) accumulate instead of clobbering.
+  addCaloriesBurned: async (date, delta) => {
+    const updated = mutate(set, date, (e) => ({ ...e, calories_burned: Math.max(0, e.calories_burned + delta) }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   logSleep: async (date, sleep) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, sleep };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, sleep }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   logMood: async (date, mood) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, mood };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, mood }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   logSteps: async (date, steps) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, steps };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, steps }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   addStrengthSession: async (date, session) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = {
-      ...entry,
-      strengthSessions: [...(entry.strengthSessions ?? []), session],
-      calories_burned: entry.calories_burned + session.totalKcal,
-    };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({
+      ...e,
+      strengthSessions: [...(e.strengthSessions ?? []), session],
+      calories_burned: e.calories_burned + session.totalKcal,
+    }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   removeStrengthSession: async (date, id) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const removed = (entry.strengthSessions ?? []).find(s => s.id === id);
-    const updated = {
-      ...entry,
-      strengthSessions: (entry.strengthSessions ?? []).filter(s => s.id !== id),
-      calories_burned: Math.max(0, entry.calories_burned - (removed?.totalKcal ?? 0)),
-    };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => {
+      const removed = (e.strengthSessions ?? []).find(s => s.id === id);
+      return {
+        ...e,
+        strengthSessions: (e.strengthSessions ?? []).filter(s => s.id !== id),
+        calories_burned: Math.max(0, e.calories_burned - (removed?.totalKcal ?? 0)),
+      };
+    });
     await saveEntry(date, updated, getEmail(), get);
   },
 
   addCardioSession: async (date, session) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, cardioSessions: [...(entry.cardioSessions ?? []), session] };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, cardioSessions: [...(e.cardioSessions ?? []), session] }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
   removeCardioSession: async (date, id) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const removed = (entry.cardioSessions ?? []).find(s => s.id === id);
-    const updated = {
-      ...entry,
-      cardioSessions: (entry.cardioSessions ?? []).filter(s => s.id !== id),
-      calories_burned: Math.max(0, entry.calories_burned - (removed?.kcal ?? 0)),
-    };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => {
+      const removed = (e.cardioSessions ?? []).find(s => s.id === id);
+      return {
+        ...e,
+        cardioSessions: (e.cardioSessions ?? []).filter(s => s.id !== id),
+        calories_burned: Math.max(0, e.calories_burned - (removed?.kcal ?? 0)),
+      };
+    });
     await saveEntry(date, updated, getEmail(), get);
   },
 
   logFastingInterval: async (date, interval) => {
-    const entries = get().entries;
-    const entry = entries[date] ?? emptyEntry(date);
-    const updated = { ...entry, fastingIntervals: [...(entry.fastingIntervals ?? []), interval] };
-    set((s) => ({ entries: { ...s.entries, [date]: updated } }));
+    const updated = mutate(set, date, (e) => ({ ...e, fastingIntervals: [...(e.fastingIntervals ?? []), interval] }));
     await saveEntry(date, updated, getEmail(), get);
   },
 

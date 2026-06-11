@@ -114,7 +114,14 @@ export function parseHeight(val: string, sys: UnitSystem): number | null {
   // ft'in" — "5'11\"" or "5 11"
   const m = s.match(/^(\d+)['\s]+(\d+)/);
   if (m) return (parseFloat(m[1]) * 12 + parseFloat(m[2])) * 2.54;
-  // Single number = treat as total inches
+  // Feet-only — "5" or "5'" — a small number in imperial height almost always
+  // means whole feet, not inches (5 inches = 12.7 cm is never a real height).
+  const feetOnly = s.match(/^(\d+)'?$/);
+  if (feetOnly) {
+    const ft = parseFloat(feetOnly[1]);
+    if (!isNaN(ft) && ft > 0 && ft <= 8) return ft * 12 * 2.54;
+  }
+  // Larger single number = treat as total inches
   const n = parseFloat(s);
   return isNaN(n) || n <= 0 ? null : n * 2.54;
 }
