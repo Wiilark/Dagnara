@@ -135,8 +135,9 @@ const st = StyleSheet.create({
   },
   // Fixed 25% columns guarantee exactly 4 tiles per row: the 5th (Pill
   // Reminder) always wraps to row 2 and lands under the first (Quit Smoking).
-  // No negative margin, so Grocery's column reaches the card's right edge.
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
+  // Negative side margins widen the columns (more gap between icons) and pull
+  // the first tile (Quit Smoking) closer to the card's left edge.
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, marginHorizontal: -spacing.sm },
 
   // Each tile is a 1/4-width column: tinted icon-square + label beneath.
   tile:           {
