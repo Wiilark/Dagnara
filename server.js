@@ -705,7 +705,11 @@ const coachLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.body?.email ?? ipKeyGenerator(req.ip)),
+  // authenticate runs first and attaches the verified user, so key per-user.
+  // The mobile client never sends `email` in the body, so without this every
+  // request fell back to IP — and behind Railway's shared proxy that lets one
+  // user exhaust the limit for everyone on the same egress IP.
+  keyGenerator: (req) => (req.user?.email ?? ipKeyGenerator(req.ip)),
   message: { error: { message: 'Too many messages — please wait a moment.' } }
 });
 
