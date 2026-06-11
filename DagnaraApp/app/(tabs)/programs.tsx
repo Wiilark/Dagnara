@@ -36,7 +36,7 @@ function ProgramTile({ icon, name, color, onPress }: ProgramTileProps) {
       activeOpacity={0.6}
     >
       <View style={[st.tileIcon, { backgroundColor: color + '26' }]}>
-        <Ionicons name={icon} size={26} color={colors.ink} />
+        <Ionicons name={icon} size={30} color={colors.ink} />
       </View>
       <Text style={st.tileLabel} numberOfLines={2}>{name}</Text>
     </TouchableOpacity>
@@ -160,7 +160,7 @@ const st = StyleSheet.create({
     gap: spacing.sm,
   },
   tileIcon:       {
-    width: 60, height: 60,
+    width: 68, height: 68,
     borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
