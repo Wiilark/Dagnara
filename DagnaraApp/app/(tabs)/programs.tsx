@@ -133,7 +133,7 @@ const st = StyleSheet.create({
     padding: spacing.md,
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap' },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', marginLeft: -spacing.xs },
 
   // Each tile is a 1/4-width column: tinted icon-square + label beneath
   tile:           {
