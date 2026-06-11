@@ -133,14 +133,14 @@ const st = StyleSheet.create({
     padding: spacing.md,
     ...(Platform.OS === 'ios' ? { borderCurve: 'continuous' as const } : null),
   },
-  // space-between pins Quit Smoking to the left and Grocery to the right,
-  // spreading the gap evenly across the four. The lone wrapped 5th tile
-  // (Pill Reminder) stays left-aligned, landing directly under Quit Smoking.
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
+  // Fixed 25% columns guarantee exactly 4 tiles per row: the 5th (Pill
+  // Reminder) always wraps to row 2 and lands under the first (Quit Smoking).
+  // No negative margin, so Grocery's column reaches the card's right edge.
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
 
-  // Each tile sizes to its icon so the row can spread edge-to-edge, 4 per row.
+  // Each tile is a 1/4-width column: tinted icon-square + label beneath.
   tile:           {
-    width: 60,
+    width: '25%',
     alignItems: 'center',
     gap: spacing.sm,
   },
