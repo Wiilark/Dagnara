@@ -114,10 +114,10 @@ export async function analyzeFood(imageData: string, mediaType: string): Promise
   return postJson<NutritionResponse>('/api/analyze-food', { imageData, mediaType }, 45_000);
 }
 
-export interface CoachMessage { role: 'user' | 'assistant'; content: string; }
+export interface HelpMessage { role: 'user' | 'assistant'; content: string; }
 
-export async function sendCoachMessage(messages: CoachMessage[], context?: string): Promise<string> {
-  const data = await postJson<{ reply: string }>('/api/coach', { messages, context });
+export async function sendHelpMessage(messages: HelpMessage[], context?: string): Promise<string> {
+  const data = await postJson<{ reply: string }>('/api/help', { messages, context });
   return data.reply;
 }
 

@@ -30,7 +30,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
   const { updateCaloriesBurned, logSleep } = useDiaryStore();
-  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, setCoachOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
+  const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, setHelpOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
   const isPremium = usePremium();
 
   const [editing, setEditing] = useState(false);
@@ -586,7 +586,7 @@ export default function ProfileScreen() {
         {/* ── Customization ── */}
         <View style={styles.menuCard}>
           {[
-            { icon: 'chatbubble-ellipses-outline', label: 'Help', color: colors.sky, value: 'Ask about the app', premium: true, onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isPremium) { setCoachOpen(true); } else { setSettingsPage('subscription'); setSettingsModal(true); } } },
+            { icon: 'chatbubble-ellipses-outline', label: 'Help', color: colors.sky, value: 'Ask about the app', premium: true, onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (isPremium) { setHelpOpen(true); } else { setSettingsPage('subscription'); setSettingsModal(true); } } },
             { icon: 'person-outline', label: 'Personal Info', color: colors.lavender, value: `${profile.age ? profile.age + ' yrs' : '—'} · ${profile.weight ? formatWeight(parseFloat(profile.weight), unitSystem) : '—'}`, onPress: () => { setDraft(profile); setEditing(true); } },
             { icon: 'person-circle-outline', label: 'Account Details', color: colors.purple, value: email, onPress: () => { setSettingsPage('account'); setSettingsModal(true); } },
             { icon: 'restaurant-outline', label: 'Diet Plan', color: colors.green, value: selectedDiet, onPress: () => setDietModal(true) },

@@ -700,7 +700,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
 });
 
 // ── Dagnara Help Assistant ────────────────────────────────────────────────────
-const coachLimiter = rateLimit({
+const helpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -713,7 +713,7 @@ const coachLimiter = rateLimit({
   message: { error: { message: 'Too many messages — please wait a moment.' } }
 });
 
-app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
+app.post('/api/help', authenticate, helpLimiter, async (req, res) => {
   const { messages, context } = req.body ?? {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: { message: 'messages is required' } });
@@ -754,7 +754,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
     const reply = data?.content?.[0]?.text ?? 'Sorry, I could not generate a response.';
     res.json({ reply });
   } catch (err) {
-    logError('coach', err.message);
+    logError('help', err.message);
     const msg = err.name === 'AbortError' ? 'Request timed out — please try again.' : 'Failed to contact AI service';
     res.status(500).json({ error: { message: msg } });
   }

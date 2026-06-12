@@ -17,7 +17,7 @@ import { fmt } from '../../src/lib/format';
 import { useAppStore } from '../../src/store/appStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { useDiaryStore } from '../../src/store/diaryStore';
-import { sendCoachMessage, type CoachMessage } from '../../src/lib/api';
+import { sendHelpMessage, type HelpMessage } from '../../src/lib/api';
 import { MESSAGES, MSG_COLORS, groupMessages, countUnread } from '../../src/lib/messages';
 
 const TODAY = () => new Date().toLocaleDateString('en-CA');
@@ -54,19 +54,19 @@ function TypingDots() {
     return () => loops.forEach(l => l.stop());
   }, [dots]);
   return (
-    <View style={coach.typingRow}>
+    <View style={help.typingRow}>
       {dots.map((d, i) => (
-        <Animated.View key={i} style={[coach.typingDot, { opacity: d }]} />
+        <Animated.View key={i} style={[help.typingDot, { opacity: d }]} />
       ))}
     </View>
   );
 }
 
 // ── Help Assistant Modal ──────────────────────────────────────────────────────
-function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function HelpModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { profile } = useAuthStore();
   const { weightGoal, activityLevel, calorieGoal } = useAppStore();
-  const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -143,12 +143,12 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
     const text = input.trim();
     if (!text || loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next: CoachMessage[] = [...messages, { role: 'user', content: text }];
+    const next: HelpMessage[] = [...messages, { role: 'user', content: text }];
     setMessages(next);
     setInput('');
     setLoading(true);
     try {
-      const reply = await sendCoachMessage(next, context);
+      const reply = await sendHelpMessage(next, context);
       setMessages(m => [...m, { role: 'assistant', content: reply }]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong';
@@ -161,7 +161,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={coach.safe} edges={[]}>
+      <SafeAreaView style={help.safe} edges={[]}>
         <LinearGradient
           colors={['rgba(124,77,255,0.18)', 'transparent']}
           style={StyleSheet.absoluteFillObject}
@@ -174,40 +174,40 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
           <ScrollView
             ref={scrollRef}
             style={{ flex: 1 }}
-            contentContainerStyle={[coach.scroll, { paddingTop: insets.top + spacing.xl * 2 + spacing.sm }]}
+            contentContainerStyle={[help.scroll, { paddingTop: insets.top + spacing.xl * 2 + spacing.sm }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
             {messages.length === 0 ? (
-              <View style={coach.emptyWrap}>
-                <Text style={coach.emptyTitle}>Hello, {(profile.name ?? '').trim().split(/\s+/)[0] || 'there'}!</Text>
+              <View style={help.emptyWrap}>
+                <Text style={help.emptyTitle}>Hello, {(profile.name ?? '').trim().split(/\s+/)[0] || 'there'}!</Text>
               </View>
             ) : (
               messages.map((m, i) => (
                 m.role === 'user' ? (
-                  <View key={i} style={coach.userRow}>
-                    <View style={coach.userBubble}>
-                      <Text style={coach.userTxt}>{m.content}</Text>
+                  <View key={i} style={help.userRow}>
+                    <View style={help.userBubble}>
+                      <Text style={help.userTxt}>{m.content}</Text>
                     </View>
                   </View>
                 ) : (
-                  <View key={i} style={coach.assistantRow}>
-                    <Text style={coach.assistantTxt}>{m.content}</Text>
+                  <View key={i} style={help.assistantRow}>
+                    <Text style={help.assistantTxt}>{m.content}</Text>
                   </View>
                 )
               ))
             )}
             {loading && (
-              <View style={coach.assistantRow}>
+              <View style={help.assistantRow}>
                 <TypingDots />
               </View>
             )}
           </ScrollView>
 
-          <Animated.View style={[coach.composerWrap, { paddingBottom: composerPad, marginBottom: insets.bottom }]}>
-            <View style={coach.composer}>
+          <Animated.View style={[help.composerWrap, { paddingBottom: composerPad, marginBottom: insets.bottom }]}>
+            <View style={help.composer}>
               <TextInput
-                style={coach.input}
+                style={help.input}
                 value={input}
                 onChangeText={setInput}
                 placeholder="How can I help you?"
@@ -219,7 +219,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 onSubmitEditing={handleSend}
               />
               <TouchableOpacity
-                style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
+                style={[help.sendBtn, (!input.trim() || loading) && help.sendBtnDisabled]}
                 onPress={handleSend}
                 activeOpacity={0.8}
                 disabled={!input.trim() || loading}
@@ -777,8 +777,8 @@ export default function TabLayout() {
   const loadApp = useAppStore((s) => s.loadApp);
   const messagesOpen = useAppStore((s) => s.messagesOpen);
   const setMessagesOpen = useAppStore((s) => s.setMessagesOpen);
-  const coachOpen = useAppStore((s) => s.coachOpen);
-  const setCoachOpen = useAppStore((s) => s.setCoachOpen);
+  const helpOpen = useAppStore((s) => s.helpOpen);
+  const setHelpOpen = useAppStore((s) => s.setHelpOpen);
   const [fabOpen, setFabOpen] = useState(false);
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const [weightOpen, setWeightOpen] = useState(false);
@@ -878,7 +878,7 @@ export default function TabLayout() {
       <SleepLogger visible={sleepOpen} onClose={() => setSleepOpen(false)} />
       <ActivityLogger visible={activityOpen} onClose={() => setActivityOpen(false)} />
       <MessagesModal visible={messagesOpen} onClose={() => setMessagesOpen(false)} />
-      <CoachModal visible={coachOpen} onClose={() => setCoachOpen(false)} />
+      <HelpModal visible={helpOpen} onClose={() => setHelpOpen(false)} />
     </>
   );
 }
@@ -1305,7 +1305,7 @@ const el = StyleSheet.create({
 });
 
 // ── Help assistant styles (clean, Claude-style chat) ──────────────────────────
-const coach = StyleSheet.create({
+const help = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   // Top padding clears the absolutely-positioned FloatingModalHeader.
   scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl * 2 + spacing.sm, paddingBottom: spacing.lg, gap: spacing.lg },
