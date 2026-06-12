@@ -144,20 +144,20 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={coach.safe} edges={['top']}>
+      <SafeAreaView style={coach.safe} edges={[]}>
         <LinearGradient
           colors={['rgba(124,77,255,0.18)', 'transparent']}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }}
           pointerEvents="none"
         />
-        <FloatingModalHeader scrollY={headerScrollY} title="Help" onBack={onClose} staticTitle />
+        <FloatingModalHeader scrollY={headerScrollY} title="Help" onBack={onClose} staticTitle topInset={insets.top} />
 
         <View style={{ flex: 1 }}>
           <ScrollView
             ref={scrollRef}
             style={{ flex: 1 }}
-            contentContainerStyle={coach.scroll}
+            contentContainerStyle={[coach.scroll, { paddingTop: insets.top + spacing.xl * 2 + spacing.sm }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
@@ -221,7 +221,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 activeOpacity={0.8}
                 disabled={!input.trim() || loading}
               >
-                <Ionicons name="arrow-up" size={18} color={(!input.trim() || loading) ? colors.ink3 : colors.white} />
+                <Ionicons name="arrow-up" size={20} color={(!input.trim() || loading) ? colors.ink3 : colors.white} />
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -1343,10 +1343,10 @@ const coach = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm,
     backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2,
     borderRadius: radius.lg, paddingLeft: spacing.md, paddingRight: spacing.sm,
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.sm,
   },
-  input: { flex: 1, color: colors.ink, fontSize: fontSize.base, lineHeight: 22, paddingVertical: spacing.xs, maxHeight: 120 },
-  sendBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
+  input: { flex: 1, color: colors.ink, fontSize: fontSize.base, lineHeight: 22, paddingVertical: spacing.sm, minHeight: 96, maxHeight: 220, textAlignVertical: 'top' },
+  sendBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
   sendBtnDisabled: { backgroundColor: colors.layer3 },
 });
 

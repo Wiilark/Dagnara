@@ -23,15 +23,18 @@ type Props = {
   action?: { label: string; onPress: () => void };
   /** Always show the title (for pages with no big in-body header to fade past). */
   staticTitle?: boolean;
+  /** Status-bar inset to pad the header down by. Pass `insets.top` inside a
+   *  full-screen Modal that has no top-edge SafeAreaView of its own. */
+  topInset?: number;
 };
 
-export function FloatingModalHeader({ scrollY, title, onBack, action, staticTitle }: Props) {
+export function FloatingModalHeader({ scrollY, title, onBack, action, staticTitle, topInset = 0 }: Props) {
   const blurOp = scrollY.interpolate({ inputRange: [10, 70], outputRange: [0, 1], extrapolate: 'clamp' });
   const titleOp = staticTitle ? 1 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [0, 1], extrapolate: 'clamp' });
   const titleTY = staticTitle ? 0 : scrollY.interpolate({ inputRange: [40, 90], outputRange: [12, 0], extrapolate: 'clamp' });
 
   return (
-    <View style={s.fixedHeader}>
+    <View style={[s.fixedHeader, { paddingTop: topInset }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: blurOp }]}>
         <BlurView tint="dark" intensity={Platform.OS === 'ios' ? 80 : 100} style={StyleSheet.absoluteFill} />
         <LinearGradient
