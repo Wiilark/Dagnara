@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   View, TouchableOpacity, StyleSheet, Text, Modal,
   ScrollView, TextInput, Alert, Pressable, Animated,
-  Platform, Keyboard, LayoutAnimation,
+  Platform, Keyboard, Easing,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,35 +73,41 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   const insets = useSafeAreaInsets();
   // Static — the Help title stays visible; the chat list has no big in-body header to fade past.
   const headerScrollY = useRef(new Animated.Value(0)).current;
-  // The composer's bottom inset, in plain state. We animate it via LayoutAnimation
-  // with the keyboard's own `duration` + `type: 'keyboard'` curve — the only built-in
-  // path that matches the system keyboard motion exactly, so they move as one.
-  const [kbHeight, setKbHeight] = useState(0);
+  // Composer lift is driven straight off an Animated.Value in the keyboard event
+  // callback — no React re-render sits between the event and the motion, so it
+  // starts on the very next frame. The iOS keyboard rides a known bezier; matching
+  // it (curve + the event's own duration) makes the two move as one.
+  const kbInset = useRef(new Animated.Value(0)).current;
+  // Resting composer gap sits above the home indicator; when the keyboard rises it
+  // overlaps that area, so lift only by the part of the keyboard beyond the safe inset.
+  const composerPad = Animated.subtract(kbInset, insets.bottom).interpolate({
+    inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: 'clamp',
+  });
 
   useEffect(() => {
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    // iOS curve for the standard keyboard show/hide (UIViewAnimationCurveKeyboard).
+    const kbEasing = Easing.bezier(0.17, 0.59, 0.4, 1);
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const onShow = Keyboard.addListener(showEvt, (e) => {
-      LayoutAnimation.configureNext({
+      Animated.timing(kbInset, {
+        toValue: e.endCoordinates.height,
         duration: e.duration || 250,
-        update: { type: LayoutAnimation.Types.keyboard },
-      });
-      setKbHeight(e.endCoordinates.height);
+        easing: kbEasing,
+        useNativeDriver: false,
+      }).start();
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
     });
     const onHide = Keyboard.addListener(hideEvt, (e) => {
-      LayoutAnimation.configureNext({
+      Animated.timing(kbInset, {
+        toValue: 0,
         duration: e?.duration || 250,
-        update: { type: LayoutAnimation.Types.keyboard },
-      });
-      setKbHeight(0);
+        easing: kbEasing,
+        useNativeDriver: false,
+      }).start();
     });
     return () => { onShow.remove(); onHide.remove(); };
-  }, []);
-
-  // Resting composer gap sits above the home indicator; when the keyboard rises it
-  // overlaps that area, so lift only by the part of the keyboard beyond the safe inset.
-  const composerPad = Math.max(0, kbHeight - insets.bottom);
+  }, [kbInset]);
 
   useEffect(() => {
     if (!visible) { setMessages([]); setInput(''); setLoading(false); }
@@ -186,7 +192,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             )}
           </ScrollView>
 
-          <View style={[coach.composerWrap, { paddingBottom: composerPad, marginBottom: insets.bottom }]}>
+          <Animated.View style={[coach.composerWrap, { paddingBottom: composerPad, marginBottom: insets.bottom }]}>
             <View style={coach.composer}>
               <TextInput
                 style={coach.input}
@@ -210,7 +216,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 <Ionicons name="arrow-up" size={20} color={(!input.trim() || loading) ? colors.ink3 : colors.white} />
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </SafeAreaView>
     </Modal>
