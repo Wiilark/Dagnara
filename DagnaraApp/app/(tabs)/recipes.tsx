@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -461,6 +461,10 @@ export default function RecipesScreen() {
   });
 
   const insets = useSafeAreaInsets();
+  // When opened from the Programs grid (`?from=programs`), the left header slot
+  // shows a back button to Programs instead of the avatar-to-Profile shortcut.
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const fromPrograms = from === 'programs';
   const scrollY = useRef(new Animated.Value(0)).current;
   // Recipe-detail modal: drives the floating header (blur + title fade in as the
   // big in-body recipe title scrolls out of view — matches the Profile header).
@@ -480,12 +484,18 @@ export default function RecipesScreen() {
           <LinearGradient colors={['transparent', colors.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18 }} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} pointerEvents="none" />
         </Animated.View>
         <View style={styles.appHeader}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn}>
-            <View style={styles.avatarThumb}>
-              <Text style={styles.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
-            </View>
-            {hasUnread && <View style={styles.avatarDot} />}
-          </TouchableOpacity>
+          {fromPrograms ? (
+            <TouchableOpacity onPress={() => router.push('/(tabs)/programs')} style={styles.headerBackBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <BackChevron size={22} color={colors.ink} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn}>
+              <View style={styles.avatarThumb}>
+                <Text style={styles.avatarInitial}>{(() => { const p = (profile?.name ?? '').trim().split(/\s+/).filter(Boolean); return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : (p[0]?.[0] ?? email?.[0] ?? '?').toUpperCase(); })()}</Text>
+              </View>
+              {hasUnread && <View style={styles.avatarDot} />}
+            </TouchableOpacity>
+          )}
           <View style={styles.appTitleWrap} pointerEvents="none"><Text style={styles.appTitle}>Recipes</Text></View>
           <View style={styles.headerRight}>
             {viewMode === 'recipes' && (
@@ -1120,6 +1130,7 @@ const styles = StyleSheet.create({
   appTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   headerRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: spacing.xl + spacing.sm, zIndex: 1 },
   avatarBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, zIndex: 1 },
+  headerBackBtn: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.line2, zIndex: 1 },
   avatarThumb: { width: spacing.xl + spacing.sm, height: spacing.xl + spacing.sm, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.purple2 },
   avatarInitial: { color: colors.white, fontSize: fontSize.sm + 1, fontWeight: '800' },
 
