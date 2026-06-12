@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   View, TouchableOpacity, StyleSheet, Text, Modal,
   ScrollView, TextInput, Alert, Pressable, Animated,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,6 +35,32 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 }
 
 
+
+// Three soft dots that fade in sequence while the assistant is thinking.
+function TypingDots() {
+  const dots = useRef([0, 1, 2].map(() => new Animated.Value(0.3))).current;
+  useEffect(() => {
+    const loops = dots.map((d, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(d, { toValue: 1, duration: 380, useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0.3, duration: 380, useNativeDriver: true }),
+          Animated.delay((2 - i) * 160),
+        ]),
+      ),
+    );
+    loops.forEach(l => l.start());
+    return () => loops.forEach(l => l.stop());
+  }, [dots]);
+  return (
+    <View style={coach.typingRow}>
+      {dots.map((d, i) => (
+        <Animated.View key={i} style={[coach.typingDot, { opacity: d }]} />
+      ))}
+    </View>
+  );
+}
 
 // ── Help Assistant Modal ──────────────────────────────────────────────────────
 function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -95,75 +122,81 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
         />
         <FloatingModalHeader scrollY={headerScrollY} title="Help" onBack={onClose} staticTitle />
 
-        <ScrollView
-          ref={scrollRef}
+        <KeyboardAvoidingView
           style={{ flex: 1 }}
-          contentContainerStyle={coach.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {messages.length === 0 && (
-            <View style={coach.emptyWrap}>
-              <Text style={coach.emptyIcon}>💬</Text>
-              <Text style={coach.emptyTitle}>How can I help you?</Text>
-              <Text style={coach.emptySub}>Ask me anything about using the Dagnara app — logging meals, reading your stats, or finding a feature.</Text>
-              <View style={coach.suggestionRow}>
-                {[
-                  'How do I log a meal?',
-                  'What is the Life Score?',
-                  'How do I set my calorie goal?',
-                ].map(s => (
-                  <TouchableOpacity key={s} style={coach.suggestion} onPress={() => setInput(s)} activeOpacity={0.75}>
-                    <Text style={coach.suggestionTxt}>{s}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-          {messages.map((m, i) => (
-            <View key={i} style={[coach.bubble, m.role === 'user' ? coach.bubbleUser : coach.bubbleAssistant]}>
-              {m.role === 'assistant' && (
-                <View style={coach.avatarDot}>
-                  <Text style={coach.avatarEmoji}>💬</Text>
-                </View>
-              )}
-              <View style={[coach.bubbleInner, m.role === 'user' ? coach.bubbleInnerUser : coach.bubbleInnerAssistant]}>
-                <Text style={[coach.bubbleTxt, m.role === 'user' && coach.bubbleTxtUser]}>{m.content}</Text>
-              </View>
-            </View>
-          ))}
-          {loading && (
-            <View style={[coach.bubble, coach.bubbleAssistant]}>
-              <View style={coach.avatarDot}><Text style={coach.avatarEmoji}>💬</Text></View>
-              <View style={[coach.bubbleInner, coach.bubbleInnerAssistant]}>
-                <Text style={coach.typingDots}>· · ·</Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        <View style={coach.inputRow}>
-          <TextInput
-            style={coach.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="How can I help you?"
-            placeholderTextColor={colors.ink3}
-            multiline
-            maxLength={500}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={handleSend}
-          />
-          <TouchableOpacity
-            style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
-            onPress={handleSend}
-            activeOpacity={0.8}
-            disabled={!input.trim() || loading}
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={coach.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Ionicons name="arrow-up" size={18} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+            {messages.length === 0 ? (
+              <View style={coach.emptyWrap}>
+                <Text style={coach.emptyTitle}>How can I help you?</Text>
+                <Text style={coach.emptySub}>Ask me anything about using the Dagnara app — logging meals, reading your stats, or finding a feature.</Text>
+                <View style={coach.suggestionRow}>
+                  {[
+                    'How do I log a meal?',
+                    'What is the Life Score?',
+                    'How do I set my calorie goal?',
+                  ].map(s => (
+                    <TouchableOpacity key={s} style={coach.suggestion} onPress={() => setInput(s)} activeOpacity={0.7}>
+                      <Text style={coach.suggestionTxt}>{s}</Text>
+                      <Ionicons name="arrow-forward" size={15} color={colors.ink3} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              messages.map((m, i) => (
+                m.role === 'user' ? (
+                  <View key={i} style={coach.userRow}>
+                    <View style={coach.userBubble}>
+                      <Text style={coach.userTxt}>{m.content}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View key={i} style={coach.assistantRow}>
+                    <Text style={coach.assistantTxt}>{m.content}</Text>
+                  </View>
+                )
+              ))
+            )}
+            {loading && (
+              <View style={coach.assistantRow}>
+                <TypingDots />
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={coach.composerWrap}>
+            <View style={coach.composer}>
+              <TextInput
+                style={coach.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="How can I help you?"
+                placeholderTextColor={colors.ink3}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={handleSend}
+              />
+              <TouchableOpacity
+                style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
+                onPress={handleSend}
+                activeOpacity={0.8}
+                disabled={!input.trim() || loading}
+              >
+                <Ionicons name="arrow-up" size={18} color={(!input.trim() || loading) ? colors.ink3 : colors.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
@@ -1239,32 +1272,52 @@ const el = StyleSheet.create({
   logBtnTxt: { fontSize: fontSize.sm + 1, fontWeight: '700', color: colors.ink },
 });
 
-// ── AI Coach styles ───────────────────────────────────────────────────────────
+// ── Help assistant styles (clean, Claude-style chat) ──────────────────────────
 const coach = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  // Top padding clears the absolutely-positioned FloatingModalHeader (back button + title).
-  scroll: { padding: spacing.md, paddingTop: spacing.xl + spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm },
-  emptyWrap: { alignItems: 'center', paddingTop: spacing.xl, paddingHorizontal: spacing.md, gap: spacing.md },
-  emptyIcon: { fontSize: fontSize['2xl'] },
-  emptyTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' },
-  emptySub: { fontSize: fontSize.base, color: colors.ink2, textAlign: 'center', lineHeight: 22 },
-  suggestionRow: { width: '100%', gap: spacing.xs + 2, marginTop: spacing.xs },
-  suggestion: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
-  suggestionTxt: { fontSize: fontSize.sm, color: colors.lavender, fontWeight: '500' },
-  bubble: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-  bubbleUser: { flexDirection: 'row-reverse' },
-  bubbleAssistant: {},
-  avatarDot: { width: 30, height: 30, borderRadius: radius.pill, backgroundColor: colors.purpleTint, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 },
-  avatarEmoji: { fontSize: fontSize.sm },
-  bubbleInner: { maxWidth: '80%', borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
-  bubbleInnerUser: { backgroundColor: colors.purple, borderBottomRightRadius: spacing.xs },
-  bubbleInnerAssistant: { backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line2, borderBottomLeftRadius: spacing.xs },
-  bubbleTxt: { fontSize: fontSize.base, color: colors.ink, lineHeight: 22 },
-  bubbleTxtUser: { color: colors.white },
-  typingDots: { fontSize: fontSize.md, color: colors.ink3, letterSpacing: 4 },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderTopWidth: 1, borderTopColor: colors.line2, backgroundColor: colors.bg },
-  input: { flex: 1, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, fontSize: fontSize.base, maxHeight: 100 },
-  sendBtn: { width: 38, height: 38, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', shadowColor: colors.purple, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
-  sendBtnDisabled: { backgroundColor: colors.layer3, shadowOpacity: 0 },
+  // Top padding clears the absolutely-positioned FloatingModalHeader.
+  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
+
+  // Empty / welcome state — centered, calm, with tappable starter prompts.
+  emptyWrap: { paddingTop: spacing.xl * 2, paddingHorizontal: spacing.xs, gap: spacing.sm },
+  emptyTitle: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink, letterSpacing: -0.5 },
+  emptySub: { fontSize: fontSize.base, color: colors.ink2, lineHeight: 23, marginBottom: spacing.md },
+  suggestionRow: { gap: spacing.sm },
+  suggestion: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+  },
+  suggestionTxt: { fontSize: fontSize.base, color: colors.ink, fontWeight: '500', flex: 1 },
+
+  // Assistant turn — full-width plain text, no bubble (Claude-style).
+  assistantRow: { paddingRight: spacing.lg },
+  assistantTxt: { fontSize: fontSize.base, color: colors.ink, lineHeight: 24 },
+
+  // User turn — right-aligned soft bubble.
+  userRow: { alignItems: 'flex-end' },
+  userBubble: {
+    maxWidth: '82%', backgroundColor: colors.layer2,
+    borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.lg, borderTopRightRadius: spacing.xs,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  userTxt: { fontSize: fontSize.base, color: colors.ink, lineHeight: 23 },
+
+  // Thinking indicator.
+  typingRow: { flexDirection: 'row', gap: 5, paddingVertical: spacing.xs },
+  typingDot: { width: 7, height: 7, borderRadius: radius.pill, backgroundColor: colors.ink3 },
+
+  // Composer — single rounded field with the send button nested inside, on the right.
+  composerWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  composer: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm,
+    backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2,
+    borderRadius: radius.lg, paddingLeft: spacing.md, paddingRight: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+  },
+  input: { flex: 1, color: colors.ink, fontSize: fontSize.base, lineHeight: 22, paddingVertical: spacing.xs, maxHeight: 120 },
+  sendBtn: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
+  sendBtnDisabled: { backgroundColor: colors.layer3 },
 });
 
