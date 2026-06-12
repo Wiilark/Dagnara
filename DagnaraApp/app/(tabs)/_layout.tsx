@@ -163,20 +163,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
           >
             {messages.length === 0 ? (
               <View style={coach.emptyWrap}>
-                <Text style={coach.emptyTitle}>How can I help you?</Text>
-                <Text style={coach.emptySub}>Ask me anything about using the Dagnara app — logging meals, reading your stats, or finding a feature.</Text>
-                <View style={coach.suggestionRow}>
-                  {[
-                    'How do I log a meal?',
-                    'What is the Life Score?',
-                    'How do I set my calorie goal?',
-                  ].map(s => (
-                    <TouchableOpacity key={s} style={coach.suggestion} onPress={() => setInput(s)} activeOpacity={0.7}>
-                      <Text style={coach.suggestionTxt}>{s}</Text>
-                      <Ionicons name="arrow-forward" size={15} color={colors.ink3} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={coach.emptyTitle}>Hello, {(profile.name ?? '').trim().split(/\s+/)[0] || 'there'}!</Text>
               </View>
             ) : (
               messages.map((m, i) => (
@@ -1308,16 +1295,8 @@ const coach = StyleSheet.create({
   scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl * 2 + spacing.sm, paddingBottom: spacing.lg, gap: spacing.lg },
 
   // Empty / welcome state — centered, calm, with tappable starter prompts.
-  emptyWrap: { paddingTop: spacing.md, paddingHorizontal: spacing.xs, gap: spacing.sm },
-  emptyTitle: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink, letterSpacing: -0.5 },
-  emptySub: { fontSize: fontSize.base, color: colors.ink2, lineHeight: 23, marginBottom: spacing.md },
-  suggestionRow: { gap: spacing.sm },
-  suggestion: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.layer1, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-  },
-  suggestionTxt: { fontSize: fontSize.base, color: colors.ink, fontWeight: '500', flex: 1 },
+  emptyWrap: { paddingTop: spacing.xl * 3, paddingHorizontal: spacing.xs, alignItems: 'center' },
+  emptyTitle: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink, letterSpacing: -0.5, textAlign: 'center' },
 
   // Assistant turn — full-width plain text, no bubble (Claude-style).
   assistantRow: { paddingRight: spacing.lg },
