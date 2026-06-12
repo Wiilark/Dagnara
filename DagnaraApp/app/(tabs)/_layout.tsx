@@ -124,7 +124,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             ref={scrollRef}
@@ -185,6 +185,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 returnKeyType="send"
                 blurOnSubmit={false}
                 onSubmitEditing={handleSend}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120)}
               />
               <TouchableOpacity
                 style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
@@ -1276,10 +1277,10 @@ const el = StyleSheet.create({
 const coach = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   // Top padding clears the absolutely-positioned FloatingModalHeader.
-  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
+  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.xl * 2 + spacing.sm, paddingBottom: spacing.lg, gap: spacing.lg },
 
   // Empty / welcome state — centered, calm, with tappable starter prompts.
-  emptyWrap: { paddingTop: spacing.xl * 2, paddingHorizontal: spacing.xs, gap: spacing.sm },
+  emptyWrap: { paddingTop: spacing.md, paddingHorizontal: spacing.xs, gap: spacing.sm },
   emptyTitle: { fontSize: fontSize['2xl'], fontWeight: '800', color: colors.ink, letterSpacing: -0.5 },
   emptySub: { fontSize: fontSize.base, color: colors.ink2, lineHeight: 23, marginBottom: spacing.md },
   suggestionRow: { gap: spacing.sm },
