@@ -112,7 +112,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={coach.safe} edges={['top', 'bottom']}>
         <LinearGradient
           colors={['rgba(124,77,255,0.18)', 'transparent']}
@@ -125,6 +125,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             ref={scrollRef}
