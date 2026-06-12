@@ -699,7 +699,7 @@ app.post('/api/estimate-nutrition', authenticate, estimateLimiter, async (req, r
   }
 });
 
-// ── AI Nutrition Coach ────────────────────────────────────────────────────────
+// ── Dagnara Help Assistant ────────────────────────────────────────────────────
 const coachLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 20,
@@ -719,7 +719,7 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
     return res.status(400).json({ error: { message: 'messages is required' } });
   }
   if (!hasAnyAIKey()) {
-    return res.status(503).json({ error: { message: 'AI coach not configured on this server' } });
+    return res.status(503).json({ error: { message: 'Help assistant not configured on this server' } });
   }
 
   const validMessages = messages
@@ -732,10 +732,12 @@ app.post('/api/coach', authenticate, coachLimiter, async (req, res) => {
   }
 
   const systemPrompt = [
-    'You are a friendly, knowledgeable personal nutrition coach for the Dagnara health app.',
-    'Give concise, practical, science-backed advice. Keep responses under 3 short paragraphs unless a detailed breakdown is explicitly requested.',
-    'Focus on nutrition, macros, meal ideas, hydration, and healthy habits. Be encouraging and specific.',
-    typeof context === 'string' && context ? `\nUser profile:\n${context.slice(0, 500)}` : '',
+    'You are the in-app Help assistant for Dagnara, a nutrition-tracking mobile app.',
+    'Your ONLY job is to help users understand and use the Dagnara app itself.',
+    'You can explain: logging food (camera scan, text search, manual entry), the diary, tracking water/steps/sleep/mood, the Progress tab and Life Score, weight history, calorie & macro goals, the onboarding wizard, Programs (Fasting, Quit Smoking, Quit Drinking, Pill Reminder, Grocery, Recipes), the Inbox, editing your profile, premium/subscription, and general navigation.',
+    'If the user asks anything NOT about using the Dagnara app — including medical, nutrition, diet, fitness, or general-knowledge questions — politely decline in one sentence and steer them back to app help. Example: "I can only help with using the Dagnara app — try asking how to log a meal or read your Life Score."',
+    'Give concise, step-by-step answers. Keep responses under 3 short paragraphs. Be friendly and clear.',
+    typeof context === 'string' && context ? `\nUser context (for personalising navigation tips only):\n${context.slice(0, 500)}` : '',
   ].filter(Boolean).join('\n');
 
   try {

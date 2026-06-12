@@ -35,7 +35,7 @@ function FabTabButton({ onPress }: { onPress: () => void }) {
 
 
 
-// ── AI Nutrition Coach Modal ──────────────────────────────────────────────────
+// ── Help Assistant Modal ──────────────────────────────────────────────────────
 function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { profile } = useAuthStore();
   const { weightGoal, activityLevel, calorieGoal } = useAppStore();
@@ -43,6 +43,8 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // Static — the Help title stays visible; the chat list has no big in-body header to fade past.
+  const headerScrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) { setMessages([]); setInput(''); setLoading(false); }
@@ -91,16 +93,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }}
           pointerEvents="none"
         />
-        <View style={coach.header}>
-          <TouchableOpacity onPress={onClose} style={coach.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={22} color={colors.ink2} />
-          </TouchableOpacity>
-          <View style={coach.headerCenter}>
-            <Text style={coach.headerTitle}>AI Coach</Text>
-            <Text style={coach.headerSub}>Nutrition · Macros · Habits</Text>
-          </View>
-          <View style={{ width: 36 }} />
-        </View>
+        <FloatingModalHeader scrollY={headerScrollY} title="Help" onBack={onClose} staticTitle />
 
         <ScrollView
           ref={scrollRef}
@@ -111,14 +104,14 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
         >
           {messages.length === 0 && (
             <View style={coach.emptyWrap}>
-              <Text style={coach.emptyIcon}>🥗</Text>
-              <Text style={coach.emptyTitle}>Your nutrition coach</Text>
-              <Text style={coach.emptySub}>Ask me anything about nutrition, macros, meal ideas, or healthy habits.</Text>
+              <Text style={coach.emptyIcon}>💬</Text>
+              <Text style={coach.emptyTitle}>How can I help you?</Text>
+              <Text style={coach.emptySub}>Ask me anything about using the Dagnara app — logging meals, reading your stats, or finding a feature.</Text>
               <View style={coach.suggestionRow}>
                 {[
-                  'What should I eat before a workout?',
-                  'How much protein do I need?',
-                  'Help me plan a high-protein day',
+                  'How do I log a meal?',
+                  'What is the Life Score?',
+                  'How do I set my calorie goal?',
                 ].map(s => (
                   <TouchableOpacity key={s} style={coach.suggestion} onPress={() => setInput(s)} activeOpacity={0.75}>
                     <Text style={coach.suggestionTxt}>{s}</Text>
@@ -131,7 +124,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             <View key={i} style={[coach.bubble, m.role === 'user' ? coach.bubbleUser : coach.bubbleAssistant]}>
               {m.role === 'assistant' && (
                 <View style={coach.avatarDot}>
-                  <Text style={coach.avatarEmoji}>🥗</Text>
+                  <Text style={coach.avatarEmoji}>💬</Text>
                 </View>
               )}
               <View style={[coach.bubbleInner, m.role === 'user' ? coach.bubbleInnerUser : coach.bubbleInnerAssistant]}>
@@ -141,7 +134,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
           ))}
           {loading && (
             <View style={[coach.bubble, coach.bubbleAssistant]}>
-              <View style={coach.avatarDot}><Text style={coach.avatarEmoji}>🥗</Text></View>
+              <View style={coach.avatarDot}><Text style={coach.avatarEmoji}>💬</Text></View>
               <View style={[coach.bubbleInner, coach.bubbleInnerAssistant]}>
                 <Text style={coach.typingDots}>· · ·</Text>
               </View>
@@ -154,7 +147,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             style={coach.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Ask your coach…"
+            placeholder="How can I help you?"
             placeholderTextColor={colors.ink3}
             multiline
             maxLength={500}
@@ -1249,12 +1242,8 @@ const el = StyleSheet.create({
 // ── AI Coach styles ───────────────────────────────────────────────────────────
 const coach = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.line2 },
-  closeBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
-  headerCenter: { alignItems: 'center' },
-  headerTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.ink },
-  headerSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 1 },
-  scroll: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm },
+  // Top padding clears the absolutely-positioned FloatingModalHeader (back button + title).
+  scroll: { padding: spacing.md, paddingTop: spacing.xl + spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm },
   emptyWrap: { alignItems: 'center', paddingTop: spacing.xl, paddingHorizontal: spacing.md, gap: spacing.md },
   emptyIcon: { fontSize: fontSize['2xl'] },
   emptyTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.ink, textAlign: 'center' },
