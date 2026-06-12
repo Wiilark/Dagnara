@@ -6,8 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -341,7 +340,12 @@ function FoodCard({ food, onPress }: { food: LocalFood; onPress: () => void }) {
   );
 }
 
-export default function RecipesScreen() {
+// `entry` distinguishes the two independent ways this screen is reached:
+//   • 'tab'      — the bottom-tab Recipes (left header slot = profile avatar)
+//   • 'programs' — pushed on top of the stack from the Programs grid tile
+//                  (left header slot = back button that pops to Programs)
+// They are separate route instances, so neither can leak state into the other.
+export function RecipesScreen({ source = 'tab' }: { source?: 'tab' | 'programs' }) {
   const { entries, addFood, loadEntry } = useDiaryStore();
   const { addXp, calorieGoal, hasUnread, checkAndUpdateStreak, dietaryPreferences } = useAppStore();
   const { email, profile } = useAuthStore();
@@ -462,20 +466,7 @@ export default function RecipesScreen() {
   });
 
   const insets = useSafeAreaInsets();
-  // When opened from the Programs grid (`?from=programs`), the left header slot
-  // shows a back button to Programs instead of the avatar-to-Profile shortcut.
-  const { from } = useLocalSearchParams<{ from?: string }>();
-  const fromPrograms = from === 'programs';
-  // Tabs persist their route params, so the `from=programs` flag would linger
-  // after the user opens Recipes from the tile. Clear it whenever the Recipes
-  // tab itself is tapped, so the tab-bar entry always shows the profile avatar.
-  const navigation = useNavigation<BottomTabNavigationProp<Record<string, undefined>>>();
-  useEffect(() => {
-    const unsub = navigation.addListener('tabPress', () => {
-      if (from !== undefined) router.setParams({ from: undefined });
-    });
-    return unsub;
-  }, [navigation, from]);
+  const fromPrograms = source === 'programs';
   const scrollY = useRef(new Animated.Value(0)).current;
   // Recipe-detail modal: drives the floating header (blur + title fade in as the
   // big in-body recipe title scrolls out of view — matches the Profile header).
@@ -496,7 +487,7 @@ export default function RecipesScreen() {
         </Animated.View>
         <View style={styles.appHeader}>
           {fromPrograms ? (
-            <TouchableOpacity onPress={() => router.push('/(tabs)/programs')} style={styles.headerBackBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <BackChevron size={22} color={colors.ink} />
             </TouchableOpacity>
           ) : (
@@ -1126,6 +1117,11 @@ export default function RecipesScreen() {
       )}
     </View>
   );
+}
+
+// Bottom-tab Recipes route — always the avatar header.
+export default function RecipesTab() {
+  return <RecipesScreen source="tab" />;
 }
 
 const styles = StyleSheet.create({
