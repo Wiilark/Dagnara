@@ -18,6 +18,7 @@ import { PillReminderModal } from '../../src/components/programs/PillReminderMod
 import { GroceryModal } from '../../src/components/programs/GroceryModal';
 import { ComingSoonModal } from '../../src/components/programs/ComingSoonModal';
 import { NoBeerIcon } from '../../src/components/NoBeerIcon';
+import { PillIcon } from '../../src/components/PillIcon';
 
 type ComingSoon = { title: string; icon: keyof typeof Ionicons.glyphMap; color: string };
 
@@ -96,7 +97,7 @@ export default function ProgramsScreen() {
             <ProgramTile glyph={<NoBeerIcon size={37} />} name="Quit Drinking" color={colors.honey} onPress={() => setQdVisible(true)} />
             <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
-            <ProgramTile icon="medkit" name="Pill Reminder"  color={colors.purple2} onPress={() => setPillVisible(true)} />
+            <ProgramTile glyph={<PillIcon size={37} />} name="Pill Reminder" color={colors.purple2} onPress={() => setPillVisible(true)} />
             <ProgramTile icon="restaurant" name="Recipes"   color={colors.sky}     onPress={() => router.push('/(tabs)/recipes')} />
             <ProgramTile icon="wine"       name="Wine"      color={colors.rose}    onPress={() => setComingSoon({ title: 'Wine', icon: 'wine', color: colors.rose })} />
             <ProgramTile icon="shirt"      name="Wardrobe"  color={colors.lavender} onPress={() => setComingSoon({ title: 'Wardrobe', icon: 'shirt', color: colors.lavender })} />
