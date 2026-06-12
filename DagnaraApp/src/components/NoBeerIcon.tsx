@@ -17,9 +17,9 @@ type Props = {
 export function NoBeerIcon({ size = 37, color = colors.ink }: Props) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
-      {/* Slim bottle: narrow neck, slight shoulder, tall body, rounded base. */}
+      {/* Very slim bottle: thin neck, gentle shoulder, narrow body, rounded base. */}
       <Path
-        d="M21 7 h6 v4 c0 1.6 1 2 1.6 3 0.8 1.3 1.4 2.6 1.4 4.6 V37 c0 1.7-1.3 3-3 3 h-7 c-1.7 0-3-1.3-3-3 V18.6 c0-2 0.6-3.3 1.4-4.6 0.6-1 1.6-1.4 1.6-3 Z"
+        d="M22.2 6 h3.6 v4.4 c0 1.4 0.7 1.8 1.2 2.7 0.6 1.1 1 2.2 1 3.9 V37 c0 1.5-1.1 2.6-2.6 2.6 h-4.8 c-1.5 0-2.6-1.1-2.6-2.6 V17 c0-1.7 0.4-2.8 1-3.9 0.5-0.9 1.2-1.3 1.2-2.7 Z"
         fill={color}
       />
       {/* Ban ring + slash over the whole glyph. */}
