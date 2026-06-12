@@ -4,10 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   View, TouchableOpacity, StyleSheet, Text, Modal,
   ScrollView, TextInput, Alert, Pressable, Animated,
-  KeyboardAvoidingView, Platform,
+  Platform, Keyboard, Easing,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize, radius } from '../../src/theme';
 import { BackChevron } from '../../src/components/BackChevron';
@@ -70,8 +70,39 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
   // Static — the Help title stays visible; the chat list has no big in-body header to fade past.
   const headerScrollY = useRef(new Animated.Value(0)).current;
+  // Drive the composer's bottom inset directly off the keyboard, on the keyboard's
+  // own animation curve, so the two move together with no lag (smoother than KAV).
+  const kbInset = useRef(new Animated.Value(0)).current;
+  // Resting composer gap sits above the home indicator; when the keyboard rises it
+  // overlaps that area, so lift only by the part of the keyboard beyond the safe inset.
+  const composerPad = Animated.subtract(kbInset, insets.bottom).interpolate({
+    inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: 'clamp',
+  });
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvt, (e) => {
+      Animated.timing(kbInset, {
+        toValue: e.endCoordinates.height,
+        duration: e.duration || 220,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    });
+    const onHide = Keyboard.addListener(hideEvt, (e) => {
+      Animated.timing(kbInset, {
+        toValue: 0,
+        duration: e?.duration || 200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { onShow.remove(); onHide.remove(); };
+  }, [kbInset]);
 
   useEffect(() => {
     if (!visible) { setMessages([]); setInput(''); setLoading(false); }
@@ -113,7 +144,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={coach.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={coach.safe} edges={['top']}>
         <LinearGradient
           colors={['rgba(124,77,255,0.18)', 'transparent']}
           style={StyleSheet.absoluteFillObject}
@@ -122,11 +153,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
         />
         <FloatingModalHeader scrollY={headerScrollY} title="Help" onBack={onClose} staticTitle />
 
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
+        <View style={{ flex: 1 }}>
           <ScrollView
             ref={scrollRef}
             style={{ flex: 1 }}
@@ -173,7 +200,7 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             )}
           </ScrollView>
 
-          <View style={coach.composerWrap}>
+          <Animated.View style={[coach.composerWrap, { paddingBottom: composerPad, marginBottom: insets.bottom }]}>
             <View style={coach.composer}>
               <TextInput
                 style={coach.input}
@@ -197,8 +224,8 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 <Ionicons name="arrow-up" size={18} color={(!input.trim() || loading) ? colors.ink3 : colors.white} />
               </TouchableOpacity>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </Animated.View>
+        </View>
       </SafeAreaView>
     </Modal>
   );
