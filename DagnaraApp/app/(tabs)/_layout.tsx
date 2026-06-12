@@ -79,12 +79,20 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   // it (curve + the event's own duration) makes the two move as one.
   const kbInset = useRef(new Animated.Value(0)).current;
   // Resting composer gap sits above the home indicator; when the keyboard rises it
-  // overlaps that area, so lift only by the part of the keyboard beyond the safe inset.
-  const composerPad = Animated.subtract(kbInset, insets.bottom).interpolate({
-    inputRange: [0, 1], outputRange: [0, 1], extrapolateLeft: 'clamp',
+  // overlaps that area, so lift only by the part of the keyboard beyond the safe
+  // inset — clamped at 0 so a small keyboard never pulls the composer downward.
+  // inputRange must be strictly increasing, so use a 1px floor when there's no inset.
+  const safeBottom = Math.max(insets.bottom, 1);
+  const composerPad = kbInset.interpolate({
+    inputRange: [0, safeBottom, safeBottom + 1],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
   });
 
   useEffect(() => {
+    // Only track the keyboard while this modal is open, so the listeners don't
+    // run (and leave kbInset stranded) for keyboards opened elsewhere in the app.
+    if (!visible) return;
     // iOS curve for the standard keyboard show/hide (UIViewAnimationCurveKeyboard).
     const kbEasing = Easing.bezier(0.17, 0.59, 0.4, 1);
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -106,8 +114,12 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
         useNativeDriver: false,
       }).start();
     });
-    return () => { onShow.remove(); onHide.remove(); };
-  }, [kbInset]);
+    return () => {
+      onShow.remove();
+      onHide.remove();
+      kbInset.setValue(0); // reset so the composer rests low next time the modal opens
+    };
+  }, [visible, kbInset]);
 
   useEffect(() => {
     if (!visible) { setMessages([]); setInput(''); setLoading(false); }
@@ -205,7 +217,6 @@ function CoachModal({ visible, onClose }: { visible: boolean; onClose: () => voi
                 returnKeyType="send"
                 blurOnSubmit={false}
                 onSubmitEditing={handleSend}
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120)}
               />
               <TouchableOpacity
                 style={[coach.sendBtn, (!input.trim() || loading) && coach.sendBtnDisabled]}
