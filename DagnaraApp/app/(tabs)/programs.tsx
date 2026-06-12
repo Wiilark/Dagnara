@@ -18,6 +18,7 @@ import { PillReminderModal } from '../../src/components/programs/PillReminderMod
 import { GroceryModal } from '../../src/components/programs/GroceryModal';
 import { ComingSoonModal } from '../../src/components/programs/ComingSoonModal';
 import { NoBeerIcon } from '../../src/components/NoBeerIcon';
+import { NoSmokingIcon } from '../../src/components/NoSmokingIcon';
 import { PillIcon } from '../../src/components/PillIcon';
 
 type ComingSoon = { title: string; icon: keyof typeof Ionicons.glyphMap; color: string };
@@ -93,7 +94,7 @@ export default function ProgramsScreen() {
         <Text style={st.sectionLabel}>Programs</Text>
         <View style={st.group}>
           <View style={st.grid}>
-            <ProgramTile icon="logo-no-smoking" name="Quit Smoking" color={colors.rose} onPress={() => setQsVisible(true)} />
+            <ProgramTile glyph={<NoSmokingIcon size={37} />} name="Quit Smoking" color={colors.rose} onPress={() => setQsVisible(true)} />
             <ProgramTile glyph={<NoBeerIcon size={37} />} name="Quit Drinking" color={colors.honey} onPress={() => setQdVisible(true)} />
             <ProgramTile icon="timer"  name="Fasting"        color={colors.teal}    onPress={() => setFastingVisible(true)} />
             <ProgramTile icon="cart"   name="Grocery"        color={colors.green}   onPress={() => setGroceryVisible(true)} />
