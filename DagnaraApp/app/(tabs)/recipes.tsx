@@ -6,7 +6,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -465,6 +466,16 @@ export default function RecipesScreen() {
   // shows a back button to Programs instead of the avatar-to-Profile shortcut.
   const { from } = useLocalSearchParams<{ from?: string }>();
   const fromPrograms = from === 'programs';
+  // Tabs persist their route params, so the `from=programs` flag would linger
+  // after the user opens Recipes from the tile. Clear it whenever the Recipes
+  // tab itself is tapped, so the tab-bar entry always shows the profile avatar.
+  const navigation = useNavigation<BottomTabNavigationProp<Record<string, undefined>>>();
+  useEffect(() => {
+    const unsub = navigation.addListener('tabPress', () => {
+      if (from !== undefined) router.setParams({ from: undefined });
+    });
+    return unsub;
+  }, [navigation, from]);
   const scrollY = useRef(new Animated.Value(0)).current;
   // Recipe-detail modal: drives the floating header (blur + title fade in as the
   // big in-body recipe title scrolls out of view — matches the Profile header).
