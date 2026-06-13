@@ -253,6 +253,23 @@ export const RECIPE_DATABASE: LocalFood[] = [
   { id: 'r018', name: 'Chicken Caesar Wrap', icon: '🌯', kcal: 205, protein: 16.0, carbs: 18.0, fat: 8.5,  fiber: 1.5, sugar: 2.0,  sodium: 560 },
 ];
 
+// Precomputed search index — built once at module load instead of on every
+// keystroke. Each entry caches the lowercased name and its split words so a
+// search does only comparisons, no per-query allocation or string work. This
+// keeps search O(n) in comparisons but eliminates the array spread, toLowerCase,
+// and split that previously ran for every food on every character typed —
+// the difference that matters once the catalog grows past a few thousand items.
+interface IndexedFood {
+  food: LocalFood;
+  name: string;    // lowercased once
+  words: string[]; // split once
+}
+
+const SEARCH_INDEX: IndexedFood[] = [...FOOD_DATABASE, ...RECIPE_DATABASE].map((food) => {
+  const name = food.name.toLowerCase();
+  return { food, name, words: name.split(' ') };
+});
+
 /** Search the local food database and recipe database. Returns results ranked by match quality. */
 export function searchLocalFoods(query: string): LocalFood[] {
   const q = query.toLowerCase().trim();
@@ -262,20 +279,17 @@ export function searchLocalFoods(query: string): LocalFood[] {
   const startsWith: LocalFood[] = [];
   const contains: LocalFood[] = [];
 
-  for (const food of [...FOOD_DATABASE, ...RECIPE_DATABASE]) {
-    const name = food.name.toLowerCase();
+  for (const entry of SEARCH_INDEX) {
+    const { name } = entry;
     if (name === q) {
-      exact.push(food);
+      exact.push(entry.food);
     } else if (name.startsWith(q)) {
-      startsWith.push(food);
+      startsWith.push(entry.food);
     } else if (name.includes(q)) {
-      contains.push(food);
-    } else {
+      contains.push(entry.food);
+    } else if (entry.words.some(w => w.startsWith(q))) {
       // Word-level match (e.g. "breast" matches "Chicken Breast")
-      const words = name.split(' ');
-      if (words.some(w => w.startsWith(q))) {
-        contains.push(food);
-      }
+      contains.push(entry.food);
     }
   }
 
