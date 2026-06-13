@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Line, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { useShallow } from 'zustand/react/shallow';
@@ -31,17 +32,27 @@ export default function LogScreen() {
   );
   const calorieGoal = rawCalGoal || 2000;
 
-  const dates = useMemo(() =>
+  // Recompute the 7-day window on every focus so the screen never shows a stale
+  // "today" after being left mounted across midnight (tabs stay mounted).
+  const [dates, setDates] = useState<string[]>(() =>
     Array.from({ length: DAYS }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
       return dateStr(d);
     }).reverse(),
-  []);
+  );
 
-  useEffect(() => {
-    Promise.all(dates.map((d) => loadEntry(d)));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const fresh = Array.from({ length: DAYS }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return dateStr(d);
+      }).reverse();
+      setDates(fresh);
+      Promise.all(fresh.map((d) => loadEntry(d)));
+    }, [loadEntry]),
+  );
 
   const CARBS_GOAL   = Math.round(calorieGoal * (macroPcts.carbs   / 100) / 4);
   const PROTEIN_GOAL = Math.round(calorieGoal * (macroPcts.protein / 100) / 4);
