@@ -989,7 +989,13 @@ export default function DiaryScreen() {
             const today = dateStr(new Date());
             const logRaw = await AsyncStorage.getItem(`dagnara_pill_log_${today}_${email}`);
             const pillLog: Record<string, { takenCount: number; takenTimes: string[] }> = logRaw ? JSON.parse(logRaw) : {};
-            const allTaken = meds.every(m => (pillLog[m.id]?.takenCount ?? 0) >= 1);
+            // A med is "done" only when every scheduled dose is taken — matches the
+            // Pill Reminder modal's definition (takenCount >= times.length). Using
+            // >= 1 here marked twice-daily meds done after a single dose, so the
+            // dashboard check and streak disagreed with the modal.
+            const medDone = (log: Record<string, { takenCount: number }>, m: { id: string; times: string[] }) =>
+              (log[m.id]?.takenCount ?? 0) >= Math.max(1, m.times.length);
+            const allTaken = meds.every(m => medDone(pillLog, m));
             setPillTakenToday(allTaken);
             let streak = allTaken ? 1 : 0;
             if (allTaken) {
@@ -1000,7 +1006,7 @@ export default function DiaryScreen() {
                 const pastRaw = await AsyncStorage.getItem(`dagnara_pill_log_${dayKey}_${email}`);
                 if (!pastRaw) break;
                 const pastLog: Record<string, { takenCount: number }> = JSON.parse(pastRaw);
-                if (meds.every(m => (pastLog[m.id]?.takenCount ?? 0) >= 1)) streak++;
+                if (meds.every(m => medDone(pastLog, m))) streak++;
                 else break;
               }
             }
