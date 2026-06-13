@@ -158,11 +158,13 @@ function queueSync(date: string, get: () => DiaryState) {
   syncTimer = setTimeout(() => processSyncQueue(get), 5000); // 5s debounce
 }
 
-// Save locally and push to Supabase if email available
+// Save locally and push to Supabase if email available. The entry is already
+// stamped with _savedAt by mutate() at edit time, so memory, AsyncStorage, and
+// the cloud push all carry the identical timestamp — which is what makes the
+// last-write-wins conflict resolution (restoreFromCloud / loadEntry) correct.
 async function saveEntry(date: string, entry: DiaryEntry, email: string | null, get: () => DiaryState) {
-  const stamped = { ...entry, _savedAt: new Date().toISOString() };
   const key = email ? `diary_${email}_${date}` : `diary_anon_${date}`;
-  await AsyncStorage.setItem(key, JSON.stringify(stamped));
+  await AsyncStorage.setItem(key, JSON.stringify(entry));
   if (email) {
     queueSync(date, get);
   }
@@ -178,7 +180,11 @@ function pruneEntries(entries: Record<string, DiaryEntry>): Record<string, Diary
 // Apply an update to one date's entry using the *freshest* state. Computing the
 // new entry inside the functional set (rather than from a get() snapshot taken
 // before the set) prevents lost updates when two mutations on the same date are
-// dispatched in the same tick. Returns the computed entry so callers can persist it.
+// dispatched in the same tick. The result is stamped with _savedAt here, at edit
+// time, so the in-memory entry, the AsyncStorage copy, and the Supabase row all
+// share one timestamp — last-write-wins comparisons depend on this being present
+// on the cloud row, not just locally. Returns the computed entry so callers can
+// persist it.
 function mutate(
   set: (fn: (s: DiaryState) => Partial<DiaryState>) => void,
   date: string,
@@ -186,7 +192,7 @@ function mutate(
 ): DiaryEntry {
   let result!: DiaryEntry;
   set((s) => {
-    result = fn(s.entries[date] ?? emptyEntry(date));
+    result = { ...fn(s.entries[date] ?? emptyEntry(date)), _savedAt: new Date().toISOString() };
     return { entries: { ...s.entries, [date]: result } };
   });
   return result;
