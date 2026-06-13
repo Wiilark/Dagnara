@@ -67,8 +67,12 @@ async function iosReadData(date: string): Promise<HealthSyncData> {
       AppleHealthKit.getSleepSamples(
         { startDate, endDate },
         (_: unknown, r: { value: string; startDate: string; endDate: string }[]) => {
+          // iOS 16+ / Apple Watch write granular stages (CORE/DEEP/REM) instead of
+          // the legacy generic ASLEEP. Count every "actually asleep" value; exclude
+          // INBED (in bed but awake) and AWAKE so time-in-bed doesn't inflate sleep.
+          const asleep = new Set(['ASLEEP', 'CORE', 'DEEP', 'REM']);
           const mins = (r ?? [])
-            .filter((s) => s.value === 'ASLEEP')
+            .filter((s) => asleep.has(s.value))
             .reduce((a, s) => {
               const diff = (new Date(s.endDate).getTime() - new Date(s.startDate).getTime()) / 60000;
               return a + diff;
