@@ -98,6 +98,11 @@ export function PillReminderModal({ visible, onClose }: { visible: boolean; onCl
     return d.toLocaleDateString('en-CA');
   });
 
+  // Depend on `today` as well as `visible`: if the modal is left open across
+  // midnight the 30s ticker re-renders, `today` rolls to the new date, and this
+  // effect re-fires to load the new day's (empty) log. Without that, `log` state
+  // would still hold yesterday's dose counts while writes target today's key —
+  // showing yesterday's doses as taken today and corrupting the new day's file.
   useEffect(() => {
     if (!visible) { setEditSheet(false); setEditMed(null); return; }
     Promise.all([
@@ -117,7 +122,7 @@ export function PillReminderModal({ visible, onClose }: { visible: boolean; onCl
       setMeds(parsedMeds);
       setLog(parsedLog);
     });
-  }, [visible]);
+  }, [visible, today]);
 
   function saveMeds(updated: Medication[]) {
     setMeds(updated);
