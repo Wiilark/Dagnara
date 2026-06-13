@@ -3,22 +3,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, TextInput, Modal, FlatList,
-  Animated, Share, KeyboardAvoidingView, Platform, Keyboard,
+  Animated, Share, KeyboardAvoidingView, Platform, Keyboard, PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Pedometer } from 'expo-sensors';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { useDiaryStore, FoodItem, StrengthSession, StrengthExercise, CardioSession } from '../../src/store/diaryStore';
 import { STRENGTH_EXERCISES, estimateStrengthKcal } from '../../src/lib/strengthExercises';
 import { useAuthStore } from '../../src/store/authStore';
-import { useAppStore, getXpLevel } from '../../src/store/appStore';
+import { useAppStore } from '../../src/store/appStore';
 import { analyzeFood, importRecipe, estimateNutrition, type AiFoodItem } from '../../src/lib/api';
 import { searchLocalRestaurants, type RestaurantItem } from '../../src/lib/restaurants';
 import { searchLocalFoods, FOOD_DATABASE, RECIPE_DATABASE, type LocalFood } from '../../src/lib/foodDatabase';
@@ -40,6 +38,12 @@ const VEG_GOAL = 3; const FRUIT_GOAL = 3;
 
 function dateStr(d: Date) { return d.toLocaleDateString('en-CA'); }
 function addDays(date: string, days: number) { const [y, m, dd] = date.split('-').map(Number); const d = new Date(y, m - 1, dd); d.setDate(d.getDate() + days); return dateStr(d); }
+function dateLabel(date: string) {
+  const today = dateStr(new Date());
+  if (date === today) return 'Today';
+  if (date === addDays(today, -1)) return 'Yesterday';
+  return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
 function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)); }
 /** Format a number to at most 2 decimal places, stripping trailing zeros */
 function r2(v: number): string { return parseFloat(v.toFixed(2)).toString(); }
@@ -747,9 +751,8 @@ export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { email, profile } = useAuthStore();
   const { selectedDate, entries, setSelectedDate, loadEntry, addFood, removeFood, setWater, setVeggies: storeSetVeggies, setFruits: storeSetFruits, setSkippedMeals: storeSetSkippedMeals, addCaloriesBurned, addStrengthSession, addCardioSession } = useDiaryStore();
-  const { streak, xp, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
+  const { streak, checkAndUpdateStreak, addXp, calorieGoal: storeCalGoal, hasUnread, programs, weightGoal, macroPcts, pendingAddMeal, setPendingAddMeal, savedRecipes, saveRecipe } = useAppStore();
   const KCAL_GOAL = storeCalGoal || 2000;
-  const xpInfo = getXpLevel(xp);
 
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -810,10 +813,6 @@ export default function DiaryScreen() {
   const [restaurantQuery, setRestaurantQuery] = useState('');
   const [restaurantResults, setRestaurantResults] = useState<RestaurantItem[]>([]);
 
-  // Step tracking
-  const [stepCount, setStepCount] = useState(0);
-  const STEP_GOAL = 8000;
-
   // Barcode scanner
   const [scanning, setScanning] = useState(false);
   const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
@@ -862,8 +861,28 @@ export default function DiaryScreen() {
   const PROTEIN_GOAL = Math.round(KCAL_GOAL * (macroPcts.protein / 100) / 4);
   const FAT_GOAL     = Math.round(KCAL_GOAL * (macroPcts.fat     / 100) / 9);
   const remaining = Math.max(0, KCAL_GOAL - netKcal);
-  const isToday = selectedDate === dateStr(new Date());
+  const today = dateStr(new Date());
+  const isToday = selectedDate === today;
   const waterGoalMet = water >= WATER_GOAL;
+
+  // Swipe the top region: right → next day (stops at today), left → previous day
+  const swipeDateRef = useRef<(dir: number) => void>(() => {});
+  swipeDateRef.current = (dir: number) => {
+    const next = addDays(selectedDate, dir);
+    if (dir > 0 && next > today) return;            // no future dates — stop at today
+    if (dir < 0 && next < addDays(today, -2)) return; // stop at oldest dot (3-day range)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedDate(next);
+  };
+  const datePan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx >= 40) swipeDateRef.current(1);       // slide right → forward a day (toward today)
+        else if (g.dx <= -40) swipeDateRef.current(-1); // slide left → back a day
+      },
+    })
+  ).current;
 
   // Calorie deficit projection (7700 kcal ≈ 1 kg body fat)
   const projText = useMemo(() => {
@@ -1062,23 +1081,6 @@ export default function DiaryScreen() {
     setFavorites(updated);
     await AsyncStorage.setItem(`dagnara_food_favorites_${email ?? 'anon'}`, JSON.stringify(updated));
   }
-
-  // Step tracking — subscribe to pedometer for today
-  useEffect(() => {
-    let sub: { remove: () => void } | undefined;
-    (async () => {
-      const available = await Pedometer.isAvailableAsync();
-      if (!available) return;
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      // Get today's steps so far
-      const { steps } = await Pedometer.getStepCountAsync(start, new Date());
-      setStepCount(steps);
-      // Live updates
-      sub = Pedometer.watchStepCount(({ steps: s }) => setStepCount(s));
-    })();
-    return () => sub?.remove?.();
-  }, []);
 
   function doRestaurantSearch(q: string) {
     if (!q.trim()) { setRestaurantResults([]); return; }
@@ -1524,88 +1526,19 @@ export default function DiaryScreen() {
 
       <Animated.ScrollView contentContainerStyle={[st.scroll, { paddingTop: totalHeaderH + 10, paddingBottom: 100 }]} showsVerticalScrollIndicator={false} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
 
-        {/* ── Date Nav (Detached) ── */}
-        <View style={[st.dateBar, { borderBottomWidth: 0, marginBottom: spacing.xs }]}>
-          <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, -1))} style={st.navBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.ink2} />
-          </TouchableOpacity>
-          <Text style={st.dateText}>
-            {isToday
-              ? `Today · ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-              : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedDate(addDays(selectedDate, 1))} style={st.navBtn} disabled={isToday}>
-            <Ionicons name="chevron-forward" size={20} color={isToday ? colors.ink3 : colors.ink2} />
-          </TouchableOpacity>
-        </View>
+        {/* ── Swipeable top region (above meals): slide right→next day, left→prev day ── */}
+        <View {...datePan.panHandlers}>
 
-        {/* ── Calorie Ring ── */}
-        <ExpoLinearGradient
-          colors={[colors.purple + '24', colors.green + '0f', 'transparent']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={st.calCard}
-        >
-        {/* Step counter (left) + Achievement tracker (right) */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
-          {/* Step counter */}
-          <View style={st.achieveBadge}>
-            <View style={[st.xpBadge, { backgroundColor: stepCount >= STEP_GOAL ? colors.green : colors.honey }]}>
-              <Text style={st.xpBadgeTxt}>👟</Text>
-            </View>
-            <View style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-                <Text style={st.xpName}>{fmt(stepCount)}</Text>
-                <Text style={st.xpPts}>/ {fmt(STEP_GOAL)}</Text>
-              </View>
-              <View style={[st.xpTrack, { width: 90 }]}>
-                <View style={[st.xpFill, { width: `${Math.min(100, (stepCount / STEP_GOAL) * 100)}%`, backgroundColor: stepCount >= STEP_GOAL ? colors.green : colors.honey }]} />
-              </View>
-            </View>
-          </View>
-
-          {/* Achievement tracker */}
-          <View style={st.achieveBadge}>
-            <View style={st.xpBadge}><Text style={st.xpBadgeTxt}>{xpInfo.level}</Text></View>
-            <View style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-                <Text style={st.xpName}>{fmt(xp)}</Text>
-                <Text style={st.xpPts}>/ {fmt(xpInfo.nextMin)} XP</Text>
-              </View>
-              <View style={[st.xpTrack, { width: 90 }]}><View style={[st.xpFill, { width: `${xpInfo.progress * 100}%` }]} /></View>
-            </View>
-          </View>
-        </View>
+        {/* ── Calorie Balance ── */}
         <View style={st.calSection}>
-          <View style={st.ringWrap}>
-            <Svg width={190} height={190} viewBox="0 0 220 220">
-              <Defs>
-                <LinearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor={colors.purple} /><Stop offset="100%" stopColor={colors.green} />
-                </LinearGradient>
-              </Defs>
-              <Circle cx={110} cy={110} r={90} fill="none" stroke={colors.line} strokeWidth={14} />
-              <G rotation="-90" origin="110, 110">
-                <Circle cx={110} cy={110} r={90} fill="none" stroke="url(#rg)" strokeWidth={14} strokeLinecap="round"
-                  strokeDasharray={`${clamp(netKcal / KCAL_GOAL, 0, 1) * 2 * Math.PI * 90} ${2 * Math.PI * 90}`} />
-              </G>
-            </Svg>
-            <Animated.View style={[st.ringCenter, {
-              transform: [{ scale: celebrateAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }],
-            }]}>
-              <Animated.Text style={[st.ringNum, {
-                color: celebrateAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.ink, colors.green] }),
-              }]}>{fmt(remaining)}</Animated.Text>
-              <Text style={st.ringLbl}>kcal left</Text>
-            </Animated.View>
-          </View>
-          <View style={st.calStatsRow}>
-            {[{ val: totalKcal, lbl: 'Eaten', color: colors.lavender }, { val: caloriesBurned, lbl: 'Burned', color: colors.honey }, { val: netKcal, lbl: 'Net', color: colors.green }].map(({ val, lbl, color }) => (
-              <View key={lbl} style={st.calStat}>
-                <Text style={[st.calStatVal, { color }]}>{fmt(val)}</Text>
-                <Text style={st.calStatLbl}>{lbl}</Text>
-              </View>
-            ))}
-          </View>
+          <Animated.View style={[st.balanceWrap, {
+            transform: [{ scale: celebrateAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+          }]}>
+            <Text style={st.balanceLbl}>kcal left</Text>
+            <Animated.Text style={[st.balanceNum, {
+              color: celebrateAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.ink, colors.green] }),
+            }]}>{fmt(remaining)}</Animated.Text>
+          </Animated.View>
           {projText && (
             <View style={st.projRow}>
               <Ionicons name={projText.startsWith('+') ? 'trending-up' : 'trending-down'} size={fontSize.xs} color={colors.teal} />
@@ -1613,7 +1546,6 @@ export default function DiaryScreen() {
             </View>
           )}
         </View>
-        </ExpoLinearGradient>
 
         {/* ── Macro Strip ── */}
         <View style={st.macroStrip}>
@@ -1635,6 +1567,30 @@ export default function DiaryScreen() {
               </View>
             </View>
           ))}
+        </View>
+
+        {/* ── Date Nav — label + 3 growing dots (oldest → today) ── */}
+        <View style={st.dateNav}>
+          <Text style={st.dateLabel}>{dateLabel(selectedDate)}</Text>
+          <View style={st.dotRow}>
+            {[addDays(today, -2), addDays(today, -1), today].map((d, i) => {
+              const active = d === selectedDate;
+              const size = 6 + i * 2; // 6 → 8 → 10, today biggest
+              return (
+                <TouchableOpacity
+                  key={d}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedDate(d); }}
+                >
+                  <View style={{
+                    width: size, height: size, borderRadius: size / 2,
+                    backgroundColor: active ? colors.purple : colors.ink3,
+                    opacity: active ? 1 : 0.4,
+                  }} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* ── Micronutrients & Vitamins ── */}
@@ -1661,18 +1617,28 @@ export default function DiaryScreen() {
           </View>
         )}
 
-        {/* ── Scan buttons ── */}
-        <View style={st.scanRow}>
-          <TouchableOpacity style={st.scanPrimary} onPress={handleCamera} disabled={analyzing}>
-            <Ionicons name="camera" size={18} color={colors.white} />
-            <Text style={st.scanTxt}>AI Scan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={st.scanSecondary} onPress={handleGallery} disabled={analyzing}>
-            <Ionicons name="images-outline" size={18} color={colors.lavender} />
-            <Text style={[st.scanTxt, { color: colors.lavender }]}>Gallery</Text>
-          </TouchableOpacity>
-          {analyzing && <ActivityIndicator color={colors.lavender} style={{ marginLeft: 4 }} />}
+        {/* ── Quick actions — circular icon row (Scan / Barcode / Gallery / Quick Add) ── */}
+        <View style={st.quickRow}>
+          {([
+            { icon: 'camera', label: 'Scan Photo', onPress: handleCamera },
+            { icon: 'images-outline', label: 'Gallery', onPress: handleGallery },
+            { icon: 'barcode-outline', label: 'Scan Barcode', onPress: handleBarcodePress },
+            { icon: 'flash-outline', label: 'Quick Add', onPress: () => { setQuickAddInput(''); setQuickAddVisible(true); } },
+          ] as const).map((a) => (
+            <TouchableOpacity key={a.label} style={st.quickItem} onPress={a.onPress} disabled={analyzing} activeOpacity={0.7}>
+              <View style={st.quickCircle}>
+                <Ionicons name={a.icon} size={24} color={colors.ink} />
+              </View>
+              <Text style={st.quickLabel} numberOfLines={1}>{a.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
+        {analyzing && (
+          <View style={st.quickAnalyzing}>
+            <ActivityIndicator color={colors.lavender} />
+            <Text style={st.quickAnalyzingTxt}>Analyzing…</Text>
+          </View>
+        )}
 
         {/* Empty state — "first meal" CTA only for brand-new accounts; past days still show a generic empty label */}
         {foods.length === 0 && isToday && !hasEverLoggedFood && (
@@ -1711,15 +1677,18 @@ export default function DiaryScreen() {
           );
         })()}
 
+        </View>{/* end swipeable top region */}
+
         {/* ── Today's meals ── */}
         <Text style={st.sectionHdr}>{isToday ? "Today's meals" : 'Meals'}</Text>
+        <View style={st.mealsGroup}>
         {MEALS.map((meal) => {
           const mealFoods = foods.filter((f) => f.meal === meal);
           const mealKcal = mealFoods.reduce((s, f) => s + f.kcal, 0);
           const accent = MEAL_ACCENT[meal];
           const skipped = skippedMeals[meal];
           return (
-            <View key={meal} style={st.mealCard} onLayout={(e) => { mealYPositions.current[meal] = e.nativeEvent.layout.y; }}>
+            <View key={meal} style={st.mealRow} onLayout={(e) => { mealYPositions.current[meal] = e.nativeEvent.layout.y; }}>
               {/* Header row — tapping it opens food search */}
               <TouchableOpacity style={st.mealHeader} onPress={() => !skipped && openFoodSearch(meal)} activeOpacity={skipped ? 1 : 0.75}>
                 <View style={st.mealIconWrap}><Text style={[st.mealEmoji, skipped && { opacity: 0.4 }]}>{MEAL_ICONS[meal]}</Text></View>
@@ -1781,6 +1750,7 @@ export default function DiaryScreen() {
             </View>
           );
         })}
+        </View>{/* end meals group */}
 
         {/* ── Activity ── */}
         <Text style={st.sectionHdr}>Activity</Text>
@@ -2653,16 +2623,6 @@ const st = StyleSheet.create({
   notifDot: { position: 'absolute', top: 8, right: 6, width: 6, height: 6, borderRadius: spacing.xs / 2, backgroundColor: colors.rose },
   avatarDot: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.rose, borderWidth: 1.5, borderColor: colors.bg },
 
-  // XP / Achievement
-  achieveBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.layer2, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6, borderWidth: 1, borderColor: colors.line2 },
-  xpBadge: { width: 32, height: 32, borderRadius: radius.md, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
-  xpBadgeTxt: { fontSize: fontSize.sm, fontWeight: '800', color: colors.ink },
-  xpMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 },
-  xpName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink },
-  xpPts: { fontSize: fontSize.xs, color: colors.ink3 },
-  xpTrack: { height: 4, backgroundColor: colors.layer2, borderRadius: spacing.xs / 3, overflow: 'hidden' },
-  xpFill: { height: 4, backgroundColor: colors.purple, borderRadius: spacing.xs / 3 },
-
   // Streak risk
   streakRisk: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, margin: spacing.xs + 2, marginHorizontal: spacing.sm + 4, padding: spacing.sm + 1, backgroundColor: colors.rose + '1a', borderWidth: 1, borderColor: colors.rose + '40', borderRadius: radius.lg },
   srbTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.rose, marginBottom: 2 },
@@ -2670,9 +2630,9 @@ const st = StyleSheet.create({
   srbCta: { fontSize: fontSize.xs, fontWeight: '700', color: colors.rose + 'd9' },
 
   // Date nav
-  dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.line },
-  navBtn: { padding: spacing.sm },
-  dateText: { color: colors.ink, fontSize: fontSize.base, fontWeight: '700' },
+  dateNav: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.xs, paddingVertical: spacing.xs },
+  dateLabel: { color: colors.ink, fontSize: fontSize.base, fontWeight: '700' },
+  dotRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 
   scroll: { paddingTop: spacing.xs, gap: spacing.xs, paddingBottom: 24 },
 
@@ -2686,27 +2646,11 @@ const st = StyleSheet.create({
   fastingBannerTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.honey },
   fastingBannerSub: { fontSize: fontSize.xs, color: colors.ink3, marginTop: 2 },
 
-  // Calorie ring
-  calCard: {
-    marginHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line2,
-    shadowColor: colors.purple,
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  calSection: { alignItems: 'center', paddingVertical: spacing.sm },
-  ringWrap: { position: 'relative', width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
-  ringCenter: { position: 'absolute', alignItems: 'center' },
-  ringNum: { fontSize: fontSize['2xl'] - 6, fontWeight: '800', color: colors.ink },
-  ringLbl: { fontSize: fontSize.xs, color: colors.ink3 },
-  calStatsRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.xs },
-  calStat: { alignItems: 'center', gap: 2 },
-  calStatVal: { fontSize: fontSize.lg, fontWeight: '700' },
-  calStatLbl: { fontSize: fontSize.xs, color: colors.ink3 },
+  // Calorie balance
+  calSection: { alignItems: 'center', paddingTop: spacing.xl + spacing.lg + spacing.xs, paddingBottom: spacing.lg },
+  balanceWrap: { alignItems: 'center', gap: spacing.xs },
+  balanceLbl: { fontSize: fontSize.sm, color: colors.ink3, fontWeight: '600' },
+  balanceNum: { fontSize: fontSize['2xl'] + 16, fontWeight: '800', color: colors.ink, letterSpacing: -1, lineHeight: fontSize['2xl'] + 20 },
   projRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingHorizontal: spacing.md },
   projTxt: { fontSize: fontSize.xs, color: colors.teal, fontWeight: '600' },
   insightCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.md, marginBottom: spacing.sm, backgroundColor: colors.layer1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, padding: spacing.md },
@@ -2725,16 +2669,19 @@ const st = StyleSheet.create({
   macroFill: { height: 3, borderRadius: spacing.xs / 3 },
 
   // Scan
-  scanRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center', paddingHorizontal: spacing.md },
-  scanPrimary: { flex: 1, backgroundColor: colors.purple, borderRadius: radius.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  scanSecondary: { flex: 1, backgroundColor: colors.layer2, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line2, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  scanTxt: { color: colors.white, fontWeight: '600', fontSize: fontSize.sm },
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs },
+  quickItem: { flex: 1, alignItems: 'center', gap: spacing.xs },
+  quickCircle: { width: 60, height: 60, borderRadius: radius.pill, backgroundColor: colors.layer2, borderWidth: 1, borderColor: colors.line2, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.ink2, textAlign: 'center' },
+  quickAnalyzing: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingTop: spacing.sm },
+  quickAnalyzingTxt: { color: colors.lavender, fontSize: fontSize.sm, fontWeight: '600' },
 
   // Meal rows
   mealCard: { flexDirection: 'column', marginHorizontal: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line },
+  mealsGroup: { marginHorizontal: spacing.md, backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  mealRow: { flexDirection: 'column' },
   mealHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm },
   mealFoods: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, gap: spacing.xs },
-  mealRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, padding: spacing.sm, backgroundColor: colors.layer1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line },
   mealRowSkipped: { opacity: 0.45 },
   mealIconWrap: { width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.layer2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   mealEmoji: { fontSize: fontSize.lg },

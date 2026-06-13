@@ -29,7 +29,7 @@ const DIET_PLANS = ['Balanced', 'High Protein', 'Low Carb', 'Keto', 'Vegan', 'Me
 
 export default function ProfileScreen() {
   const { email, profile, logout, setProfile } = useAuthStore();
-  const { updateCaloriesBurned, logSleep } = useDiaryStore();
+  const { updateCaloriesBurned, logSleep, logSteps } = useDiaryStore();
   const { streak, setGoals, activityLevel, weightGoal, calorieGoal: storeCalGoal, unitSystem, setUnitSystem, country, setCountry, setMessagesOpen, setHelpOpen, unreadCount, dietaryPreferences, setDietaryPreferences, setMacroPcts, addWeightEntry, setPremium } = useAppStore();
   const isPremium = usePremium();
 
@@ -243,6 +243,9 @@ export default function ProfileScreen() {
     try {
       const today = new Date().toLocaleDateString('en-CA');
       const data = await readHealthData(today);
+      if (healthSyncSteps && data.steps > 0) {
+        await logSteps(today, data.steps);
+      }
       if (healthSyncCalories && data.activeCalories > 0) {
         // Don't clobber manually logged workouts: keep whichever is higher.
         // This also makes re-syncing idempotent (max stays stable).
@@ -262,7 +265,7 @@ export default function ProfileScreen() {
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setHealthLastSync(now);
       await AsyncStorage.setItem(`${p}_health_last_sync`, now);
-      Alert.alert('Synced', `Health data updated.\nSteps: ${fmt(data.steps)}${healthSyncCalories ? `\nCalories burned: ${fmt(data.activeCalories)} kcal` : ''}${healthSyncSleep ? `\nSleep: ${Math.floor(data.sleepMinutes / 60)}h ${data.sleepMinutes % 60}m` : ''}`);
+      Alert.alert('Synced', `Health data updated.${healthSyncSteps ? `\nSteps: ${fmt(data.steps)}` : ''}${healthSyncCalories ? `\nCalories burned: ${fmt(data.activeCalories)} kcal` : ''}${healthSyncSleep ? `\nSleep: ${Math.floor(data.sleepMinutes / 60)}h ${data.sleepMinutes % 60}m` : ''}`);
     } catch {
       Alert.alert('Sync failed', 'Could not read health data. Try again.');
     } finally {
