@@ -76,12 +76,23 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     try {
-      await register(values.email.trim().toLowerCase(), values.password, {
+      const result = await register(values.email.trim().toLowerCase(), values.password, {
         name: values.name.trim(),
         age: values.age,
         weight: values.weight,
         height: values.height,
       });
+      // 'active' → a session exists; the root guard routes into onboarding.
+      // 'confirm' → email confirmation is required, so there's no session yet.
+      // Don't pretend the user is signed in; send them back to sign in after
+      // they confirm via the emailed link.
+      if (result === 'confirm') {
+        Alert.alert(
+          'Confirm your email',
+          `We sent a confirmation link to ${values.email.trim().toLowerCase()}. Tap it, then sign in to finish setting up your account.`,
+          [{ text: 'Go to sign in', onPress: () => router.replace('/(auth)/login') }],
+        );
+      }
     } catch (e) {
       Alert.alert('Registration failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {

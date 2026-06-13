@@ -45,7 +45,11 @@ interface AuthState {
   setEmail: (email: string | null) => void;
   setProfile: (profile: Profile) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, profile: Profile) => Promise<void>;
+  // Returns 'active' when sign-up created a usable session (email confirmation
+  // OFF) and the user is logged in, or 'confirm' when Supabase requires email
+  // confirmation first (no session yet — the UI must tell the user to check
+  // their inbox rather than treat them as signed in).
+  register: (email: string, password: string, profile: Profile) => Promise<'active' | 'confirm'>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   loadSession: () => Promise<void>;
@@ -138,7 +142,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .eq('email', email)
       .maybeSingle();
     await AsyncStorage.setItem(`dagnara_onboarded_${email}`, 'true');
-    const profileData = (data?.profile_data ?? {}) as Profile;
+    // If the row is empty this may be the first confirmed login after a
+    // confirmation-gated sign-up (profile was cached locally but never written
+    // because there was no session yet). Recover the cached profile and persist
+    // it now that we have an authenticated session.
+    let profileData = (data?.profile_data ?? {}) as Profile;
+    if (!data?.profile_data) {
+      const cached = await readCachedProfile(email);
+      if (cached && Object.keys(cached).length > 0) {
+        profileData = cached;
+        try {
+          await supabase.from('dagnara_profiles').upsert(
+            { email, profile_data: cached, updated_at: new Date().toISOString() },
+            { onConflict: 'email' }
+          );
+        } catch { /* non-fatal — cached copy still drives the UI */ }
+      }
+    }
     await cacheProfile(email, profileData);
     set({
       email,
@@ -148,8 +168,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (email, password, profile) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+
+    // When email confirmation is ON, signUp returns a user but NO session, so
+    // we have no access token. Writing the profile would silently fail RLS and
+    // marking the user "logged in" would leave them stranded (bounced to login
+    // on next launch, AI calls 401). Cache the profile locally so it survives
+    // until first real login, then tell the caller to show a confirm-email
+    // screen instead of entering the app.
+    await cacheProfile(email, profile);
+    if (!data.session) return 'confirm';
 
     try {
       const { error: upErr } = await supabase.from('dagnara_profiles').upsert(
@@ -157,15 +186,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         { onConflict: 'email' }
       );
       if (upErr) {
-         
+
         console.error('[authStore.register] profile upsert failed:', upErr.message);
       }
     } catch (e) {
 
       console.error('[authStore.register] profile upsert network error:', e instanceof Error ? e.message : e);
     }
-    await cacheProfile(email, profile);
     set({ email, profile });
+    return 'active';
   },
 
   logout: async () => {
