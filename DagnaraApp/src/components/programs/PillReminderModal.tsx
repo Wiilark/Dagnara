@@ -129,7 +129,10 @@ export function PillReminderModal({ visible, onClose }: { visible: boolean; onCl
     AsyncStorage.setItem(KEYS.PILLS, JSON.stringify(updated));
     // Re-schedule push notifications for every med × time, respecting daysOfWeek
     void schedulePillReminders(
-      updated.map(m => ({ id: m.id, name: m.name, dosage: m.dosage, times: m.times, daysOfWeek: m.daysOfWeek }))
+      updated.map(m => ({
+        id: m.id, name: m.name, dosage: m.dosage, times: m.times,
+        daysOfWeek: m.daysOfWeek, durationDays: m.durationDays, startDate: m.startDate,
+      }))
     );
   }
 

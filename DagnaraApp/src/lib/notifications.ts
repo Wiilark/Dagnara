@@ -263,6 +263,11 @@ export async function cancelQdNotifications(): Promise<void> {
  * `daysOfWeek` is Apple-style (0=Mon … 6=Sun). When null/undefined the medication
  * fires every day (DAILY trigger). When set, one WEEKLY trigger is scheduled per
  * active day so users on a Mon/Wed/Fri schedule don't get notifications on Tue/Thu.
+ *
+ * A finite course (`durationDays` set) must NOT use the open-ended DAILY/WEEKLY
+ * recurring triggers — those never stop, so the user keeps getting nagged to take
+ * a drug they already finished. Instead, one-shot DATE notifications are scheduled
+ * for each remaining course day, so reminders end when the course does.
  */
 export async function schedulePillReminders(
   meds: {
@@ -271,6 +276,8 @@ export async function schedulePillReminders(
     dosage: string;
     times: string[];
     daysOfWeek?: number[] | null;
+    durationDays?: number | null;
+    startDate?: string;
   }[],
 ): Promise<void> {
   if (Platform.OS === 'web') return;
@@ -290,14 +297,47 @@ export async function schedulePillReminders(
 
   // Convert Apple-style weekday (0=Mon..6=Sun) → Expo weekly weekday (1=Sun..7=Sat).
   const toExpoWeekday = (appleDay: number): number => ((appleDay + 1) % 7) + 1;
+  // iOS caps pending notifications at 64; bound how far ahead a finite course schedules.
+  const MAX_COURSE_DATES = 60;
 
   for (const med of meds) {
-    const everyDay = !med.daysOfWeek || med.daysOfWeek.length === 0 || med.daysOfWeek.length === 7;
+    const dows = med.daysOfWeek;
+    const everyDay = !dows || dows.length === 0 || dows.length === 7;
+
     for (const t of med.times) {
       const parts = t.split(':');
       const hour   = parseInt(parts[0], 10) || 0;
       const minute = parseInt(parts[1], 10) || 0;
 
+      // Finite course → discrete one-shot reminders that stop when the course ends.
+      if (med.durationDays != null && med.durationDays > 0) {
+        const start = new Date(`${med.startDate ?? new Date().toLocaleDateString('en-CA')}T00:00:00`);
+        let scheduled = 0;
+        for (let day = 0; day < med.durationDays && scheduled < MAX_COURSE_DATES; day++) {
+          const fireAt = new Date(start);
+          fireAt.setDate(start.getDate() + day);
+          fireAt.setHours(hour, minute, 0, 0);
+          if (fireAt.getTime() <= Date.now()) continue; // already passed
+          // Respect a custom weekday set: skip days not in the schedule. (0=Mon…6=Sun)
+          if (!everyDay) {
+            const jsDay = fireAt.getDay();
+            const appleDay = jsDay === 0 ? 6 : jsDay - 1;
+            if (!dows!.includes(appleDay)) continue;
+          }
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: `💊 Pill o'clock: ${med.name}`,
+              body:  `A little nudge to take ${med.dosage}. ✨`,
+              data:  { tag: `pill_${med.id}_${t}_d${day}` },
+            },
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+          });
+          scheduled++;
+        }
+        continue;
+      }
+
+      // Ongoing medication → open-ended recurring reminders.
       if (everyDay) {
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -312,7 +352,7 @@ export async function schedulePillReminders(
           },
         });
       } else {
-        for (const appleDay of med.daysOfWeek!) {
+        for (const appleDay of dows!) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: `💊 Pill o'clock: ${med.name}`,
