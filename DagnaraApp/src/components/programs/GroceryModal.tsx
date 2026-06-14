@@ -63,7 +63,9 @@ export function GroceryModal({ visible, onClose }: { visible: boolean; onClose: 
 
   function addItem() {
     if (!newName.trim()) return;
-    save([...items, { id: `${Date.now()}`, name: newName.trim(), qty: newQty.trim(), category: newCat, checked: false }]);
+    // Random suffix so two adds in the same millisecond can't collide — a shared id
+    // would make toggling/deleting one item silently hit its twin (see addFromHistory).
+    save([...items, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: newName.trim(), qty: newQty.trim(), category: newCat, checked: false }]);
     setNewName('');
     setNewQty('');
   }
