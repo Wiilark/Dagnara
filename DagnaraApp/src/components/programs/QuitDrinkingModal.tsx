@@ -181,7 +181,7 @@ export function QuitDrinkingModal({ visible, onClose }: { visible: boolean; onCl
     const cpdLocal = parseFloat(formCpd) || 5;
     const cpdUsd = localToUsd(cpdLocal, country);
     if (dpd < 0.1 || dpd > 50) { Alert.alert('Invalid value', 'Drinks per day must be between 0.1 and 50.'); return; }
-    if (cpdUsd < 0 || cpdUsd > 500) { Alert.alert('Invalid value', `Cost per drink must be between ${formatMoneyFromUsd(0, country, 0)} and ${formatMoneyFromUsd(500, country, 0)}.`); return; }
+    if (cpdUsd <= 0 || cpdUsd > 500) { Alert.alert('Invalid value', `Cost per drink must be between ${formatMoneyFromUsd(0.01, country)} and ${formatMoneyFromUsd(500, country, 0)}.`); return; }
     // Validate the quit date — an invalid string would crash .toISOString() with
     // a RangeError, and a future date would render every stat negative. Reject
     // both before persisting.
