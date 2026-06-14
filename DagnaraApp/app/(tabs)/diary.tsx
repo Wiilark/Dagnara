@@ -786,6 +786,10 @@ export default function DiaryScreen() {
   const celebrateAnim = useRef(new Animated.Value(0)).current;
   const celebratedRef = useRef<string | null>(null);
 
+  // The "today" this screen last saw, used to detect a midnight rollover while
+  // the tab stays mounted (Expo Router keeps tabs alive).
+  const lastTodayRef = useRef(dateStr(new Date()));
+
   // Quick Add (cross-platform alternative to Alert.prompt)
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddInput, setQuickAddInput] = useState('');
@@ -927,6 +931,19 @@ export default function DiaryScreen() {
 
 
   useEffect(() => { loadEntry(selectedDate); }, [selectedDate]);
+
+  // Midnight rollover: tabs stay mounted, so `selectedDate` can silently lag a
+  // day behind the real date — the user would keep logging to yesterday. The
+  // 30s `now` ticker re-renders this effect's dependency; when the calendar day
+  // advances AND the user was still on the (now-stale) live day, follow them to
+  // the new today. A deliberately chosen past day is left untouched.
+  useEffect(() => {
+    const realToday = dateStr(new Date());
+    if (realToday !== lastTodayRef.current) {
+      if (selectedDate === lastTodayRef.current) setSelectedDate(realToday);
+      lastTodayRef.current = realToday;
+    }
+  }, [now, selectedDate, setSelectedDate]);
 
   // Pre-warm permission status so handlers skip the async bridge call on tap
   useEffect(() => {
