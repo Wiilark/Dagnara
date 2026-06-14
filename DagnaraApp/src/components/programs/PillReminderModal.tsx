@@ -282,8 +282,14 @@ export function PillReminderModal({ visible, onClose }: { visible: boolean; onCl
 
   function slotStatus(med: Medication, slotIdx: number): 'taken' | 'skipped' | 'overdue' | 'upcoming' {
     const entry = log[med.id] ?? { takenCount: 0, takenTimes: [], skippedSlots: [] };
-    if (slotIdx < entry.takenCount) return 'taken';
-    if ((entry.skippedSlots ?? []).includes(slotIdx)) return 'skipped';
+    const skipped = entry.skippedSlots ?? [];
+    // An explicit skip always wins — it must never be reclassified as taken.
+    if (skipped.includes(slotIdx)) return 'skipped';
+    // `takenCount` is a scalar, so taken doses fill the lowest-index slots that
+    // aren't skipped. Ranking by non-skipped position keeps the taken state on
+    // the slot the user actually tapped when an earlier slot was skipped.
+    const rankAmongActive = slotIdx - skipped.filter(s => s < slotIdx).length;
+    if (rankAmongActive < entry.takenCount) return 'taken';
     const [h, mins] = (med.times[slotIdx] ?? '00:00').split(':').map(Number);
     const slot = new Date(); slot.setHours(h, mins, 0, 0);
     return new Date() > slot ? 'overdue' : 'upcoming';
