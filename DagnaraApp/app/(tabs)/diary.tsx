@@ -1158,7 +1158,10 @@ export default function DiaryScreen() {
         // OFF search failure is non-fatal — local results already shown
       }
     }
-    setSearching(false);
+    // Only clear the spinner if this is still the active query. A slower earlier
+    // request resolving after a newer one must not hide the spinner while the
+    // newer request is still in flight.
+    if (searchQueryRef.current === q) setSearching(false);
   }
 
   // True only while the chosen fasting window is still running. Computed fresh
