@@ -1296,8 +1296,12 @@ export default function DiaryScreen() {
         };
         await addFood(selectedDate, food);
       }
-      // Save aggregate recipe to library (per-serving nutrition, stored as per-100g for serving modal)
-      const servings: number = data?.servings ?? 1;
+      // Save aggregate recipe to library (per-serving nutrition, stored as per-100g for serving modal).
+      // The model can hallucinate servings as 0, negative, or non-numeric — dividing by that
+      // yields Infinity/NaN, which JSON-serializes to null and corrupts the saved recipe.
+      // Clamp to a sane positive integer (≥1) so per-serving math is always finite.
+      const rawServings = Number(data?.servings);
+      const servings = Number.isFinite(rawServings) && rawServings >= 1 ? Math.round(rawServings) : 1;
       const recipe: LocalFood = {
         id: `r_${Date.now()}`,
         name: (data?.name as string | undefined) ?? 'Imported Recipe',
