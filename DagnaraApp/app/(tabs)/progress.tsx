@@ -68,11 +68,17 @@ function lastWeeklyReset(now = new Date()): Date {
   return reset;
 }
 
-/** True when a check-in taken on `dateStr` (YYYY-MM-DD) predates this week's reset. */
-function isLifeScoreExpired(dateStr: string | null, now = new Date()): boolean {
-  if (!dateStr) return false;
-  const taken = new Date(dateStr + 'T12:00');
-  return taken < lastWeeklyReset(now);
+/**
+ * True when a check-in taken on `takenDate` (YYYY-MM-DD) predates this week's reset.
+ *
+ * Compares at *day* granularity: a check-in carries only a date (see setLifeScore),
+ * so a score saved on the reset Sunday — even after 22:00 — belongs to the new week
+ * and must not be marked expired. Comparing the stored noon instant against the
+ * 22:00 reset instant would wrongly expire every Sunday-night check-in.
+ */
+function isLifeScoreExpired(takenDate: string | null, now = new Date()): boolean {
+  if (!takenDate) return false;
+  return takenDate < dateStr(lastWeeklyReset(now));
 }
 
 function scoreColor(s: number) {
