@@ -77,7 +77,7 @@ export function FastingModal({ visible, onClose }: { visible: boolean; onClose: 
   }
 
   function toggleFast() {
-    const modeInfo = IF_MODES.find(m => m.id === state.mode)!;
+    const modeInfo = IF_MODES.find(m => m.id === state.mode) ?? IF_MODES[1];
     if (state.active) {
       const endTime = new Date().toISOString();
       const actualHours = elapsed / 3600000;
