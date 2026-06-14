@@ -343,7 +343,11 @@ export const useDiaryStore = create<DiaryState>((set, get) => ({
   },
 
   addCardioSession: async (date, session) => {
-    const updated = mutate(set, date, (e) => ({ ...e, cardioSessions: [...(e.cardioSessions ?? []), session] }));
+    const updated = mutate(set, date, (e) => ({
+      ...e,
+      cardioSessions: [...(e.cardioSessions ?? []), session],
+      calories_burned: e.calories_burned + session.kcal,
+    }));
     await saveEntry(date, updated, getEmail(), get);
   },
 
