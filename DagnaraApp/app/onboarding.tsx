@@ -209,7 +209,7 @@ export default function OnboardingScreen() {
         {/* Step 1: Goal */}
         {step === 1 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 1 OF 8</Text>
+            <Text style={s.stepLabel}>STEP 1 OF 7</Text>
             <Text style={s.heading}>What's your main goal?</Text>
             <Text style={s.body}>This sets your daily calorie target.</Text>
             <View style={s.optionList}>
@@ -235,7 +235,7 @@ export default function OnboardingScreen() {
         {/* Step 2: Activity */}
         {step === 2 && (
           <View style={s.section}>
-            <Text style={s.stepLabel}>STEP 2 OF 8</Text>
+            <Text style={s.stepLabel}>STEP 2 OF 7</Text>
             <Text style={s.heading}>How active are you?</Text>
             <Text style={s.body}>Used to calculate your energy expenditure.</Text>
             <View style={s.optionList}>
